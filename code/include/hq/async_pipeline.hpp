@@ -178,7 +178,7 @@ public:
     }
 
     [[nodiscard]] bool done() const noexcept {
-        return !handle_ || handle_.done();
+        return handle_ && handle_.done();
     }
 
     [[nodiscard]] bool has_exception() const noexcept {
@@ -190,20 +190,23 @@ public:
     }
 
     [[nodiscard]] T& result() & {
-        if (handle_ && !handle_.done()) handle_.resume();
+        if (!handle_) throw std::runtime_error("task: result() called on empty task");
+        if (!handle_.done()) handle_.resume();
         if (auto& ex = handle_.promise().exception_; ex)
             std::rethrow_exception(ex);
         return *handle_.promise().result_;
     }
 
     [[nodiscard]] const T& result() const& {
+        if (!handle_) throw std::runtime_error("task: result() called on empty task");
         if (auto& ex = handle_.promise().exception_; ex)
             std::rethrow_exception(ex);
         return *handle_.promise().result_;
     }
 
     [[nodiscard]] T&& result() && {
-        if (handle_ && !handle_.done()) handle_.resume();
+        if (!handle_) throw std::runtime_error("task: result() called on empty task");
+        if (!handle_.done()) handle_.resume();
         if (auto& ex = handle_.promise().exception_; ex)
             std::rethrow_exception(ex);
         return std::move(*handle_.promise().result_);
@@ -212,7 +215,7 @@ public:
     struct awaiter {
         std::coroutine_handle<promise_type> handle_;
         bool await_ready() noexcept {
-            return !handle_ || handle_.done();
+            return handle_ && handle_.done();
         }
         void await_suspend(std::coroutine_handle<> caller) noexcept {
             handle_.promise().continuation_ = caller;
@@ -262,7 +265,7 @@ public:
     }
 
     [[nodiscard]] bool done() const noexcept {
-        return !handle_ || handle_.done();
+        return handle_ && handle_.done();
     }
 
     [[nodiscard]] bool has_exception() const noexcept {
@@ -274,14 +277,15 @@ public:
     }
 
     void result() const {
-        if (handle_ && handle_.promise().exception_)
+        if (!handle_) throw std::runtime_error("task<void>: result() called on empty task");
+        if (handle_.promise().exception_)
             std::rethrow_exception(handle_.promise().exception_);
     }
 
     struct awaiter {
         std::coroutine_handle<promise_type> handle_;
         bool await_ready() noexcept {
-            return !handle_ || handle_.done();
+            return handle_ && handle_.done();
         }
         void await_suspend(std::coroutine_handle<> caller) noexcept {
             handle_.promise().continuation_ = caller;

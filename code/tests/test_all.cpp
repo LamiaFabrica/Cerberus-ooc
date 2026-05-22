@@ -2733,9 +2733,10 @@ TEST_F(CoroutineTest, Task_MoveSemantics) {
     std::print("[TEST] Task_MoveSemantics\n");
     auto t1 = coro_return_value();
     EXPECT_EQ(t1.result(), 42);
+    EXPECT_TRUE(t1.done());
 
     task<int> t2(std::move(t1));
-    EXPECT_FALSE(t1.done());  // moved-from has no handle
+    EXPECT_FALSE(t1.done());  // moved-from: handle is null, done() returns false
     EXPECT_TRUE(t2.done());
     EXPECT_EQ(t2.result(), 42);
 
