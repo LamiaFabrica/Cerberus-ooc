@@ -69,6 +69,31 @@ endif()
 find_package(CUDAToolkit QUIET)
 if(CUDAToolkit_FOUND)
     message(STATUS "CUDA found: ${CUDAToolkit_VERSION} at ${CUDAToolkit_BIN_DIR}")
+    # NVML (NVIDIA Management Library) for GPU telemetry — always available with CUDA toolkit
+    find_library(NVML_LIB NAMES nvml nvidia-ml nvml_linux
+        HINTS
+            ${CUDAToolkit_BIN_DIR}/../lib/x64
+            ${CUDAToolkit_BIN_DIR}/../lib
+            ${CUDAToolkit_ROOT}/lib/x64
+            ${CUDAToolkit_ROOT}/lib
+        DOC "NVIDIA Management Library (nvml.lib / libnvidia-ml.so)"
+    )
+    find_path(NVML_INCLUDE_DIR NAMES nvml.h
+        HINTS
+            ${CUDAToolkit_BIN_DIR}/../include
+            ${CUDAToolkit_ROOT}/include
+        DOC "NVML header directory"
+    )
+    if(NVML_LIB)
+        message(STATUS "NVML found: ${NVML_LIB}")
+    else()
+        message(STATUS "NVML not found — NVIDIA GPU telemetry disabled")
+    endif()
+    if(NVML_INCLUDE_DIR)
+        message(STATUS "NVML headers: ${NVML_INCLUDE_DIR}")
+    else()
+        message(STATUS "NVML headers not found — will rely on __has_include probe")
+    endif()
 else()
     message(STATUS "CUDA not found — GPU compute disabled (HIP fallback if available)")
 endif()
@@ -98,23 +123,35 @@ else()
 endif()
 
 # --- ONNX Runtime ---
-find_library(ONNXRUNTIME_LIB onnxruntime
+# Use the local ORT SDK (GPU package with CUDA/DML EP support)
+set(ONNXRUNTIME_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../ort" CACHE PATH "ONNX Runtime SDK root directory")
+find_library(ONNXRUNTIME_LIB NAMES onnxruntime
     HINTS
-        /usr/local/lib/onnxruntime
-        $ENV{ONNXRUNTIME_ROOT}/lib
+        ${ONNXRUNTIME_ROOT}/lib
     DOC "ONNX Runtime shared library"
 )
-if(NOT ONNXRUNTIME_LIB)
-    message(STATUS "ONNX Runtime library not found — inference will be unavailable")
-endif()
-find_path(ONNXRUNTIME_INCLUDE onnxruntime_cxx_api.h
+find_path(ONNXRUNTIME_INCLUDE NAMES onnxruntime_cxx_api.h onnxruntime_cxx_inline.h
     HINTS
-        /usr/local/include/onnxruntime
-        $ENV{ONNXRUNTIME_ROOT}/include
-    DOC "ONNX Runtime headers"
+        ${ONNXRUNTIME_ROOT}/include
+    DOC "ONNX Runtime C++ API headers"
 )
-if(NOT ONNXRUNTIME_INCLUDE)
-    message(STATUS "ONNX Runtime headers not found — inference will be unavailable")
+if(ONNXRUNTIME_LIB AND ONNXRUNTIME_INCLUDE)
+    message(STATUS "ONNX Runtime: found (lib=${ONNXRUNTIME_LIB}, include=${ONNXRUNTIME_INCLUDE})")
+else()
+    message(STATUS "ONNX Runtime: NOT found — inference will be unavailable")
+    message(STATUS "  Set ONNXRUNTIME_ROOT to point to the ORT SDK directory")
+endif()
+
+# Find ORT CUDA provider library (optional)
+find_library(ORT_CUDA_PROVIDER_LIB NAMES onnxruntime_providers_cuda
+    HINTS
+        ${ONNXRUNTIME_ROOT}/lib
+    DOC "ONNX Runtime CUDA provider library"
+)
+if(ORT_CUDA_PROVIDER_LIB)
+    message(STATUS "ORT CUDA provider: found (${ORT_CUDA_PROVIDER_LIB})")
+else()
+    message(STATUS "ORT CUDA provider: not found — CUDA EP will use CPU fallback")
 endif()
 
 # --- GoogleTest (FetchContent preferred for hermetic builds) ---
@@ -230,9 +267,11 @@ target_include_directories(um790_includes INTERFACE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     $<INSTALL_INTERFACE:include>
 )
+# ORT headers are treated as SYSTEM includes to suppress their warnings
 target_include_directories(um790_includes SYSTEM INTERFACE
     $<$<BOOL:${HAILORT_FOUND}>:${HAILORT_INCLUDE_DIRS}>
     $<$<BOOL:${ONNXRUNTIME_INCLUDE}>:${ONNXRUNTIME_INCLUDE}>
+    $<$<BOOL:${NVML_INCLUDE_DIR}>:${NVML_INCLUDE_DIR}>
 )
 
 # ---------------------------------------------------------------------------
@@ -299,8 +338,10 @@ target_link_libraries(um790_pipeline
         $<$<BOOL:${HAILORT_FOUND}>:${HAILORT_LIBRARIES}>
         $<$<TARGET_EXISTS:rocm_smi64>:rocm_smi64>
         $<$<TARGET_EXISTS:CUDA::cudart>:CUDA::cudart>
+        $<$<BOOL:${NVML_LIB}>:${NVML_LIB}>
     PRIVATE
         $<$<BOOL:${ONNXRUNTIME_LIB}>:${ONNXRUNTIME_LIB}>
+        $<$<BOOL:${ORT_CUDA_PROVIDER_LIB}>:${ORT_CUDA_PROVIDER_LIB}>
         um790_link_options
         Threads::Threads
         # ClusterTransport requires Winsock on Windows
@@ -433,6 +474,7 @@ message(STATUS "  C++ Standard: ${CMAKE_CXX_STANDARD}")
 message(STATUS "  Compiler:   ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
 message(STATUS "  HIP:        ${HIP_FOUND} (${HIP_VERSION})")
 message(STATUS "  CUDA:       ${CUDAToolkit_FOUND} (${CUDAToolkit_VERSION})")
+message(STATUS "  NVML:       ${NVML_LIB}")
 message(STATUS "  DirectML:  ${UM790_HAS_DIRECTML}")
 message(STATUS "  HailoRT:    ${HAILORT_FOUND} (${HAILORT_VERSION})")
 message(STATUS "  ONNX RT:    ${ONNXRUNTIME_LIB}")

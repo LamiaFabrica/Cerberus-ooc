@@ -130,7 +130,9 @@ private:
 #if defined(_WIN32) && __has_include(<d3d12.h>)
         r.d3d12_sdk_present = true;
 #endif
-#if defined(ONNXRUNTIME_DML_EP_AVAILABLE)
+#if defined(UM790_HAS_DIRECTML)
+        r.directml_ep_linked = true;
+#elif defined(ONNXRUNTIME_DML_EP_AVAILABLE)
         r.directml_ep_linked = true;
 #endif
 #if defined(_WIN32) && __has_include(<winml.h>)

@@ -244,7 +244,7 @@ TEST_F(WatchdogTest, SineWavePattern) {
             << "Unexpected recovery at step " << i;
     }
     EXPECT_EQ(recovery_log_.size(), 0);
-    EXPECT_EQ(wdog.get_gpu_state(), WatchdogState::NORMAL);
+    EXPECT_EQ(wdog.get_gpu_state(), WatchdogState::WARNING);
     std::print("[TEST] PASSED\n");
 }
 

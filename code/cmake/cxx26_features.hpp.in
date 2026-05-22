@@ -44,11 +44,26 @@
 // =============================================================================
 // std::print compatibility shim
 //
-// MinGW-W64 GCC 14 ships <print> and defines __cpp_lib_print but the linker
+// MinGW-W64 GCC 14/15 ships <print> and defines __cpp_lib_print but the linker
 // is missing std::__open_terminal / std::__write_to_terminal. CMake detects
 // this via the link test (UM790_HAS_STD_PRINT = 0). The shim below re-provides
-// std::print / std::println using std::format + std::fputs so all call-sites
-// compile and link without change.
+// std::print / std::println using std::format + platform-safe output so all
+// call-sites compile and link without change.
+//
+// CRITICAL: MinGW-W64's std::fputs crashes with ACCESS_VIOLATION when stdout
+// is piped (e.g. `um790_test | Out-Null`). The root cause is the MinGW CRT
+// console initialization code that dereferences a null handle when the output
+// stream is not a console.
+//
+// Fix: On Windows, write directly via the CRT _write() function which operates
+// on raw file descriptors and does NOT go through the broken console layer.
+// This is safe for both console and pipe handles. On POSIX, std::fwrite is
+// already safe so no special handling needed.
+//
+// No <windows.h> inclusion here — it pollutes the global namespace with
+// ERROR, max, min, etc. and breaks downstream code. If Win32 API is ever
+// needed, include it ONLY in the .cpp file that needs it, with appropriate
+// NO* defines and #undef guards.
 //
 // When UM790_HAS_STD_PRINT == 1 (real implementation), this block is skipped
 // entirely — the caller #includes <print> themselves via the UM790_HAS_STD_PRINT
@@ -58,26 +73,56 @@
 #  include <cstdio>
 #  include <format>
 #  include <string>
+#  ifdef _WIN32
+#    include <io.h>
+#  endif
+
 namespace std {
+    namespace detail {
+        // _write() is a POSIX/CRT function available on Windows (MinGW), Linux, macOS.
+        // It operates on raw file descriptors (1 = stdout, 2 = stderr) and bypasses
+        // the broken MinGW console layer that causes ACCESS_VIOLATION on pipe redirect.
+        inline void safe_write_fd(int fd, const char* data, std::size_t len) {
+#  ifdef _WIN32
+            _write(fd, data, static_cast<unsigned>(len));
+#  else
+            std::fwrite(data, 1, len, fd == 1 ? stdout : stderr);
+            std::fflush(fd == 1 ? stdout : stderr);
+#  endif
+        }
+    } // namespace detail
+
     template<typename... Args>
     inline void print(std::format_string<Args...> fmt, Args&&... args) {
-        std::fputs(std::format(fmt, std::forward<Args>(args)...).c_str(), stdout);
+        auto s = std::format(fmt, std::forward<Args>(args)...);
+        detail::safe_write_fd(1, s.data(), s.size());
     }
     template<typename... Args>
     inline void print(std::FILE* f, std::format_string<Args...> fmt, Args&&... args) {
-        std::fputs(std::format(fmt, std::forward<Args>(args)...).c_str(), f);
+        auto s = std::format(fmt, std::forward<Args>(args)...);
+#  ifdef _WIN32
+        detail::safe_write_fd(f == stdout ? 1 : 2, s.data(), s.size());
+#  else
+        std::fwrite(s.data(), 1, s.size(), f);
+        std::fflush(f);
+#  endif
     }
     template<typename... Args>
     inline void println(std::format_string<Args...> fmt, Args&&... args) {
         auto s = std::format(fmt, std::forward<Args>(args)...);
         s += '\n';
-        std::fputs(s.c_str(), stdout);
+        detail::safe_write_fd(1, s.data(), s.size());
     }
     template<typename... Args>
     inline void println(std::FILE* f, std::format_string<Args...> fmt, Args&&... args) {
         auto s = std::format(fmt, std::forward<Args>(args)...);
         s += '\n';
-        std::fputs(s.c_str(), f);
+#  ifdef _WIN32
+        detail::safe_write_fd(f == stdout ? 1 : 2, s.data(), s.size());
+#  else
+        std::fwrite(s.data(), 1, s.size(), f);
+        std::fflush(f);
+#  endif
     }
 } // namespace std
 #endif
