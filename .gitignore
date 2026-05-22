@@ -1,0 +1,7 @@
+build/
+build_r7/
+code/build/
+*.Zone.Identifier
+__pycache__/
+*.pyc
+

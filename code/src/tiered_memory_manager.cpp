@@ -1,0 +1,783 @@
+/// @file tiered_memory_manager.cpp
+/// @copyright Copyright (c) 2026 D Hargreaves (AKA Roylepython). LamiaFabrica. All rights reserved.
+/// Four-tier heterogeneous memory manager — implementation.
+
+#include "hq/tiered_memory_manager.hpp"
+
+#include <algorithm>
+#include <cassert>
+#include <cstdlib>
+#include <cstring>
+#include <filesystem>
+#include <format>
+#include <fstream>
+#include <list>
+#if UM790_HAS_STD_PRINT
+#  include <print>
+#endif
+#include <unordered_map>
+
+#ifdef UM790_HAS_HIP
+#  include <hip/hip_runtime_api.h>
+#endif
+#ifdef _WIN32
+#  include <malloc.h>
+#endif
+
+namespace hq {
+
+namespace {
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+constexpr std::size_t align_up(std::size_t v, std::size_t a) noexcept {
+    return (v + a - 1) & ~(a - 1);
+}
+
+inline void* alloc_aligned_(std::size_t align, std::size_t size) noexcept {
+#ifdef _WIN32
+    return _aligned_malloc(size, align);
+#else
+    return std::aligned_alloc(align, size);
+#endif
+}
+
+inline void free_aligned_(void* p) noexcept {
+#ifdef _WIN32
+    _aligned_free(p);
+#else
+    std::free(p);
+#endif
+}
+
+// ---------------------------------------------------------------------------
+// CoolPmrResource — std::pmr::memory_resource backed by aligned_alloc
+// ---------------------------------------------------------------------------
+
+class CoolPmrResource final : public std::pmr::memory_resource {
+public:
+    explicit CoolPmrResource(std::size_t capacity_bytes,
+                              std::size_t default_alignment) noexcept
+        : capacity_{capacity_bytes}
+        , default_align_{default_alignment} {}
+
+    [[nodiscard]] std::size_t allocated() const noexcept { return allocated_; }
+
+protected:
+    void* do_allocate(std::size_t bytes, std::size_t alignment) override {
+        const std::size_t a = std::max(alignment, default_align_);
+        if (capacity_ > 0 && allocated_ + bytes > capacity_)
+            throw std::bad_alloc{};
+        void* p = alloc_aligned_(a, align_up(bytes, a));
+        if (!p) throw std::bad_alloc{};
+        allocated_ += bytes;
+        return p;
+    }
+
+    void do_deallocate(void* p, std::size_t bytes, std::size_t /*alignment*/) override {
+        free_aligned_(p);
+        if (allocated_ >= bytes) allocated_ -= bytes;
+    }
+
+    bool do_is_equal(const memory_resource& o) const noexcept override {
+        return this == &o;
+    }
+
+private:
+    std::size_t capacity_;
+    std::size_t default_align_;
+    std::size_t allocated_{0};
+};
+
+// ---------------------------------------------------------------------------
+// WarmPmrResource — CXL coherent pool (falls back to aligned_alloc when CXL
+//                   hardware is absent; a real implementation would call the
+//                   CXL memory-tiering ioctl or numactl-aware mmap).
+// ---------------------------------------------------------------------------
+
+class WarmPmrResource final : public std::pmr::memory_resource {
+public:
+    explicit WarmPmrResource(std::size_t capacity_bytes,
+                              std::size_t default_alignment,
+                              bool cxl_present) noexcept
+        : capacity_{capacity_bytes}
+        , default_align_{default_alignment}
+        , cxl_present_{cxl_present} {}
+
+    [[nodiscard]] bool cxl_present() const noexcept { return cxl_present_; }
+    [[nodiscard]] std::size_t allocated() const noexcept { return allocated_; }
+
+protected:
+    void* do_allocate(std::size_t bytes, std::size_t alignment) override {
+        const std::size_t a = std::max(alignment, default_align_);
+        if (capacity_ > 0 && allocated_ + bytes > capacity_)
+            throw std::bad_alloc{};
+
+        void* p = nullptr;
+        // When CXL is present, bind to NUMA node 1 (CXL expander).
+        // Without libnuma / CXL driver, fall back to aligned_alloc.
+#if __has_include(<numa.h>)
+        if (cxl_present_) {
+            p = numa_alloc_onnode(align_up(bytes, a), 1 /*CXL node*/);
+        }
+#endif
+        if (!p) {
+            p = alloc_aligned_(a, align_up(bytes, a));
+        }
+        if (!p) throw std::bad_alloc{};
+        allocated_ += bytes;
+        return p;
+    }
+
+    void do_deallocate(void* p, std::size_t bytes, std::size_t /*alignment*/) override {
+#if __has_include(<numa.h>)
+        if (cxl_present_) {
+            numa_free(p, align_up(bytes, default_align_));
+            if (allocated_ >= bytes) allocated_ -= bytes;
+            return;
+        }
+#endif
+        free_aligned_(p);
+        if (allocated_ >= bytes) allocated_ -= bytes;
+    }
+
+    bool do_is_equal(const memory_resource& o) const noexcept override {
+        return this == &o;
+    }
+
+private:
+    std::size_t capacity_;
+    std::size_t default_align_;
+    bool        cxl_present_;
+    std::size_t allocated_{0};
+};
+
+} // anonymous namespace
+
+// ---------------------------------------------------------------------------
+// Impl (pImpl pattern)
+// ---------------------------------------------------------------------------
+
+struct TieredMemoryManager::Impl {
+    TieredMemoryConfig cfg;
+    MigrationHook      on_migrate;
+
+    // PMR resources
+    std::unique_ptr<CoolPmrResource> cool_res;
+    std::unique_ptr<WarmPmrResource> warm_res;
+
+    // Per-tier availability flags
+    bool hot_available{false};   // GPU VRAM (requires HIP)
+    bool warm_available{false};  // CXL or fallback RAM
+    bool cool_available{true};   // Always available
+    bool cold_available{false};  // NVMe (path exists and is writable)
+
+    // Allocation registry (handle → descriptor)
+    // Protected by registry_mutex_
+    mutable std::shared_mutex registry_mutex;
+    std::unordered_map<TierHandle, TierAllocation> registry;
+    std::atomic<TierHandle> next_handle{1};
+
+    // Per-tier accounting (lock-free for hot-path reads)
+    struct TierAccounting {
+        std::atomic<std::size_t>   allocated{0};
+        std::atomic<std::size_t>   peak{0};
+        std::atomic<std::uint64_t> alloc_count{0};
+        std::atomic<std::uint64_t> free_count{0};
+        std::atomic<std::uint64_t> migration_in{0};
+        std::atomic<std::uint64_t> migration_out{0};
+        std::size_t capacity{0};
+        bool available{false};
+    };
+    std::array<TierAccounting, 4> acct; // indexed by MemoryTier
+
+    // LRU list per tier for pressure eviction (protected by registry_mutex)
+    std::array<std::list<TierHandle>, 4> lru;
+
+    // Cold-tier spill: map handle → file path
+    std::unordered_map<TierHandle, std::filesystem::path> cold_files;
+
+    explicit Impl(const TieredMemoryConfig& c, MigrationHook hook)
+        : cfg{c}, on_migrate{std::move(hook)} {}
+};
+
+// ---------------------------------------------------------------------------
+// Helpers for Impl internals
+// ---------------------------------------------------------------------------
+
+namespace {
+
+void* alloc_hot(std::size_t bytes, std::size_t alignment) {
+#ifdef UM790_HAS_HIP
+    void* p = nullptr;
+    hipError_t err = hipMalloc(&p, bytes);
+    if (err != hipSuccess || !p) return nullptr;
+    (void)alignment; // HIP aligns to at least 256 B
+    return p;
+#else
+    (void)bytes; (void)alignment;
+    return nullptr;
+#endif
+}
+
+void free_hot(void* p) {
+#ifdef UM790_HAS_HIP
+    if (p) hipFree(p);
+#else
+    (void)p;
+#endif
+}
+
+bool detect_cxl() noexcept {
+    // Probe for NUMA node 1 with CXL memory type. On real hardware this would
+    // inspect /sys/bus/cxl/devices/ or use libnuma's numa_node_size().
+    // For portability across dev machines we return false and rely on fallback.
+#if __has_include(<numa.h>)
+    // Would call: numa_available() >= 0 && numa_num_configured_nodes() > 1
+#endif
+    return false;
+}
+
+} // anonymous namespace
+
+// ---------------------------------------------------------------------------
+// Construction / Destruction
+// ---------------------------------------------------------------------------
+
+TieredMemoryManager::TieredMemoryManager(const TieredMemoryConfig& cfg,
+                                          MigrationHook on_migrate)
+    : impl_{std::make_unique<Impl>(cfg, std::move(on_migrate))} {
+    auto& m = *impl_;
+
+    // Cool tier — always available
+    m.cool_res = std::make_unique<CoolPmrResource>(
+        cfg.cool_capacity_bytes, cfg.cool_alignment);
+    m.cool_available = true;
+    m.acct[static_cast<int>(MemoryTier::Cool)].capacity  = cfg.cool_capacity_bytes;
+    m.acct[static_cast<int>(MemoryTier::Cool)].available = true;
+
+    // Warm tier (CXL or RAM fallback)
+    const bool cxl = detect_cxl();
+    m.warm_res = std::make_unique<WarmPmrResource>(
+        cfg.warm_capacity_bytes, cfg.warm_alignment, cxl);
+    m.warm_available = true; // Always provide Warm (even without real CXL)
+    m.acct[static_cast<int>(MemoryTier::Warm)].capacity  = cfg.warm_capacity_bytes;
+    m.acct[static_cast<int>(MemoryTier::Warm)].available = true;
+
+    // Hot tier — GPU VRAM via HIP
+#ifdef UM790_HAS_HIP
+    int dev_count = 0;
+    if (hipGetDeviceCount(&dev_count) == hipSuccess && dev_count > 0) {
+        m.hot_available = true;
+        // Query VRAM size and use configured budget or available VRAM
+        std::size_t free_vram = 0, total_vram = 0;
+        if (hipMemGetInfo(&free_vram, &total_vram) == hipSuccess) {
+            m.acct[static_cast<int>(MemoryTier::Hot)].capacity =
+                (cfg.hot_capacity_bytes > 0)
+                    ? std::min(cfg.hot_capacity_bytes, total_vram)
+                    : total_vram;
+        } else {
+            m.acct[static_cast<int>(MemoryTier::Hot)].capacity =
+                cfg.hot_capacity_bytes;
+        }
+    }
+#endif
+    m.acct[static_cast<int>(MemoryTier::Hot)].available = m.hot_available;
+
+    // Cold tier — NVMe spill
+    {
+        std::error_code ec;
+        std::filesystem::create_directories(cfg.cold_spill_dir, ec);
+        if (!ec) {
+            m.cold_available = true;
+            m.acct[static_cast<int>(MemoryTier::Cold)].capacity =
+                cfg.cold_capacity_bytes;
+        }
+    }
+    m.acct[static_cast<int>(MemoryTier::Cold)].available = m.cold_available;
+
+    std::print("[TieredMemory] Hot={} Warm={}{} Cool={} Cold={}\n",
+               m.hot_available ? "GPU" : "off",
+               m.warm_available ? "on" : "off",
+               cxl ? "(CXL)" : "(RAM)",
+               m.cool_available ? "on" : "off",
+               m.cold_available ? cfg.cold_spill_dir : "off");
+}
+
+TieredMemoryManager::~TieredMemoryManager() noexcept {
+    if (!impl_) return;
+    auto& m = *impl_;
+
+    // Free all hot-tier allocations (GPU memory leaks silently otherwise)
+    std::unique_lock lock{m.registry_mutex};
+    for (auto& [handle, alloc] : m.registry) {
+        if (alloc.tier == MemoryTier::Hot) {
+            free_hot(alloc.device_ptr);
+        } else if (alloc.tier == MemoryTier::Warm) {
+            if (alloc.ptr) m.warm_res->deallocate(alloc.ptr, alloc.size_bytes,
+                                                    alloc.alignment);
+        } else if (alloc.tier == MemoryTier::Cool) {
+            if (alloc.ptr) m.cool_res->deallocate(alloc.ptr, alloc.size_bytes,
+                                                    alloc.alignment);
+        } else {
+            // Cold: remove spill file
+            auto it = m.cold_files.find(handle);
+            if (it != m.cold_files.end()) {
+                std::error_code ec;
+                std::filesystem::remove(it->second, ec);
+            }
+        }
+    }
+    m.registry.clear();
+}
+
+TieredMemoryManager::TieredMemoryManager(TieredMemoryManager&&) noexcept = default;
+TieredMemoryManager& TieredMemoryManager::operator=(TieredMemoryManager&&) noexcept = default;
+
+// ---------------------------------------------------------------------------
+// allocate()
+// ---------------------------------------------------------------------------
+
+std::expected<TierAllocation, TierError>
+TieredMemoryManager::allocate(std::size_t size_bytes,
+                               MemoryTier preferred_tier,
+                               std::size_t alignment) {
+    if (size_bytes == 0)
+        return std::unexpected{TierError::InvalidSize};
+
+    auto& m = *impl_;
+
+    // Walk from preferred tier toward Cold until one succeeds
+    constexpr auto kTiers = std::array{
+        MemoryTier::Hot, MemoryTier::Warm,
+        MemoryTier::Cool, MemoryTier::Cold};
+
+    const int start = static_cast<int>(preferred_tier);
+
+    for (int ti = start; ti < static_cast<int>(kTiers.size()); ++ti) {
+        const MemoryTier tier = kTiers[static_cast<std::size_t>(ti)];
+        auto& acc = m.acct[ti];
+
+        if (!acc.available) continue;
+        if (acc.capacity > 0 &&
+            acc.allocated.load(std::memory_order_relaxed) + size_bytes > acc.capacity)
+            continue;
+
+        TierAllocation alloc{};
+        alloc.tier       = tier;
+        alloc.size_bytes = size_bytes;
+        alloc.alignment  = alignment == 0
+                            ? [&]() -> std::size_t {
+                                switch (tier) {
+                                    case MemoryTier::Hot:  return m.cfg.hot_alignment;
+                                    case MemoryTier::Warm: return m.cfg.warm_alignment;
+                                    case MemoryTier::Cool: return m.cfg.cool_alignment;
+                                    case MemoryTier::Cold: return m.cfg.cold_alignment;
+                                }
+                                return 64;
+                              }()
+                            : alignment;
+
+        bool success = false;
+
+        if (tier == MemoryTier::Hot) {
+            alloc.device_ptr = alloc_hot(size_bytes, alloc.alignment);
+            if (alloc.device_ptr) success = true;
+
+        } else if (tier == MemoryTier::Warm) {
+            try {
+                alloc.ptr = m.warm_res->allocate(size_bytes, alloc.alignment);
+                success = (alloc.ptr != nullptr);
+            } catch (...) {}
+
+        } else if (tier == MemoryTier::Cool) {
+            try {
+                alloc.ptr = m.cool_res->allocate(size_bytes, alloc.alignment);
+                success = (alloc.ptr != nullptr);
+            } catch (...) {}
+
+        } else { // Cold
+            if (!m.cold_available) continue;
+            // Spill to a temp file on NVMe
+            auto path = std::filesystem::path{m.cfg.cold_spill_dir} /
+                        std::format("cerberus_{:016x}.spill",
+                                    m.next_handle.load(std::memory_order_relaxed));
+            std::ofstream f{path, std::ios::binary};
+            if (f) {
+                // Reserve space with seek + write of one zero byte
+                f.seekp(static_cast<std::streamoff>(size_bytes - 1));
+                f.put('\0');
+                f.flush();
+                success = f.good();
+                if (success) {
+                    m.cold_files[m.next_handle.load(std::memory_order_relaxed)] = path;
+                    alloc.ptr = nullptr; // NVMe is not directly addressable
+                }
+            }
+        }
+
+        if (!success) continue;
+
+        alloc.handle = m.next_handle.fetch_add(1, std::memory_order_relaxed);
+
+        acc.allocated.fetch_add(size_bytes, std::memory_order_relaxed);
+        const std::size_t cur = acc.allocated.load(std::memory_order_relaxed);
+        std::size_t old_peak = acc.peak.load(std::memory_order_relaxed);
+        while (cur > old_peak &&
+               !acc.peak.compare_exchange_weak(old_peak, cur,
+                                               std::memory_order_relaxed)) {}
+        acc.alloc_count.fetch_add(1, std::memory_order_relaxed);
+
+        {
+            std::unique_lock lock{m.registry_mutex};
+            m.registry.emplace(alloc.handle, alloc);
+            m.lru[ti].push_front(alloc.handle);
+        }
+
+        return alloc;
+    }
+
+    return std::unexpected{TierError::OutOfMemory};
+}
+
+// ---------------------------------------------------------------------------
+// free()
+// ---------------------------------------------------------------------------
+
+std::expected<void, TierError>
+TieredMemoryManager::free(TierHandle handle) noexcept {
+    auto& m = *impl_;
+
+    std::unique_lock lock{m.registry_mutex};
+    auto it = m.registry.find(handle);
+    if (it == m.registry.end())
+        return std::unexpected{TierError::InvalidHandle};
+
+    TierAllocation alloc = it->second;
+    const int ti = static_cast<int>(alloc.tier);
+
+    // Remove from LRU list
+    auto& lru_list = m.lru[ti];
+    lru_list.remove(handle);
+
+    // Actually free the memory
+    if (alloc.tier == MemoryTier::Hot) {
+        free_hot(alloc.device_ptr);
+    } else if (alloc.tier == MemoryTier::Warm) {
+        if (alloc.ptr)
+            m.warm_res->deallocate(alloc.ptr, alloc.size_bytes, alloc.alignment);
+    } else if (alloc.tier == MemoryTier::Cool) {
+        if (alloc.ptr)
+            m.cool_res->deallocate(alloc.ptr, alloc.size_bytes, alloc.alignment);
+    } else {
+        auto cf = m.cold_files.find(handle);
+        if (cf != m.cold_files.end()) {
+            std::error_code ec;
+            std::filesystem::remove(cf->second, ec);
+            m.cold_files.erase(cf);
+        }
+    }
+
+    m.registry.erase(it);
+    lock.unlock();
+
+    auto& acc = m.acct[ti];
+    const std::size_t cur = acc.allocated.load(std::memory_order_relaxed);
+    if (cur >= alloc.size_bytes)
+        acc.allocated.fetch_sub(alloc.size_bytes, std::memory_order_relaxed);
+    acc.free_count.fetch_add(1, std::memory_order_relaxed);
+
+    return {};
+}
+
+// ---------------------------------------------------------------------------
+// query()
+// ---------------------------------------------------------------------------
+
+std::expected<TierAllocation, TierError>
+TieredMemoryManager::query(TierHandle handle) const noexcept {
+    auto& m = *impl_;
+    std::shared_lock lock{m.registry_mutex};
+    auto it = m.registry.find(handle);
+    if (it == m.registry.end())
+        return std::unexpected{TierError::InvalidHandle};
+    return it->second;
+}
+
+// ---------------------------------------------------------------------------
+// promote() / demote()
+// ---------------------------------------------------------------------------
+
+std::expected<TierAllocation, TierError>
+TieredMemoryManager::promote(TierHandle handle) {
+    auto& m = *impl_;
+
+    std::shared_lock rlock{m.registry_mutex};
+    auto it = m.registry.find(handle);
+    if (it == m.registry.end())
+        return std::unexpected{TierError::InvalidHandle};
+    TierAllocation src = it->second;
+    rlock.unlock();
+
+    if (src.tier == MemoryTier::Hot) return src; // already hottest
+
+    const MemoryTier target = static_cast<MemoryTier>(
+        static_cast<int>(src.tier) - 1);
+
+    auto new_alloc = allocate(src.size_bytes, target, src.alignment);
+    if (!new_alloc) return std::unexpected{TierError::MigrationFailed};
+
+    // Copy data
+    if (src.tier == MemoryTier::Warm || src.tier == MemoryTier::Cool) {
+        if (src.ptr && new_alloc->ptr) {
+            std::memcpy(new_alloc->ptr, src.ptr, src.size_bytes);
+        }
+#ifdef UM790_HAS_HIP
+        else if (new_alloc->device_ptr && src.ptr) {
+            hipMemcpy(new_alloc->device_ptr, src.ptr, src.size_bytes,
+                      hipMemcpyHostToDevice);
+        }
+#endif
+    } else if (src.tier == MemoryTier::Cold) {
+        // Load from NVMe spill file
+        std::shared_lock lock2{m.registry_mutex};
+        auto cf = m.cold_files.find(handle);
+        if (cf != m.cold_files.end() && new_alloc->ptr) {
+            std::ifstream f{cf->second, std::ios::binary};
+            f.read(static_cast<char*>(new_alloc->ptr),
+                   static_cast<std::streamsize>(src.size_bytes));
+        }
+    }
+
+    if (m.on_migrate) m.on_migrate(handle, src.tier, new_alloc->tier);
+
+    auto& old_acc = m.acct[static_cast<int>(src.tier)];
+    auto& new_acc = m.acct[static_cast<int>(new_alloc->tier)];
+    old_acc.migration_out.fetch_add(1, std::memory_order_relaxed);
+    new_acc.migration_in.fetch_add(1, std::memory_order_relaxed);
+
+    // Update registry: replace old entry with new handle pointing to hotter tier
+    {
+        std::unique_lock lock{m.registry_mutex};
+        // Re-look up because lock was dropped
+        auto& entry = m.registry[handle];
+        const MemoryTier old_tier = entry.tier;
+
+        // Free old physical backing without touching registry yet
+        const TierAllocation old_alloc = entry;
+        const int old_ti = static_cast<int>(old_tier);
+        m.lru[old_ti].remove(handle);
+        entry = *new_alloc;
+        entry.handle = handle; // keep original handle
+
+        // Free the temporary handle created by allocate()
+        m.registry.erase(new_alloc->handle);
+        m.lru[static_cast<int>(new_alloc->tier)].remove(new_alloc->handle);
+
+        lock.unlock();
+
+        // Now free old backing
+        if (old_alloc.tier == MemoryTier::Hot)       free_hot(old_alloc.device_ptr);
+        else if (old_alloc.tier == MemoryTier::Warm && old_alloc.ptr)
+            m.warm_res->deallocate(old_alloc.ptr, old_alloc.size_bytes, old_alloc.alignment);
+        else if (old_alloc.tier == MemoryTier::Cool && old_alloc.ptr)
+            m.cool_res->deallocate(old_alloc.ptr, old_alloc.size_bytes, old_alloc.alignment);
+        else {
+            std::unique_lock l2{m.registry_mutex};
+            auto cf = m.cold_files.find(handle);
+            if (cf != m.cold_files.end()) {
+                std::error_code ec;
+                std::filesystem::remove(cf->second, ec);
+                m.cold_files.erase(cf);
+            }
+        }
+
+        old_acc.allocated.fetch_sub(std::min(old_acc.allocated.load(), old_alloc.size_bytes),
+                                    std::memory_order_relaxed);
+        old_acc.free_count.fetch_add(1, std::memory_order_relaxed);
+    }
+
+    return query(handle);
+}
+
+std::expected<TierAllocation, TierError>
+TieredMemoryManager::demote(TierHandle handle) {
+    auto& m = *impl_;
+
+    std::shared_lock rlock{m.registry_mutex};
+    auto it = m.registry.find(handle);
+    if (it == m.registry.end())
+        return std::unexpected{TierError::InvalidHandle};
+    TierAllocation src = it->second;
+    rlock.unlock();
+
+    if (src.tier == MemoryTier::Cold) return src; // already coldest
+
+    const MemoryTier target = static_cast<MemoryTier>(
+        static_cast<int>(src.tier) + 1);
+
+    if (!tier_available(target))
+        return std::unexpected{TierError::TierUnavailable};
+
+    auto new_alloc = allocate(src.size_bytes, target, src.alignment);
+    if (!new_alloc) return std::unexpected{TierError::MigrationFailed};
+
+    // Copy data to colder tier
+    if (target == MemoryTier::Warm || target == MemoryTier::Cool) {
+#ifdef UM790_HAS_HIP
+        if (src.device_ptr && new_alloc->ptr) {
+            hipMemcpy(new_alloc->ptr, src.device_ptr, src.size_bytes,
+                      hipMemcpyDeviceToHost);
+        } else
+#endif
+        if (src.ptr && new_alloc->ptr) {
+            std::memcpy(new_alloc->ptr, src.ptr, src.size_bytes);
+        }
+    } else if (target == MemoryTier::Cold && new_alloc->ptr == nullptr) {
+        // Written to spill file — read from source and write
+        void* src_data = src.ptr;
+        std::unique_ptr<std::byte[]> buf;
+#ifdef UM790_HAS_HIP
+        if (!src_data && src.device_ptr) {
+            buf = std::make_unique<std::byte[]>(src.size_bytes);
+            hipMemcpy(buf.get(), src.device_ptr, src.size_bytes,
+                      hipMemcpyDeviceToHost);
+            src_data = buf.get();
+        }
+#endif
+        std::unique_lock l2{m.registry_mutex};
+        auto cf = m.cold_files.find(new_alloc->handle);
+        if (cf != m.cold_files.end() && src_data) {
+            std::ofstream f{cf->second, std::ios::binary | std::ios::trunc};
+            f.write(static_cast<const char*>(src_data),
+                    static_cast<std::streamsize>(src.size_bytes));
+        }
+    }
+
+    if (m.on_migrate) m.on_migrate(handle, src.tier, new_alloc->tier);
+
+    auto& old_acc = m.acct[static_cast<int>(src.tier)];
+    auto& new_acc = m.acct[static_cast<int>(new_alloc->tier)];
+    old_acc.migration_out.fetch_add(1, std::memory_order_relaxed);
+    new_acc.migration_in.fetch_add(1, std::memory_order_relaxed);
+
+    // Atomic registry swap (same pattern as promote())
+    {
+        std::unique_lock lock{m.registry_mutex};
+        auto& entry = m.registry[handle];
+        const TierAllocation old_alloc = entry;
+        const int old_ti = static_cast<int>(old_alloc.tier);
+        m.lru[old_ti].remove(handle);
+        entry = *new_alloc;
+        entry.handle = handle;
+        m.registry.erase(new_alloc->handle);
+        m.lru[static_cast<int>(new_alloc->tier)].remove(new_alloc->handle);
+        lock.unlock();
+
+        if (old_alloc.tier == MemoryTier::Hot) free_hot(old_alloc.device_ptr);
+        else if (old_alloc.tier == MemoryTier::Warm && old_alloc.ptr)
+            m.warm_res->deallocate(old_alloc.ptr, old_alloc.size_bytes, old_alloc.alignment);
+        else if (old_alloc.tier == MemoryTier::Cool && old_alloc.ptr)
+            m.cool_res->deallocate(old_alloc.ptr, old_alloc.size_bytes, old_alloc.alignment);
+
+        old_acc.allocated.fetch_sub(std::min(old_acc.allocated.load(), old_alloc.size_bytes),
+                                    std::memory_order_relaxed);
+        old_acc.free_count.fetch_add(1, std::memory_order_relaxed);
+    }
+
+    return query(handle);
+}
+
+// ---------------------------------------------------------------------------
+// pressure_evict()
+// ---------------------------------------------------------------------------
+
+std::expected<std::size_t, TierError>
+TieredMemoryManager::pressure_evict(MemoryTier tier, float target_pct) {
+    auto& m = *impl_;
+    const int ti = static_cast<int>(tier);
+    auto& acc = m.acct[ti];
+
+    if (!acc.available) return std::unexpected{TierError::TierUnavailable};
+    if (acc.capacity == 0) return 0; // unlimited — nothing to evict
+
+    std::size_t evicted = 0;
+
+    while (true) {
+        const float fill = static_cast<float>(acc.allocated.load(std::memory_order_relaxed))
+                         / static_cast<float>(acc.capacity);
+        if (fill <= target_pct) break;
+
+        // Pop LRU candidate
+        TierHandle victim = kInvalidTierHandle;
+        {
+            std::unique_lock lock{m.registry_mutex};
+            auto& lru_list = m.lru[ti];
+            if (lru_list.empty()) break;
+            victim = lru_list.back();
+        }
+
+        if (victim == kInvalidTierHandle) break;
+
+        auto dem = demote(victim);
+        if (!dem) break; // demote failed (e.g. Cold tier full)
+        ++evicted;
+    }
+
+    return evicted;
+}
+
+// ---------------------------------------------------------------------------
+// Telemetry
+// ---------------------------------------------------------------------------
+
+TierStats TieredMemoryManager::stats(MemoryTier tier) const noexcept {
+    auto& m = *impl_;
+    const int ti = static_cast<int>(tier);
+    const auto& acc = m.acct[ti];
+    const std::size_t alloc = acc.allocated.load(std::memory_order_relaxed);
+    const std::size_t cap   = acc.capacity;
+    return TierStats{
+        .tier                 = tier,
+        .available            = acc.available,
+        .capacity_bytes       = cap,
+        .allocated_bytes      = alloc,
+        .peak_allocated_bytes = acc.peak.load(std::memory_order_relaxed),
+        .alloc_count          = acc.alloc_count.load(std::memory_order_relaxed),
+        .free_count           = acc.free_count.load(std::memory_order_relaxed),
+        .migration_in         = acc.migration_in.load(std::memory_order_relaxed),
+        .migration_out        = acc.migration_out.load(std::memory_order_relaxed),
+        .fill_pct             = (cap > 0)
+                                 ? (static_cast<float>(alloc) / static_cast<float>(cap) * 100.0f)
+                                 : 0.0f,
+    };
+}
+
+std::vector<TierStats> TieredMemoryManager::all_stats() const {
+    return {
+        stats(MemoryTier::Hot),
+        stats(MemoryTier::Warm),
+        stats(MemoryTier::Cool),
+        stats(MemoryTier::Cold),
+    };
+}
+
+bool TieredMemoryManager::tier_available(MemoryTier tier) const noexcept {
+    return impl_->acct[static_cast<int>(tier)].available;
+}
+
+// ---------------------------------------------------------------------------
+// PMR resource accessors
+// ---------------------------------------------------------------------------
+
+std::pmr::memory_resource* TieredMemoryManager::cool_resource() noexcept {
+    return impl_->cool_res.get();
+}
+
+std::pmr::memory_resource* TieredMemoryManager::warm_resource() noexcept {
+    return impl_->warm_res.get();
+}
+
+} // namespace hq

@@ -1,0 +1,83 @@
+#pragma once
+// =============================================================================
+// Auto-generated C++26 feature detection header (do not edit manually).
+//
+// This is the CANONICAL feature detection header for the UM790 pipeline.
+// Values come from CMake's check_cxx_source_compiles() (or try_compile())
+// tests run at configure time — NOT from __has_include or __cpp macro guards
+// that may silently disagree with the actual toolchain.
+//
+// The generated output is written to:
+//   ${CMAKE_CURRENT_BINARY_DIR}/generated/hq/cxx26_features.hpp
+//
+// The include path orders ${BUILD_INTERFACE:generated} before
+// ${BUILD_INTERFACE:include} so this file shadows any stale source copy.
+// =============================================================================
+
+// CMake substitutes @ONLY variables below (no fallback overrides — the cmake
+// link-test result IS the authority; __cpp_lib_* macros must not override it).
+
+#ifndef UM790_HAS_STD_EXPECTED
+#cmakedefine01 UM790_HAS_STD_EXPECTED
+#endif
+
+#ifndef UM790_HAS_STD_PRINT
+#cmakedefine01 UM790_HAS_STD_PRINT
+#endif
+
+#ifndef UM790_HAS_STD_MDSPAN
+#cmakedefine01 UM790_HAS_STD_MDSPAN
+#endif
+
+#ifndef UM790_HAS_STD_FORMAT
+#cmakedefine01 UM790_HAS_STD_FORMAT
+#endif
+
+#ifndef UM790_HAS_COROUTINES
+#cmakedefine01 UM790_HAS_COROUTINES
+#endif
+
+#ifndef UM790_HAS_STD_COROUTINE
+#cmakedefine01 UM790_HAS_STD_COROUTINE
+#endif
+
+// =============================================================================
+// std::print compatibility shim
+//
+// MinGW-W64 GCC 14 ships <print> and defines __cpp_lib_print but the linker
+// is missing std::__open_terminal / std::__write_to_terminal. CMake detects
+// this via the link test (UM790_HAS_STD_PRINT = 0). The shim below re-provides
+// std::print / std::println using std::format + std::fputs so all call-sites
+// compile and link without change.
+//
+// When UM790_HAS_STD_PRINT == 1 (real implementation), this block is skipped
+// entirely — the caller #includes <print> themselves via the UM790_HAS_STD_PRINT
+// guard.
+// =============================================================================
+#if !UM790_HAS_STD_PRINT && UM790_HAS_STD_FORMAT
+#  include <cstdio>
+#  include <format>
+#  include <string>
+namespace std {
+    template<typename... Args>
+    inline void print(std::format_string<Args...> fmt, Args&&... args) {
+        std::fputs(std::format(fmt, std::forward<Args>(args)...).c_str(), stdout);
+    }
+    template<typename... Args>
+    inline void print(std::FILE* f, std::format_string<Args...> fmt, Args&&... args) {
+        std::fputs(std::format(fmt, std::forward<Args>(args)...).c_str(), f);
+    }
+    template<typename... Args>
+    inline void println(std::format_string<Args...> fmt, Args&&... args) {
+        auto s = std::format(fmt, std::forward<Args>(args)...);
+        s += '\n';
+        std::fputs(s.c_str(), stdout);
+    }
+    template<typename... Args>
+    inline void println(std::FILE* f, std::format_string<Args...> fmt, Args&&... args) {
+        auto s = std::format(fmt, std::forward<Args>(args)...);
+        s += '\n';
+        std::fputs(s.c_str(), f);
+    }
+} // namespace std
+#endif

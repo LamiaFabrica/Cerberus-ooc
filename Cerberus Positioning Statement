@@ -1,0 +1,4 @@
+Cerberus is a C++26 heterogeneous AI inference runtime built by a solo neurodiverse developer on real consumer hardware.
+It treats severe hardware constraints as a forcing function to aggressively own memory, maximise utilisation across CPU + GPU + NPU, and extract serious performance from limited resources.
+The project explores whether techniques developed under tight constraints can help unlock better utilisation of NPUs that often sit underused even on higher-end platforms.
+It combines deep systems work with physical maker modifications and is being developed openly with the long-term goal of making serious inference performance more accessible — free from artificial paywalls and geopolitical restrictions.
