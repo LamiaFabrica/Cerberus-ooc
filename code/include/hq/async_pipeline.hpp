@@ -113,7 +113,7 @@ struct task_promise final : task_promise_base {
             bool await_ready() noexcept { return false; }
             std::coroutine_handle<> await_suspend(
                 std::coroutine_handle<>) noexcept {
-                return continuation_;
+                return continuation_ ? continuation_ : std::noop_coroutine();
             }
             void await_resume() noexcept {}
         };
@@ -139,7 +139,7 @@ struct task_promise<void> : task_promise_base {
             bool await_ready() noexcept { return false; }
             std::coroutine_handle<> await_suspend(
                 std::coroutine_handle<>) noexcept {
-                return continuation_;
+                return continuation_ ? continuation_ : std::noop_coroutine();
             }
             void await_resume() noexcept {}
         };

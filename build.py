@@ -37,9 +37,9 @@ CODE_DIR    = SCRIPT_DIR / "code"
 BUILD_DIR   = CODE_DIR   / "build"
 LOG_DIR     = BUILD_DIR
 
-GXX   = r"C:\Program Files\CodeBlocks\MinGW\bin\g++.exe"
-GCC   = r"C:\Program Files\CodeBlocks\MinGW\bin\gcc.exe"
-MAKE  = r"C:\Program Files\CodeBlocks\MinGW\bin\mingw32-make.exe"
+GXX   = r"C:\gcc-15.2.0\mingw64\bin\g++.exe"
+GCC   = r"C:\gcc-15.2.0\mingw64\bin\gcc.exe"
+MAKE  = r"C:\gcc-15.2.0\mingw64\bin\mingw32-make.exe"
 
 # ---------------------------------------------------------------------------
 # ANSI colour codes for terminal output
