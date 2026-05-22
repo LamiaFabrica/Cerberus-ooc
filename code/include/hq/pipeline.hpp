@@ -55,13 +55,6 @@ namespace hq::npu { class INpuPostProcessor; }
 namespace hq {
 
 // ---------------------------------------------------------------------------
-// Forward declarations
-// ---------------------------------------------------------------------------
-class UtilizationWatchdog;
-class HailoMonitor;
-class EmbeddingStagingManager;
-
-// ---------------------------------------------------------------------------
 /// @brief All possible pipeline error conditions.
 ///
 /// Used as the error type in std::expected<T, PipelineError> throughout
@@ -103,9 +96,9 @@ struct GenerationRequest {
 // ---------------------------------------------------------------------------
 struct GeneratedImage {
     std::vector<std::uint8_t> pixels;  ///< RGBA8 pixel data
-    uint32_t                  width;   ///< Image width
-    uint32_t                  height;  ///< Image height
-    float                     generation_time_ms;  ///< Wall-clock time
+    uint32_t                  width{0};   ///< Image width
+    uint32_t                  height{0};  ///< Image height
+    float                     generation_time_ms{0.0f};  ///< Wall-clock time
 };
 
 // ---------------------------------------------------------------------------

@@ -50,27 +50,30 @@ typedef enum {
 #define CERBERUS_MAX_DEVICE_NAME 64
 
 typedef struct {
-    int    index;
-    int    device_type;
-    char   name[CERBERUS_MAX_DEVICE_NAME];
-    int    available;
-    float  utilization_percent;
-    float  temperature_celsius;
+    int    index;               ///< Device index
+    int    device_type;          ///< CERBERUS_DEVICE_GPU or CERBERUS_DEVICE_NPU
+    char   name[CERBERUS_MAX_DEVICE_NAME]; ///< Device name string
+    int    available;            ///< 1 if device is usable, 0 otherwise
+    float  utilization_percent;  ///< [0, 100] GPU/NPU utilization
+    float  temperature_celsius;  ///< Die temperature
 } cerberus_device_info_t;
+/// Callers MUST zero-initialize: cerberus_device_info_t info = {0};
 
 // ===========================================================================
 // Session configuration
 // ===========================================================================
 
 typedef struct {
-    const char* model_path;
-    int32_t     width;
-    int32_t     height;
-    int32_t     num_steps;
-    float       guidance_scale;
-    int32_t     preferred_device;
-    int32_t     num_threads;
+    const char* model_path;      ///< Path to .onnx model file
+    int32_t     width;           ///< Output image width
+    int32_t     height;          ///< Output image height
+    int32_t     num_steps;       ///< Number of denoising steps
+    float       guidance_scale;  ///< CFG guidance scale
+    int32_t     preferred_device;///< CERBERUS_DEVICE_GPU or CERBERUS_DEVICE_NPU
+    int32_t     num_threads;     ///< ORT session thread count
 } cerberus_session_config_t;
+/// Callers MUST zero-initialize: cerberus_session_config_t cfg = {0};
+/// then set required fields.
 
 // ===========================================================================
 // Opaque handle

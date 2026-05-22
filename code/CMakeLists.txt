@@ -1,6 +1,8 @@
 # =============================================================================
-# Top-level CMake for UM790 Pipeline
-# Target: MinisForum UM790 Pro (Zen 4, AVX-512, ROCm 6.0+, HailoRT 4.20+)
+# Top-level CMake for Cerberus Heterogeneous AI Inference Runtime
+# Dev target:  ROG Strix G18 (Intel Ultra 9 275HX + RTX 5070 Ti + Intel AI Boost NPU)
+# Prod target: MinisForum UM790 Pro (Zen 4, AVX-512, ROCm 6.0+, HailoRT 4.20+)
+# -march=native auto-detects the host CPU on every build machine.
 # =============================================================================
 cmake_minimum_required(VERSION 3.28)
 
@@ -61,7 +63,31 @@ if(TARGET hip::host)
               $ENV{ROCM_PATH}/lib/cmake/rocm_smi64)
 endif()
 
-# --- HailoRT (via pkg-config) ---
+# --- CUDA (NVIDIA GPU) ---
+# Primary GPU backend for NVIDIA RTX GPUs (replaces ROCm/HIP on Windows)
+# Required for real UNet/VAE inference on RTX 5070 Ti and similar hardware
+find_package(CUDAToolkit QUIET)
+if(CUDAToolkit_FOUND)
+    message(STATUS "CUDA found: ${CUDAToolkit_VERSION} at ${CUDAToolkit_BIN_DIR}")
+else()
+    message(STATUS "CUDA not found — GPU compute disabled (HIP fallback if available)")
+endif()
+
+# --- DirectML (Intel AI Boost NPU / NVIDIA DML) ---
+# Intel AI Boost NPU (PCI VEN_8086 DEV_AD1D) and NVIDIA DML EP
+# require DirectML headers + onnxruntime_providers_dml.lib
+# On Windows 11, DirectML is available via the Windows SDK and ORT DML EP
+if(WIN32)
+    set(UM790_HAS_DIRECTML ON CACHE BOOL "DirectML available on Windows via SDK")
+else()
+    set(UM790_HAS_DIRECTML OFF CACHE BOOL "DirectML not available on non-Windows")
+endif()
+if(UM790_HAS_DIRECTML)
+    message(STATUS "DirectML: available (Windows SDK) — Intel AI Boost NPU + NVIDIA DML EP enabled")
+else()
+    message(STATUS "DirectML: not available — NPU/DML inference paths disabled")
+endif()
+
 if(PkgConfig_FOUND)
     pkg_check_modules(HAILORT hailort)
     if(NOT HAILORT_FOUND)
@@ -152,7 +178,7 @@ endif()
 add_library(um790_compile_options INTERFACE)
 target_compile_options(um790_compile_options INTERFACE
     $<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:
-        -march=znver4          # Zen 4 with AVX-512
+        -march=native        # Detect host CPU features (Zen 4 on UM790, Arrow Lake on G18 dev)
         -Wall -Wextra -Wpedantic -Werror
 
         # --- Maximum diagnostic verbosity ---
@@ -272,6 +298,7 @@ target_link_libraries(um790_pipeline
         $<$<TARGET_EXISTS:hip::host>:hip::host>
         $<$<BOOL:${HAILORT_FOUND}>:${HAILORT_LIBRARIES}>
         $<$<TARGET_EXISTS:rocm_smi64>:rocm_smi64>
+        $<$<TARGET_EXISTS:CUDA::cudart>:CUDA::cudart>
     PRIVATE
         $<$<BOOL:${ONNXRUNTIME_LIB}>:${ONNXRUNTIME_LIB}>
         um790_link_options
@@ -283,6 +310,8 @@ target_link_libraries(um790_pipeline
 target_compile_definitions(um790_pipeline PUBLIC
     ${HAILORT_CFLAGS_OTHER}
     $<$<BOOL:${HIP_FOUND}>:UM790_HAS_HIP>
+    $<$<BOOL:${CUDAToolkit_FOUND}>:UM790_HAS_CUDA>
+    $<$<BOOL:${UM790_HAS_DIRECTML}>:UM790_HAS_DIRECTML>
 )
 
 set_target_properties(um790_pipeline PROPERTIES
@@ -398,11 +427,13 @@ include(CPack)
 # Status Summary
 # =============================================================================
 message(STATUS "")
-message(STATUS "=== UM790 Pipeline Configuration ===")
+message(STATUS "=== Cerberus Pipeline Configuration ===")
 message(STATUS "  Project:    ${PROJECT_NAME} v${PROJECT_VERSION}")
 message(STATUS "  C++ Standard: ${CMAKE_CXX_STANDARD}")
 message(STATUS "  Compiler:   ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
 message(STATUS "  HIP:        ${HIP_FOUND} (${HIP_VERSION})")
+message(STATUS "  CUDA:       ${CUDAToolkit_FOUND} (${CUDAToolkit_VERSION})")
+message(STATUS "  DirectML:  ${UM790_HAS_DIRECTML}")
 message(STATUS "  HailoRT:    ${HAILORT_FOUND} (${HAILORT_VERSION})")
 message(STATUS "  ONNX RT:    ${ONNXRUNTIME_LIB}")
 message(STATUS "  Install:    ${CMAKE_INSTALL_PREFIX}")

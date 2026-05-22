@@ -95,7 +95,7 @@ PinnedStagingPool<T>::PinnedStagingPool(std::size_t embedding_bytes, int num_slo
         }
     }
 #else
-    // --- Stub build: use regular heap allocations ---
+    // Non-HIP build: use regular heap allocations
     for (int i = 0; i < num_slots_; ++i) {
         Slot& s = slots_[i];
         s.host_ptr = std::malloc(embedding_bytes_);
@@ -315,7 +315,7 @@ PinnedStagingPool<T>::get_gpu_buffer(std::uint32_t step) {
                              static_cast<int>(err)});
     }
 #else
-    // Stub build: always "ready"
+    // Non-HIP build: always "ready" (heap-allocated, no DMA)
     s.in_flight = false;
     s.ready = true;
     return static_cast<T*>(s.device_ptr);
@@ -398,7 +398,7 @@ bool PinnedStagingPool<T>::is_ready(std::uint32_t step) noexcept {
     // hipErrorNotReady or other error → not ready
     return false;
 #else
-    // Stub build: always ready
+    // Non-HIP build: always ready
     s.in_flight = false;
     s.ready = true;
     return true;
@@ -462,7 +462,7 @@ void PinnedStagingPool<T>::free_all() noexcept {
         stream_ = nullptr;
     }
 #else
-    // Stub build: free heap allocations
+    // Non-HIP build: free heap allocations
     for (Slot& s : slots_) {
         if (s.host_ptr) {
             std::free(s.host_ptr);

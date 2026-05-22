@@ -67,12 +67,12 @@ namespace hq::async {
 // ===========================================================================
 
 struct StepResult {
-    std::uint32_t step_index;
-    float         gpu_util;
-    float         hailo_util;
-    float         temperature;
-    double        latency_ms;
-    const float*  latents_ptr;
+    std::uint32_t step_index{0};
+    float         gpu_util{0.0f};
+    float         hailo_util{0.0f};
+    float         temperature{0.0f};
+    double        latency_ms{0.0};
+    const float*  latents_ptr{nullptr};
 };
 
 // ===========================================================================

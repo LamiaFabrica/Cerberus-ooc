@@ -1156,11 +1156,11 @@ static void monitor_sigint_handler(int) noexcept {
     auto cfg = make_pipeline_config(args);
 
     struct SecondSample {
-        std::uint32_t second;
-        float gpu_util;
-        float hailo_util;
-        float gpu_temp;
-        float hailo_temp;
+        std::uint32_t second{0};
+        float gpu_util{0.0f};
+        float hailo_util{0.0f};
+        float gpu_temp{0.0f};
+        float hailo_temp{0.0f};
     };
     std::vector<SecondSample> samples;
 
@@ -1372,11 +1372,11 @@ static void monitor_sigint_handler(int) noexcept {
     // Workload definitions
     // -------------------------------------------------------------------------
     struct Workload {
-        const char*   id;
-        const char*   prompt;
-        std::uint32_t width;
-        std::uint32_t height;
-        std::uint32_t num_steps;
+        const char*   id{nullptr};
+        const char*   prompt{nullptr};
+        std::uint32_t width{0};
+        std::uint32_t height{0};
+        std::uint32_t num_steps{0};
     };
     static constexpr Workload kWorkloads[] = {
         {"WL-A", "a cat in space",             512, 512, 20},
@@ -1683,7 +1683,7 @@ static void monitor_sigint_handler(int) noexcept {
     std::print("  Generate succeeded. Image: {}x{} ({} bytes)\n",
                result->width, result->height, result->pixels.size());
     std::print("\n=== Heterogeneous Execution Reality (2026-05-22) ===\n");
-    std::print("  Text encoding  : {} — synthetic XOR (ORT stub, no real model)\n",
+    std::print("  Text encoding  : {} — synthetic XOR (ORT offline build, no real model)\n",
                timings.encoder_name);
     std::print("  UNet denoising : ORT GPU session (ROCm EP if available, else CPU)\n");
     std::print("  VAE decode     : ORT session (same path as UNet)\n");

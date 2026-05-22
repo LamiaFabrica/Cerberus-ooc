@@ -12,9 +12,7 @@
 #include <cstring>
 #include <limits>
 
-#ifdef __AVX512F__
-#    include <immintrin.h>
-#endif
+#include <immintrin.h>
 
 namespace hq {
 
@@ -269,13 +267,11 @@ DEISScheduler::step(hq::tensor::FloatTensor4D latents,
 // AVX-512 vectorized path
 // ============================================================================
 
-#ifdef __AVX512F__
-
 __attribute__((target("avx512f")))
 void DEISScheduler::apply_step_avx512_(float* latents,
-                                       const float* model_output,
-                                       float coeff_x0, float coeff_eps,
-                                       std::size_t latent_count) {
+                                        const float* model_output,
+                                        float coeff_x0, float coeff_eps,
+                                        std::size_t latent_count) {
     const __m512 vc0 = _mm512_set1_ps(coeff_x0);
     const __m512 vc1 = _mm512_set1_ps(coeff_eps);
 
@@ -299,8 +295,6 @@ void DEISScheduler::apply_step_avx512_(float* latents,
         latents[i] = coeff_x0 * latents[i] + coeff_eps * model_output[i];
     }
 }
-
-#endif // __AVX512F__
 
 // ============================================================================
 // Scalar fallback

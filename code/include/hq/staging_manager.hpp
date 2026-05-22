@@ -27,8 +27,8 @@ namespace hq {
 // ---------------------------------------------------------------------------
 struct StagingBuffer {
     std::span<std::byte>    data;      ///< Writable view
-    std::size_t             capacity;  ///< Total allocated bytes
-    std::size_t             used;      ///< Bytes currently in use
+    std::size_t             capacity{0};  ///< Total allocated bytes
+    std::size_t             used{0};      ///< Bytes currently in use
 };
 
 // ---------------------------------------------------------------------------

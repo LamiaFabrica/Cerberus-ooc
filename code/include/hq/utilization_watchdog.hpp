@@ -69,22 +69,22 @@ enum class RecoveryResult : std::uint8_t { SUCCESS = 0, PARTIAL = 1, FATAL = 2 }
 /// @brief Per-device utilization snapshot captured at a single denoising step.
 // ---------------------------------------------------------------------------
 struct UtilizationSnapshot {
-    ComputeUnit   device;          ///< Which accelerator
-    std::uint32_t step;            ///< Denoising step index
-    float         utilization;     ///< Utilization percentage [0, 100]
-    float         temperature;     ///< Die temperature (Celsius)
-    float         power_watts;     ///< Power draw in watts
-    bool          device_healthy;  ///< False if the driver reported an error
+    ComputeUnit   device{ComputeUnit::GPU_780M}; ///< Which accelerator
+    std::uint32_t step{0};            ///< Denoising step index
+    float         utilization{0.0f};     ///< Utilization percentage [0, 100]
+    float         temperature{0.0f};     ///< Die temperature (Celsius)
+    float         power_watts{0.0f};     ///< Power draw in watts
+    bool          device_healthy{true};  ///< False if the driver reported an error
 };
 
 // ---------------------------------------------------------------------------
 /// @brief Action returned by UtilizationWatchdog::step() when recovery fires.
 // ---------------------------------------------------------------------------
 struct RecoveryAction {
-    RecoveryResult result;       ///< Outcome of the recovery attempt
-    ComputeUnit    device;       ///< Which accelerator was recovered
-    std::uint32_t  step;         ///< Step number where recovery triggered
-    float          util_at_fault;///< Utilization that caused the trigger
+    RecoveryResult result{RecoveryResult::SUCCESS}; ///< Outcome of the recovery attempt
+    ComputeUnit    device{ComputeUnit::GPU_780M};       ///< Which accelerator was recovered
+    std::uint32_t  step{0};         ///< Step number where recovery triggered
+    float          util_at_fault{0.0f};///< Utilization that caused the trigger
     std::string    reason;       ///< Human-readable description
 };
 

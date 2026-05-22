@@ -157,8 +157,8 @@ struct WorkerTelemetry {
 // ---------------------------------------------------------------------------
 
 struct DispatchDecision {
-    std::uint32_t target_node_id;  ///< Which worker to route to
-    float         expected_score;  ///< Predicted composite health after dispatch
+    std::uint32_t target_node_id{0};  ///< Which worker to route to
+    float         expected_score{0.0f};  ///< Predicted composite health after dispatch
     std::string   rationale;       ///< Human-readable reason (for logging)
 };
 
@@ -234,8 +234,8 @@ public:
     /// Receive next message (blocking up to recv_timeout).
     /// Returns {source_node_id, type, payload}.
     struct ReceivedMsg {
-        std::uint32_t       from_node_id;
-        MsgType             type;
+        std::uint32_t       from_node_id{0};
+        MsgType             type{MsgType::Heartbeat};
         std::vector<std::byte> payload;
     };
     [[nodiscard]] std::expected<ReceivedMsg, ClusterError>

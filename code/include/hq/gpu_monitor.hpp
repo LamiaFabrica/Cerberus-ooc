@@ -46,9 +46,9 @@ enum class GPUError : std::uint8_t {
 /// @brief Detailed error information for a failed GPU query.
 // ---------------------------------------------------------------------------
 struct GPUErrorInfo {
-    GPUError code;
+    GPUError code{GPUError::Ok};
     std::string message;
-    int raw_status; ///< raw rsmi_status_t if applicable
+    int raw_status{0}; ///< raw rsmi_status_t if applicable
 };
 
 // ---------------------------------------------------------------------------

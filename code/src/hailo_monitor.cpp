@@ -68,7 +68,7 @@ void HailoMonitor::DeviceDeleter::operator()(hailort::Device* ptr) noexcept {
         delete ptr;
     }
 #else
-    (void)ptr;  // Stub — nothing to release
+    (void)ptr;  // Non-HailoRT build — no device handle to release
 #endif
 }
 
@@ -201,9 +201,9 @@ std::expected<void, HailoError> HailoMonitor::open(const std::string& device_id)
                selected.bus_rev,
                devices.size());
 #else
-    // --- Stub build: synthesize a connected state ---
+    // Non-HailoRT build: synthesize a connected state for offline/CI testing
     opened_device_id_ = device_id.empty() ? "sim:hailo0" : device_id;
-    std::print("[hailo] Stub mode — device '{}' simulated.\n", opened_device_id_);
+    std::print("[hailo] Non-HailoRT build — device '{}' simulated for CI.\n", opened_device_id_);
 #endif
 
     // Reset inference delta tracking for a fresh baseline

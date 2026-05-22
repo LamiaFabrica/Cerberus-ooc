@@ -49,13 +49,13 @@ struct CerberusHandle {
 };
 
 struct SessionState {
-    cerberus_handle_t    handle;
-    cerberus_session_config_t config;
+    cerberus_handle_t    handle{nullptr};
+    cerberus_session_config_t config{};
     std::unique_ptr<hq::Pipeline> pipeline;
     std::unique_ptr<hq::npu::NpuDmaPipeline> npu_pipeline;
     std::string model_path_owned;
     std::vector<float> output_buffer;
-    bool active;
+    bool active{false};
 };
 
 struct ThreadPool {

@@ -55,9 +55,9 @@ namespace hq {
 #ifdef __HIP_PLATFORM_AMD__
 
 struct __align__(16) DdimDeviceParams {
-    float coeff_x0;
-    float coeff_eps;
-    float padding[2];
+    float coeff_x0{0.0f};
+    float coeff_eps{0.0f};
+    float padding[2]{};
 };
 
 __global__ void ddim_update_kernel(float* __restrict__ latents,

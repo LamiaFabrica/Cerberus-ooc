@@ -212,8 +212,8 @@ class DeviceLoadBalancer {
 public:
     struct DeviceChoice {
         std::string device_name;
-        float       utilization_percent;
-        bool        available;
+        float       utilization_percent{0.0f};
+        bool        available{false};
     };
 
     explicit DeviceLoadBalancer(bool verbose = false);
@@ -338,7 +338,7 @@ struct ServerStats {
     std::atomic<std::uint64_t> health_checks{0};
     std::atomic<std::uint64_t> model_lists{0};
     std::atomic<std::uint64_t> errors{0};
-    std::chrono::steady_clock::time_point start_time;
+    std::chrono::steady_clock::time_point start_time{}; ///< epoch until server starts
 };
 
 // ===========================================================================

@@ -115,12 +115,12 @@ inline constexpr TierHandle kInvalidTierHandle = 0;
 // ---------------------------------------------------------------------------
 
 struct TierAllocation {
-    TierHandle   handle;      ///< Unique allocation ID
-    MemoryTier   tier;        ///< Current residence tier
-    void*        ptr;         ///< Host-accessible pointer (may be null for Hot/device-only)
-    void*        device_ptr;  ///< Device pointer (non-null on Hot/CXL tiers with HIP)
-    std::size_t  size_bytes;  ///< Requested allocation size
-    std::size_t  alignment;   ///< Actual alignment (>= requested)
+    TierHandle   handle{kInvalidTierHandle}; ///< Unique allocation ID
+    MemoryTier   tier{MemoryTier::Cold};      ///< Current residence tier
+    void*        ptr{nullptr};         ///< Host-accessible pointer (may be null for Hot/device-only)
+    void*        device_ptr{nullptr};  ///< Device pointer (non-null on Hot/CXL tiers with HIP)
+    std::size_t  size_bytes{0};  ///< Requested allocation size
+    std::size_t  alignment{0};   ///< Actual alignment (>= requested)
 };
 
 // ---------------------------------------------------------------------------
@@ -154,16 +154,16 @@ struct TieredMemoryConfig {
 // ---------------------------------------------------------------------------
 
 struct TierStats {
-    MemoryTier  tier;
-    bool        available;          ///< Hardware tier present
-    std::size_t capacity_bytes;
-    std::size_t allocated_bytes;
-    std::size_t peak_allocated_bytes;
-    std::uint64_t alloc_count;
-    std::uint64_t free_count;
-    std::uint64_t migration_in;     ///< Blocks migrated into this tier
-    std::uint64_t migration_out;    ///< Blocks migrated out of this tier
-    float        fill_pct;          ///< allocated / capacity * 100
+    MemoryTier  tier{MemoryTier::Cold};
+    bool        available{false};          ///< Hardware tier present
+    std::size_t capacity_bytes{0};
+    std::size_t allocated_bytes{0};
+    std::size_t peak_allocated_bytes{0};
+    std::uint64_t alloc_count{0};
+    std::uint64_t free_count{0};
+    std::uint64_t migration_in{0};     ///< Blocks migrated into this tier
+    std::uint64_t migration_out{0};    ///< Blocks migrated out of this tier
+    float        fill_pct{0.0f};          ///< allocated / capacity * 100
 };
 
 // ---------------------------------------------------------------------------
