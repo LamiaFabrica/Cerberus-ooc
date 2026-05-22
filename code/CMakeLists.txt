@@ -280,6 +280,7 @@ target_include_directories(um790_includes SYSTEM INTERFACE
 set(UM790_PIPELINE_SOURCES
     src/logger.cpp
     src/benchmark_logger.cpp
+    src/safe_write.cpp
     src/pipeline_integration.cpp
     src/hailo_monitor.cpp
     src/utilization_watchdog.cpp
