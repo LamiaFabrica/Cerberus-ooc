@@ -7,4 +7,10 @@ __pycache__/
 gcc-*/
 *.7z
 *.zip
+*Agent*Battle*
+*Battle*Test*Report*
+New folder/
+doc/
+include/hq/
+src/
 
