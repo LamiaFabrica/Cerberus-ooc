@@ -4,4 +4,7 @@ code/build/
 *.Zone.Identifier
 __pycache__/
 *.pyc
+gcc-*/
+*.7z
+*.zip
 
