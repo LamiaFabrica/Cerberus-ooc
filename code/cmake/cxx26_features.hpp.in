@@ -50,79 +50,53 @@
 // std::print / std::println using std::format + platform-safe output so all
 // call-sites compile and link without change.
 //
-// CRITICAL: MinGW-W64's std::fputs crashes with ACCESS_VIOLATION when stdout
-// is piped (e.g. `um790_test | Out-Null`). The root cause is the MinGW CRT
-// console initialization code that dereferences a null handle when the output
-// stream is not a console.
+// CRITICAL: MinGW-W64's std::fputs AND _write() crash with ACCESS_VIOLATION
+// when stdout is piped. The root cause is the MinGW CRT console initialization
+// code that dereferences a null handle when the output stream is not a console.
 //
-// Fix: On Windows, write directly via the CRT _write() function which operates
-// on raw file descriptors and does NOT go through the broken console layer.
-// This is safe for both console and pipe handles. On POSIX, std::fwrite is
-// already safe so no special handling needed.
+// Fix: On Windows, safe_write.cpp provides hq_safe_write() which calls Win32
+// WriteFile() via GetStdHandle(), completely bypassing the broken CRT console
+// layer. On POSIX, std::fwrite is safe so no special handling needed.
 //
-// No <windows.h> inclusion here — it pollutes the global namespace with
-// ERROR, max, min, etc. and breaks downstream code. If Win32 API is ever
-// needed, include it ONLY in the .cpp file that needs it, with appropriate
-// NO* defines and #undef guards.
+// No <windows.h> in this header — Win32 calls are isolated in safe_write.cpp
+// to prevent namespace pollution (ERROR, max, min, etc. breaking downstream).
 //
 // When UM790_HAS_STD_PRINT == 1 (real implementation), this block is skipped
-// entirely — the caller #includes <print> themselves via the UM790_HAS_STD_PRINT
-// guard.
+// entirely — the caller #includes <print> themselves via the guard.
 // =============================================================================
 #if !UM790_HAS_STD_PRINT && UM790_HAS_STD_FORMAT
 #  include <cstdio>
+#  include <cstddef>
 #  include <format>
 #  include <string>
-#  ifdef _WIN32
-#    include <io.h>
-#  endif
+
+// Platform-safe write function provided by safe_write.cpp.
+// On Windows: uses Win32 WriteFile() to avoid MinGW CRT pipe crash.
+// On POSIX: uses std::fwrite (safe on all platforms).
+extern "C" std::size_t hq_safe_write(int fd, const char* data, std::size_t len);
 
 namespace std {
-    namespace detail {
-        // _write() is a POSIX/CRT function available on Windows (MinGW), Linux, macOS.
-        // It operates on raw file descriptors (1 = stdout, 2 = stderr) and bypasses
-        // the broken MinGW console layer that causes ACCESS_VIOLATION on pipe redirect.
-        inline void safe_write_fd(int fd, const char* data, std::size_t len) {
-#  ifdef _WIN32
-            _write(fd, data, static_cast<unsigned>(len));
-#  else
-            std::fwrite(data, 1, len, fd == 1 ? stdout : stderr);
-            std::fflush(fd == 1 ? stdout : stderr);
-#  endif
-        }
-    } // namespace detail
-
     template<typename... Args>
     inline void print(std::format_string<Args...> fmt, Args&&... args) {
         auto s = std::format(fmt, std::forward<Args>(args)...);
-        detail::safe_write_fd(1, s.data(), s.size());
+        hq_safe_write(1, s.data(), s.size());
     }
     template<typename... Args>
     inline void print(std::FILE* f, std::format_string<Args...> fmt, Args&&... args) {
         auto s = std::format(fmt, std::forward<Args>(args)...);
-#  ifdef _WIN32
-        detail::safe_write_fd(f == stdout ? 1 : 2, s.data(), s.size());
-#  else
-        std::fwrite(s.data(), 1, s.size(), f);
-        std::fflush(f);
-#  endif
+        hq_safe_write(f == stdout ? 1 : 2, s.data(), s.size());
     }
     template<typename... Args>
     inline void println(std::format_string<Args...> fmt, Args&&... args) {
         auto s = std::format(fmt, std::forward<Args>(args)...);
         s += '\n';
-        detail::safe_write_fd(1, s.data(), s.size());
+        hq_safe_write(1, s.data(), s.size());
     }
     template<typename... Args>
     inline void println(std::FILE* f, std::format_string<Args...> fmt, Args&&... args) {
         auto s = std::format(fmt, std::forward<Args>(args)...);
         s += '\n';
-#  ifdef _WIN32
-        detail::safe_write_fd(f == stdout ? 1 : 2, s.data(), s.size());
-#  else
-        std::fwrite(s.data(), 1, s.size(), f);
-        std::fflush(f);
-#  endif
+        hq_safe_write(f == stdout ? 1 : 2, s.data(), s.size());
     }
 } // namespace std
 #endif
