@@ -341,7 +341,7 @@ public:
     /// Configuration for the NPU DMA pipeline.
     struct Config {
         std::size_t num_slots{3};             ///< Triple-buffer for deep pipelining
-        std::size_t embedding_bytes{MAX_EMBEDDING_BYTES};
+        std::size_t embedding_bytes{hq::npu::MAX_EMBEDDING_BYTES};
         bool        enable_gpu_staging{true};  ///< Auto-DMA to GPU
         bool        enable_npu_util_tracking{true};
     };

@@ -1,11 +1,15 @@
 #pragma once
 /// @file gpu_monitor.hpp
 /// @copyright Copyright (c) 2026 D Hargreaves (AKA Roylepython). LamiaFabrica. All rights reserved.
-/// Standalone GPU telemetry monitor using ROCm SMI.
-/// Wraps rsmi_dev_gpu_busy_percent_get, temperature, power, memory queries.
+/// GPU telemetry monitor with multi-backend support.
+///
+/// Backends (selected at compile time, probed at runtime):
+///   - NVIDIA NVML (UM790_HAS_CUDA): RTX GPUs, uses nvmlDeviceGet* APIs
+///   - AMD ROCm SMI (UM790_HAS_HIP): Radeon GPUs, uses rsmi_dev_* APIs
+///   - Fallback: returns zeros when no GPU telemetry library is available
 ///
 /// @author LamiaFabrica Team
-/// @version 2.0.0
+/// @version 2.1.0
 
 #include "hq/cxx26_features.hpp"
 
@@ -103,7 +107,8 @@ public:
     GPUMonitor(GPUMonitor&&) noexcept;
     GPUMonitor& operator=(GPUMonitor&&) noexcept;
 
-    /// Initialize ROCm SMI. Must be called before any queries.
+    /// Initialize GPU telemetry backend (NVML prioritized, then ROCm SMI, then none).
+    /// Must be called before any queries.
     /// @return void on success, GPUErrorInfo on failure.
     [[nodiscard]] std::expected<void, GPUErrorInfo> initialize();
 
@@ -142,10 +147,19 @@ public:
     /// @return true if throttling detected, false otherwise.
     [[nodiscard]] std::expected<bool, GPUErrorInfo> is_throttling(float threshold_c = kDefaultThrottleThresholdC);
 
+    /// @brief Which backend is active (if any) after initialize().
+    enum class Backend : std::uint8_t { None = 0, NVML, ROCM_SMI };
+
+    [[nodiscard]] Backend backend() const noexcept { return backend_; }
+
 private:
     std::uint32_t device_index_{0};
     bool initialized_{false};
-    bool rsmi_initialized_{false}; ///< track if we need rsmi_shut_down()
+    Backend backend_{Backend::None};
+
+#if defined(UM790_HAS_CUDA) && __has_include(<nvml.h>)
+    void* nvml_device_{nullptr};
+#endif
 };
 
 // ---------------------------------------------------------------------------
@@ -165,6 +179,15 @@ private:
     return "Unknown";
 }
 
+[[nodiscard]] inline std::string to_string(GPUMonitor::Backend b) {
+    switch (b) {
+        case GPUMonitor::Backend::None:     return "None";
+        case GPUMonitor::Backend::NVML:     return "NVML";
+        case GPUMonitor::Backend::ROCM_SMI: return "ROCM_SMI";
+    }
+    return "Unknown";
+}
+
 } // namespace hq
 
 // std::formatter specialization for GPUError
@@ -173,6 +196,13 @@ template<>
 struct std::formatter<hq::GPUError> : std::formatter<std::string_view> {
     auto format(hq::GPUError e, std::format_context& ctx) const {
         return std::formatter<std::string_view>::format(hq::to_string(e), ctx);
+    }
+};
+
+template<>
+struct std::formatter<hq::GPUMonitor::Backend> : std::formatter<std::string_view> {
+    auto format(hq::GPUMonitor::Backend b, std::format_context& ctx) const {
+        return std::formatter<std::string_view>::format(hq::to_string(b), ctx);
     }
 };
 #endif

@@ -39,7 +39,17 @@
 #include <hip/hip_runtime_api.h>
 #endif
 
-// ROCm SMI (for GPU utilization and temperature queries)
+// NVIDIA CUDA runtime (for GPU compute on RTX 5070 Ti etc.)
+#ifdef UM790_HAS_CUDA
+#include <cuda_runtime_api.h>
+#endif
+
+// NVIDIA NVML (for GPU telemetry on NVIDIA hardware)
+#if defined(UM790_HAS_CUDA) && __has_include(<nvml.h>)
+#include <nvml.h>
+#endif
+
+// ROCm SMI (for GPU utilization and temperature queries on AMD)
 #if defined(UM790_HAS_HIP) && __has_include(<rocm_smi/rocm_smi.h>)
 #include <rocm_smi/rocm_smi.h>
 #define UM790_HAS_ROCM_SMI 1
@@ -48,6 +58,22 @@
 #endif
 
 namespace hq {
+
+// ===========================================================================
+// Cross-platform ORT path helper
+// On Windows, Ort::Session takes wchar_t* for model paths (ORTCHAR_T = wchar_t).
+// On Linux/macOS, it takes const char* (ORTCHAR_T = char).
+// The helper stores the path in the correct string type and returns a pointer
+// that remains valid for the duration of the call site expression.
+#if defined(_WIN32)
+inline std::wstring ort_model_path(const std::filesystem::path& p) {
+    return p.wstring();
+}
+#else
+inline std::string ort_model_path(const std::filesystem::path& p) {
+    return p.string();
+}
+#endif
 
 // ===========================================================================
 // Internal: ONNX Runtime state (pImpl pattern)
@@ -65,33 +91,63 @@ public:
         OrtArenaAllocator, OrtMemTypeDefault)};
 
     explicit OrtState() {
-        // GPU session: ROCm EP (if available)
+        // GPU session: try CUDA EP first (NVIDIA RTX 5070 Ti), then ROCm EP (AMD), then CPU
+#ifdef UM790_HAS_CUDA
         try {
-            Ort::ThrowOnError(OrtSessionOptionsAppendExecutionProvider_ROCM(
-                gpu_options, 0));
-        } catch (const Ort::Exception&) {
-            // ROCm EP not available -- fall back to CPU
-                        HQ_LOG_WARN("ROCm EP not registered, falling back to CPU");
-
+            OrtCUDAProviderOptions cuda_opts{};
+            cuda_opts.device_id = 0;
+            gpu_options.AppendExecutionProvider_CUDA(cuda_opts);
+            HQ_LOG_INFO("CUDA EP registered for GPU session (device 0)");
+        } catch (const Ort::Exception& e) {
+            HQ_LOG_WARN("CUDA EP not registered: {} — trying ROCm EP fallback", e.what());
+#endif
+#if defined(UM790_HAS_HIP) || defined(UM790_HAS_CUDA)
+            try {
+                OrtROCMProviderOptions rocm_opts{};
+                rocm_opts.device_id = 0;
+                gpu_options.AppendExecutionProvider_ROCM(rocm_opts);
+            } catch (const Ort::Exception& e) {
+                HQ_LOG_WARN("ROCm EP not registered: {} — falling back to CPU", e.what());
+            }
+#endif
+#ifdef UM790_HAS_CUDA
         }
+#endif
         gpu_options.SetIntraOpNumThreads(1);
         gpu_options.SetGraphOptimizationLevel(
             GraphOptimizationLevel::ORT_ENABLE_ALL);
 
-        // Hailo session: Hailo EP (if available)
+        // Hailo/NPU session: try DirectML EP first (Intel AI Boost NPU), then Hailo EP
+#ifdef UM790_HAS_DIRECTML
         try {
-            Ort::ThrowOnError(OrtSessionOptionsAppendExecutionProvider(
-                hailo_options, "Hailo", nullptr, 0));
-        } catch (const Ort::Exception&) {
-            // Hailo EP not available -- fall back to CPU
-                        HQ_LOG_WARN("Hailo EP not registered, falling back to CPU");
-
+            hailo_options.AppendExecutionProvider("DML");
+            HQ_LOG_INFO("DirectML EP registered for NPU session (device 0)");
+        } catch (const Ort::Exception& e) {
+            HQ_LOG_WARN("DirectML EP not registered: {} — trying Hailo EP fallback", e.what());
+#endif
+            try {
+                hailo_options.AppendExecutionProvider("Hailo");
+            } catch (const Ort::Exception& e) {
+                HQ_LOG_WARN("Hailo EP not registered: {} — falling back to CPU", e.what());
+            }
+#ifdef UM790_HAS_DIRECTML
         }
+#endif
         hailo_options.SetIntraOpNumThreads(2);
         hailo_options.SetGraphOptimizationLevel(
             GraphOptimizationLevel::ORT_ENABLE_ALL);
 
-        // VAE session: default (GPU preferred, CPU fallback)
+        // VAE session: try CUDA EP for GPU-accelerated VAE decode, fall back to CPU
+#ifdef UM790_HAS_CUDA
+        try {
+            OrtCUDAProviderOptions vae_cuda_opts{};
+            vae_cuda_opts.device_id = 0;
+            vae_options.AppendExecutionProvider_CUDA(vae_cuda_opts);
+            HQ_LOG_INFO("CUDA EP registered for VAE session (device 0)");
+        } catch (const Ort::Exception& e) {
+            HQ_LOG_WARN("CUDA EP not registered for VAE: {} — using CPU", e.what());
+        }
+#endif
         vae_options.SetIntraOpNumThreads(2);
         vae_options.SetGraphOptimizationLevel(
             GraphOptimizationLevel::ORT_ENABLE_ALL);
@@ -164,15 +220,15 @@ Pipeline::Pipeline(const PipelineConfig& cfg)
         HQ_LOG_INFO(" - Staging buffers:      {} x {} MiB", cfg_.staging_buffer_count, cfg_.staging_buffer_size_mb);
 
 
-    // Initialize GPUMonitor (wraps ROCm SMI)
+    // Initialize GPUMonitor (NVML on NVIDIA, ROCm SMI on AMD)
     if (gpu_monitor_) {
-        auto rsmi_init = gpu_monitor_->initialize();
-        if (rsmi_init) {
-                        HQ_LOG_INFO("GPUMonitor initialized (GPU queries enabled)");
-
+        auto init_result = gpu_monitor_->initialize();
+        if (init_result) {
+            HQ_LOG_INFO("GPUMonitor initialized (backend={}, GPU queries enabled)",
+                         hq::to_string(gpu_monitor_->backend()));
         } else {
-                        HQ_LOG_WARN("GPUMonitor init failed: {} (raw_status={}), GPU telemetry disabled", rsmi_init.error().message, rsmi_init.error().raw_status);
-
+            HQ_LOG_WARN("GPUMonitor init failed: {} (raw_status={}), GPU telemetry disabled",
+                        init_result.error().message, init_result.error().raw_status);
         }
     }
 
@@ -289,7 +345,7 @@ Pipeline::Pipeline(const PipelineConfig& cfg)
 }
 
 Pipeline::~Pipeline() {
-    // GPUMonitor's destructor handles rsmi_shut_down() if needed
+    // GPUMonitor destructor handles NVML/ROCm SMI shutdown if needed
     shutdown();
 }
 
@@ -303,7 +359,7 @@ bool Pipeline::initialize_onnx_sessions_() {
     try {
         if (!cfg_.text_encoder_onnx.empty() && validate_model_path_(cfg_.text_encoder_onnx)) {
             ort.hailo_session = std::make_unique<Ort::Session>(
-                ort.env, cfg_.text_encoder_onnx.string().c_str(), ort.hailo_options);
+                ort.env, ort_model_path(cfg_.text_encoder_onnx).c_str(), ort.hailo_options);
                         HQ_LOG_INFO("Text encoder session loaded (Hailo)");
 
         }
@@ -316,7 +372,7 @@ bool Pipeline::initialize_onnx_sessions_() {
     try {
         if (!cfg_.unet_onnx.empty() && validate_model_path_(cfg_.unet_onnx)) {
             ort.gpu_session = std::make_unique<Ort::Session>(
-                ort.env, cfg_.unet_onnx.string().c_str(), ort.gpu_options);
+                ort.env, ort_model_path(cfg_.unet_onnx).c_str(), ort.gpu_options);
                         HQ_LOG_INFO("UNet session loaded (GPU)");
 
         }
@@ -329,7 +385,7 @@ bool Pipeline::initialize_onnx_sessions_() {
     try {
         if (!cfg_.vae_decoder_onnx.empty() && validate_model_path_(cfg_.vae_decoder_onnx)) {
             ort.vae_session = std::make_unique<Ort::Session>(
-                ort.env, cfg_.vae_decoder_onnx.string().c_str(), ort.vae_options);
+                ort.env, ort_model_path(cfg_.vae_decoder_onnx).c_str(), ort.vae_options);
                         HQ_LOG_INFO("VAE decoder session loaded");
 
         }
@@ -1166,7 +1222,7 @@ Pipeline::on_watchdog_recovery_(ComputeUnit unit, std::uint32_t step,
                 return std::unexpected{PipelineError::InvalidModelPath};
             }
             ort_state_->gpu_session = std::make_unique<Ort::Session>(
-                ort_state_->env, cfg_.unet_onnx.string().c_str(), ort_state_->gpu_options);
+                ort_state_->env, ort_model_path(cfg_.unet_onnx).c_str(), ort_state_->gpu_options);
             session_rebuilt = static_cast<bool>(ort_state_->gpu_session);
                         HQ_LOG_INFO(" -> GPU session rebuilt OK");
 
@@ -1191,7 +1247,7 @@ Pipeline::on_watchdog_recovery_(ComputeUnit unit, std::uint32_t step,
                 return std::unexpected{PipelineError::InvalidModelPath};
             }
             ort_state_->hailo_session = std::make_unique<Ort::Session>(
-                ort_state_->env, cfg_.text_encoder_onnx.string().c_str(), ort_state_->hailo_options);
+                ort_state_->env, ort_model_path(cfg_.text_encoder_onnx).c_str(), ort_state_->hailo_options);
             session_rebuilt = static_cast<bool>(ort_state_->hailo_session);
                         HQ_LOG_INFO(" -> Hailo session rebuilt OK");
 
