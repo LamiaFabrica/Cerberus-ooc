@@ -229,8 +229,8 @@ public:
 
 private:
     bool verbose_{false};
-    float last_gpu_util_{0.0f}, last_gpu_temp_{0.0f};
-    float last_hailo_util_{0.0f}, last_hailo_temp_{0.0f};
+    float last_gpu_util_{-1.0f}, last_gpu_temp_{-1.0f};
+    float last_hailo_util_{-1.0f}, last_hailo_temp_{-1.0f};
     bool gpu_available_{false}, hailo_available_{false};
     std::unique_ptr<GPUMonitor>   gpu_monitor_;
     std::unique_ptr<HailoMonitor> hailo_monitor_;

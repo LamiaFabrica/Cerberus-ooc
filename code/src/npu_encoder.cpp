@@ -362,13 +362,13 @@ Hailo8lEncoder::encode(const NpuEncodeRequest& req) {
 float Hailo8lEncoder::utilization() const {
     if (impl_->hailo_available)
         return impl_->last_utilization;
-    return 0.0f;
+    return -1.0f;  // No hardware present
 }
 
 float Hailo8lEncoder::temperature() const {
     if (impl_->hailo_available)
         return impl_->last_temperature;
-    return 0.0f;
+    return -1.0f;  // No hardware present
 }
 
 std::string Hailo8lEncoder::name() const {
@@ -383,6 +383,12 @@ bool Hailo8lEncoder::is_available() const {
 
 std::string Hailo8lEncoder::unavailable_reason() const {
     return impl_->unavailable_reason;
+}
+
+bool Hailo8lEncoder::synthetic_mode() const noexcept {
+    // Real Hailo hardware with loaded HEF = not synthetic
+    // No HEF loaded = CPU fallback path = synthetic
+    return !(impl_->hailo_available && impl_->hef_loaded);
 }
 
 // ===========================================================================
@@ -486,11 +492,11 @@ CpuFallbackEncoder::encode(const NpuEncodeRequest& req) {
 }
 
 float CpuFallbackEncoder::utilization() const {
-    return 0.0f;
+    return -1.0f;  // No NPU hardware present
 }
 
 float CpuFallbackEncoder::temperature() const {
-    return 0.0f;
+    return -1.0f;  // No NPU hardware present
 }
 
 std::string CpuFallbackEncoder::name() const {
@@ -499,6 +505,16 @@ std::string CpuFallbackEncoder::name() const {
 
 bool CpuFallbackEncoder::is_available() const {
     return session_ != nullptr;
+}
+
+std::string CpuFallbackEncoder::unavailable_reason() const {
+    if (session_ == nullptr) return "ORT session is null — no ONNX Runtime session loaded";
+    return {};
+}
+
+bool CpuFallbackEncoder::synthetic_mode() const noexcept {
+    // CPU fallback never uses real NPU/GPU hardware
+    return true;
 }
 
 // ===========================================================================

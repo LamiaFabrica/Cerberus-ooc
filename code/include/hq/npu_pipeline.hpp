@@ -295,9 +295,9 @@ struct NpuEncodeResult {
     // Sentinel values for npu_utilization and npu_temperature:
     //   >= 0.0f : Real measured value from NPU hardware
     //   -1.0f   : No NPU hardware present (CPU fallback encoder)
-    //   0.0f    : Honest zero when no NPU sensor data available
-    float               npu_utilization{0.0f};
-    float               npu_temperature{0.0f};
+    //   -2.0f   : Synthetic/fabricated value (reserved)
+    float               npu_utilization{-1.0f};
+    float               npu_temperature{-1.0f};
     float               encode_time_us{0.0f};
     std::size_t         slot_index{0};
 };
@@ -312,7 +312,7 @@ struct NpuTensorHandle {
     float*              device_ptr{nullptr};
     std::size_t         element_count{0};
     std::array<std::int64_t, 3> shape{1, 77, 768}; ///< [batch, seq, hidden]
-    float               npu_util{0.0f};
+    float               npu_util{-1.0f};
     bool                valid{false};
 
     [[nodiscard]] explicit operator bool() const noexcept {
@@ -442,8 +442,8 @@ struct EncodeResult {
     NpuTensorHandle cond;       ///< Conditional embeddings on GPU
     NpuTensorHandle uncond;     ///< Unconditional (empty-prompt) on GPU
     bool            cfg_active{false};
-    float           npu_utilization{0.0f};
-    float           npu_temp{0.0f};
+    float           npu_utilization{-1.0f};
+    float           npu_temp{-1.0f};
     float           total_time_us{0.0f};
 };
 

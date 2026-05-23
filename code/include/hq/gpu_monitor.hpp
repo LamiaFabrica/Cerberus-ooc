@@ -59,14 +59,46 @@ struct GPUErrorInfo {
 /// @brief Complete GPU telemetry snapshot from a single query_all() call.
 // ---------------------------------------------------------------------------
 struct GPUTelemetry {
-    float utilization_percent{0.0f};      ///< [0, 100] from rsmi_dev_gpu_busy_percent_get
-    float temperature_celsius{0.0f};      ///< from rsmi_dev_temp_metric_get (EDGE)
-    float junction_temperature_c{0.0f};   ///< from rsmi_dev_temp_metric_get (JUNCTION)
-    float power_watts{0.0f};              ///< from rsmi_dev_power_ave_get
-    float memory_used_mb{0.0f};           ///< from rsmi_dev_memory_usage_get (VRAM)
-    float memory_total_mb{0.0f};          ///< total VRAM
-    bool  is_throttling{false};           ///< true if temp > 85C or throttling status active
-    std::uint64_t timestamp_ms{0};        ///< steady_clock time since epoch
+    // --- Telemetry fields ---
+    // Sentinel convention:
+    //   >= 0.0f   : Valid measured value
+    //   -1.0f     : Query failed / no backend / not applicable
+    //   -2.0f     : Synthetic/fabricated (reserved)
+    float utilization_percent{-1.0f};
+    float temperature_celsius{-1.0f};
+    float junction_temperature_c{-1.0f};
+    float power_watts{-1.0f};
+    float memory_used_mb{-1.0f};
+    float memory_total_mb{-1.0f};
+
+    // --- State ---
+    // is_throttling is ONLY meaningful when telemetry_valid == true.
+    // When telemetry_valid == false, is_throttling MUST be ignored.
+    bool  is_throttling{false};
+    bool  telemetry_valid{false};
+    std::uint64_t timestamp_ms{0};
+
+    // --- Explicit invalidation ---
+    void invalidate() noexcept {
+        utilization_percent = -1.0f;
+        temperature_celsius = -1.0f;
+        junction_temperature_c = -1.0f;
+        power_watts = -1.0f;
+        memory_used_mb = -1.0f;
+        memory_total_mb = -1.0f;
+        is_throttling = false;
+        telemetry_valid = false;
+    }
+
+    // --- Convenience ---
+    [[nodiscard]] bool has_any_real_data() const noexcept {
+        return telemetry_valid &&
+               (utilization_percent >= 0.0f ||
+                temperature_celsius >= 0.0f ||
+                junction_temperature_c >= 0.0f ||
+                power_watts >= 0.0f ||
+                memory_used_mb >= 0.0f);
+    }
 };
 
 // ---------------------------------------------------------------------------

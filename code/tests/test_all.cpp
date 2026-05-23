@@ -4533,19 +4533,21 @@ TEST_F(Round18EvidenceTest, CpuPostProcessor_Name) {
     std::print("[TEST] PASSED\n");
 }
 
-// Test 3: CpuPostProcessor::can_handle() accepts PostProcess task
+// Test 3: CpuPostProcessor::can_handle() returns FALSE — it does not claim NPU capability
 TEST_F(Round18EvidenceTest, CpuPostProcessor_CanHandle_PostProcess) {
     std::print("[TEST] CpuPostProcessor_CanHandle_PostProcess\n");
     hq::npu::CpuPostProcessor pp;
-    EXPECT_TRUE(pp.can_handle(hq::npu::NpuTaskType::PostProcess));
+    // CPU pass-through performs NO NPU acceleration; it must not claim capability.
+    // The factory selects it as an explicit fallback, not because can_handle() is true.
+    EXPECT_FALSE(pp.can_handle(hq::npu::NpuTaskType::PostProcess));
     std::print("[TEST] PASSED\n");
 }
 
-// Test 4: CpuPostProcessor::can_handle() accepts SafetyFilter task
+// Test 4: CpuPostProcessor::can_handle() returns FALSE for SafetyFilter too
 TEST_F(Round18EvidenceTest, CpuPostProcessor_CanHandle_SafetyFilter) {
     std::print("[TEST] CpuPostProcessor_CanHandle_SafetyFilter\n");
     hq::npu::CpuPostProcessor pp;
-    EXPECT_TRUE(pp.can_handle(hq::npu::NpuTaskType::SafetyFilter));
+    EXPECT_FALSE(pp.can_handle(hq::npu::NpuTaskType::SafetyFilter));
     std::print("[TEST] PASSED\n");
 }
 

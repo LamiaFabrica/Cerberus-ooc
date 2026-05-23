@@ -70,7 +70,7 @@ struct NpuPostProcessResult {
     std::uint32_t width{0};
     std::uint32_t height{0};
     float processing_time_us{0.0f};        ///< Wall-clock duration of the call
-    float npu_utilization{0.0f};           ///< NN-core utilization % during this pass
+    float npu_utilization{-1.0f};           ///< NN-core utilization % during this pass
     bool  was_npu_accelerated{false};      ///< True only when real NPU ran (not CPU)
 };
 
@@ -120,6 +120,17 @@ public:
 
     /// @brief Instantaneous hardware utilization (0.0–100.0%).
     [[nodiscard]] virtual float utilization() const = 0;
+
+    // --- NEW: Honesty markers ---
+    /// @brief Returns true if this post-processor operates without real NPU hardware.
+    ///        CPU fallback, delegation, or stub path = true. Real Hailo inference = false.
+    ///        ALL concrete implementations MUST override this.
+    [[nodiscard]] virtual bool synthetic_mode() const noexcept { return false; }
+
+    /// @brief Diagnostic: why is_available() returned false.
+    ///        Returns empty string when is_available() == true.
+    ///        ALL concrete implementations MUST override this.
+    [[nodiscard]] virtual std::string unavailable_reason() const { return {}; }
 };
 
 // ===========================================================================
@@ -147,14 +158,11 @@ public:
                     float                  guidance_scale) noexcept override;
 
     [[nodiscard]] bool can_handle(NpuTaskType task) const override;
-    /// @return false — this CPU pass-through performs no NPU acceleration.
-    ///   Callers must not treat this component as an NPU accelerator.
-    ///   It exists as a safe fallback so the pipeline runs without NPU hardware,
-    ///   but it provides zero acceleration.
     [[nodiscard]] bool is_available() const override { return false; }
     [[nodiscard]] std::string name() const override { return "CPU-PassThrough"; }
-    /// @return 0.0f — this is a CPU pass-through, not real NPU hardware.
-    [[nodiscard]] float utilization() const override { return 0.0f; }
+    [[nodiscard]] float utilization() const override { return -1.0f; }  // No NPU hardware
+    [[nodiscard]] std::string unavailable_reason() const override;
+    [[nodiscard]] bool synthetic_mode() const noexcept override;
 };
 
 // ===========================================================================
@@ -199,7 +207,10 @@ public:
     [[nodiscard]] bool load_post_hef(const std::filesystem::path& hef_path);
 
     /// @brief Diagnostic: why is_available() returned false.
-    [[nodiscard]] std::string unavailable_reason() const;
+    [[nodiscard]] std::string unavailable_reason() const override;
+
+    /// @brief Returns true when no post-HEF loaded (delegates to CPU fallback).
+    [[nodiscard]] bool synthetic_mode() const noexcept override;
 
 private:
     struct Impl;

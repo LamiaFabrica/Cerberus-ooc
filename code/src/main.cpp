@@ -1683,8 +1683,8 @@ static void monitor_sigint_handler(int) noexcept {
     std::print("  Generate succeeded. Image: {}x{} ({} bytes)\n",
                result->width, result->height, result->pixels.size());
     std::print("\n=== Heterogeneous Execution Reality (2026-05-22) ===\n");
-    std::print("  Text encoding  : {} — synthetic XOR (ORT offline build, no real model)\n",
-               timings.encoder_name);
+    std::print("  Text encoding  : {} — CPU inference via ONNX Runtime (no NPU hardware)\n",
+                timings.encoder_name);
     std::print("  UNet denoising : ORT GPU session (ROCm EP if available, else CPU)\n");
     std::print("  VAE decode     : ORT session (same path as UNet)\n");
     std::print("  Post-processing: {} — CPU pass-through (HailoRT not installed)\n",

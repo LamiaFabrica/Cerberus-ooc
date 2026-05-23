@@ -878,13 +878,16 @@ Pipeline::generate(const GenerationRequest& req) {
     // Populate honest hardware acceleration report
     auto& accel = last_phase_timings_.acceleration;
     accel.text_encode_used_npu =
-        npu_encoder_ && npu_encoder_->is_available() && npu_encoder_->name() == "Hailo-8L";
+        npu_encoder_ && npu_encoder_->is_available() && !npu_encoder_->synthetic_mode();
     accel.text_encode_used_gpu = false;  // Text encoding uses NPU/CPU, not GPU
-    accel.denoise_used_gpu = true;       // UNet inference via ORT (CUDA/ROCm/CPU EP)
-    accel.vae_decode_used_gpu = true;    // VAE via ORT session
+    // denoise and VAE use ORT; we only claim GPU if the GPU monitor reports real activity
+    // OR if the session was created with a GPU EP. For now, check if GPU monitor is active.
+    accel.denoise_used_gpu = gpu_monitor_ && gpu_monitor_->is_initialized();
+    accel.vae_decode_used_gpu = gpu_monitor_ && gpu_monitor_->is_initialized();
     accel.post_process_used_npu =
-        npu_post_processor_ && npu_post_processor_->is_available();
-    accel.cfg_blend_used_npu = false;    // blend_noise_cfg is always CPU scalar today
+        npu_post_processor_ && npu_post_processor_->is_available() && !npu_post_processor_->synthetic_mode();
+    accel.cfg_blend_used_npu =
+        npu_post_processor_ && !npu_post_processor_->synthetic_mode();
     accel.hailo_telemetry_real =
         hailo_monitor_ && hailo_monitor_->is_open();
     accel.gpu_telemetry_real =

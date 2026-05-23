@@ -102,10 +102,10 @@ public:
             std::string{"WindowsNpuBackend unavailable: "} + probe_.reason};
     }
 
-    /// @return 0.0f — no NPU utilization data available (backend not operational).
-    [[nodiscard]] float       utilization()  const override { return 0.0f; }
-    /// @return 0.0f — no NPU temperature data available (backend not operational).
-    [[nodiscard]] float       temperature()  const override { return 0.0f; }
+    /// @return -1.0f — no NPU utilization data available (backend not operational).
+    [[nodiscard]] float       utilization()  const override { return -1.0f; }
+    /// @return -1.0f — no NPU temperature data available (backend not operational).
+    [[nodiscard]] float       temperature()  const override { return -1.0f; }
 
     [[nodiscard]] std::string name() const override {
         if (probe_.directml_ep_linked) return "WindowsNpuBackend(DirectML)";
@@ -115,6 +115,15 @@ public:
     /// True only when DirectML EP or WinML is actually linked and ready.
     [[nodiscard]] bool is_available() const override {
         return probe_.directml_ep_linked;
+    }
+
+    [[nodiscard]] std::string unavailable_reason() const override {
+        return probe_.reason;
+    }
+
+    [[nodiscard]] bool synthetic_mode() const noexcept override {
+        // Not real hardware until DirectML EP is actually linked
+        return !probe_.directml_ep_linked;
     }
 
     /// Expose the probe result for diagnostic logging and tests.

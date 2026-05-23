@@ -102,9 +102,19 @@ CpuPostProcessor::blend_noise_cfg(
 }
 
 bool CpuPostProcessor::can_handle(NpuTaskType task) const {
-    // CPU fallback handles all task types because it is a general-purpose
-    // compute path. It does not claim to accelerate anything.
+    // CPU pass-through does NOT claim to accelerate any NPU task.
+    // It exists as a safe fallback when no NPU backend is available.
+    // The factory selects it explicitly, not because it "can handle" NPU tasks.
     (void)task;
+    return false;
+}
+
+std::string CpuPostProcessor::unavailable_reason() const {
+    return "CPU pass-through performs no NPU acceleration";
+}
+
+bool CpuPostProcessor::synthetic_mode() const noexcept {
+    // CPU pass-through is always a non-hardware fallback path
     return true;
 }
 
@@ -181,9 +191,11 @@ HailoNpuPostProcessor::blend_noise_cfg(
 }
 
 bool HailoNpuPostProcessor::can_handle(NpuTaskType task) const {
-    // CPU fallback can handle all task types; Hailo path is task-specific
+    // Only claim capability for tasks we can actually accelerate on Hailo hardware.
+    // When no post-HEF is loaded, we delegate to CPU — do not claim NPU capability.
+    if (!impl_->post_hef_loaded) return false;
     (void)task;
-    return true;  // Delegates to CpuPostProcessor for unsupported tasks
+    return true;  // HEF loaded → real Hailo acceleration available
 }
 
 bool HailoNpuPostProcessor::is_available() const {
@@ -206,7 +218,7 @@ float HailoNpuPostProcessor::utilization() const {
         }
     }
 #endif
-    return 0.0f;
+    return -1.0f;  // No device or power read failed
 }
 
 bool HailoNpuPostProcessor::device_present() const noexcept {
@@ -221,10 +233,10 @@ bool HailoNpuPostProcessor::load_post_hef(const std::filesystem::path& hef_path)
         return false;
     }
     if (hef_path.empty() || !std::filesystem::exists(hef_path)) {
-        m.unavailable_reason = std::format("Post-HEF not found: {}", hef_path.string());
+        m.unavailable_reason = std::format(
+            "Post-HEF not found: {}", hef_path.string());
         return false;
     }
-    // TODO: v2.2 — compile post-processing network to HEF and load via VDevice
     m.unavailable_reason = "Post-HEF loading not yet implemented (v2.2)";
     return false;
 #else
@@ -236,6 +248,12 @@ bool HailoNpuPostProcessor::load_post_hef(const std::filesystem::path& hef_path)
 
 std::string HailoNpuPostProcessor::unavailable_reason() const {
     return impl_->unavailable_reason;
+}
+
+bool HailoNpuPostProcessor::synthetic_mode() const noexcept {
+    // When no post-HEF loaded, all operations delegate to CPU fallback.
+    // From the caller's perspective, this is a synthetic/fallback path.
+    return !impl_->post_hef_loaded;
 }
 
 // ===========================================================================

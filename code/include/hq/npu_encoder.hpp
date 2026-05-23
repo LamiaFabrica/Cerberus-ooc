@@ -74,6 +74,17 @@ public:
     /// True when this encoder is usable: hardware present, HEF loaded,
     /// driver ready, ORT session valid, etc.
     [[nodiscard]] virtual bool is_available() const = 0;
+
+    // --- NEW: Honesty markers ---
+    /// @brief Returns true if this encoder operates without real NPU/GPU hardware.
+    ///        CPU fallback, stub, or synthetic path = true. Real silicon = false.
+    ///        ALL concrete implementations MUST override this.
+    [[nodiscard]] virtual bool synthetic_mode() const noexcept { return false; }
+
+    /// @brief Diagnostic: why is_available() returned false.
+    ///        Returns empty string when is_available() == true.
+    ///        ALL concrete implementations MUST override this.
+    [[nodiscard]] virtual std::string unavailable_reason() const { return {}; }
 };
 
 // ===========================================================================
@@ -109,7 +120,10 @@ public:
     [[nodiscard]] bool        is_available()  const override;
 
     /// @brief Diagnostic: why is_available() returned false.
-    [[nodiscard]] std::string unavailable_reason() const;
+    [[nodiscard]] std::string unavailable_reason() const override;
+
+    /// @brief Returns true when no real Hailo hardware + HEF is loaded.
+    [[nodiscard]] bool        synthetic_mode() const noexcept override;
 
 private:
     struct Impl;
@@ -139,6 +153,12 @@ public:
     [[nodiscard]] float       temperature()   const override;
     [[nodiscard]] std::string name()          const override;
     [[nodiscard]] bool        is_available()  const override;
+
+    /// @brief Diagnostic: why is_available() returned false.
+    [[nodiscard]] std::string unavailable_reason() const override;
+
+    /// @brief Returns true — CPU fallback never uses real NPU/GPU hardware.
+    [[nodiscard]] bool        synthetic_mode() const noexcept override;
 
 private:
     Ort::Session*    session_{nullptr};

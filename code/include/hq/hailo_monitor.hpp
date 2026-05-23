@@ -112,19 +112,24 @@ struct HailoError {
 
 struct HailoStats {
     /// Fused NN-core utilization [%] 0.0–100.0.
-    float nn_core_utilization{0.0f};
+    /// Sentinel: -1.0f when no real sample taken.
+    float nn_core_utilization{-1.0f};
 
     /// Raw power indicator [%] (for diagnostics).
-    float power_indicator{0.0f};
+    /// Sentinel: -1.0f when no real sample taken.
+    float power_indicator{-1.0f};
 
     /// Raw inference indicator [%] (for diagnostics).
-    float inference_indicator{0.0f};
+    /// Sentinel: -1.0f when no real sample taken.
+    float inference_indicator{-1.0f};
 
     /// Power draw in Watts.
-    float power_watts{0.0f};
+    /// Sentinel: -1.0f when no real sample taken.
+    float power_watts{-1.0f};
 
     /// Chip temperature in Celsius.
-    float temperature_celsius{0.0f};
+    /// Sentinel: -1.0f when no real sample taken.
+    float temperature_celsius{-1.0f};
 
     /// Cumulative inference count (monotonically increasing).
     std::uint64_t inferences_count{0};

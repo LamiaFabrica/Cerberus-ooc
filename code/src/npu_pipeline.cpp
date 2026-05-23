@@ -44,7 +44,7 @@ struct NpuDmaPipeline::Impl {
     std::unique_ptr<INpuEncoder> owned_encoder;
 
     // NPU telemetry
-    float last_npu_util{0.0f};
+    float last_npu_util{-1.0f};  // No NPU measurement yet
     float last_npu_temp{0.0f};
     double accum_npu_util{0.0};
     std::uint64_t npu_samples{0};
@@ -349,7 +349,7 @@ float NpuDmaPipeline::last_npu_utilization() const noexcept {
 }
 
 float NpuDmaPipeline::avg_npu_utilization() const noexcept {
-    if (impl_->npu_samples == 0) return 0.0f;
+    if (impl_->npu_samples == 0) return -1.0f;  // No samples = unknown
     return static_cast<float>(impl_->accum_npu_util /
                                static_cast<double>(impl_->npu_samples));
 }

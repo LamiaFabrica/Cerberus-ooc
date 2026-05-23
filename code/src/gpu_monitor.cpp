@@ -253,8 +253,12 @@ std::expected<float, GPUErrorInfo> GPUMonitor::query_utilization() {
 #endif
 
     default:
-        std::print("[GPUMonitor] WARNING No GPU backend available — returning 0% utilization.\n");
-        return 0.0f;
+        std::print("[GPUMonitor] WARNING No GPU backend available — returning error.\n");
+        return std::unexpected{GPUErrorInfo{
+            .code       = GPUError::NotInitialized,
+            .message    = "No GPU telemetry backend available (NVML or ROCm SMI not linked)",
+            .raw_status = -1,
+        }};
     }
 }
 
@@ -316,8 +320,12 @@ std::expected<float, GPUErrorInfo> GPUMonitor::query_temperature_edge() {
 #endif
 
     default:
-        std::print("[GPUMonitor] WARNING No GPU backend available — returning 0C edge temperature.\n");
-        return 0.0f;
+        std::print("[GPUMonitor] WARNING No GPU backend available — returning error.\n");
+        return std::unexpected{GPUErrorInfo{
+            .code       = GPUError::NotInitialized,
+            .message    = "No GPU telemetry backend available (NVML or ROCm SMI not linked)",
+            .raw_status = -1,
+        }};
     }
 }
 
@@ -383,8 +391,12 @@ std::expected<float, GPUErrorInfo> GPUMonitor::query_temperature_junction() {
 #endif
 
     default:
-        std::print("[GPUMonitor] WARNING No GPU backend available — returning 0C junction temperature.\n");
-        return 0.0f;
+        std::print("[GPUMonitor] WARNING No GPU backend available — returning error.\n");
+        return std::unexpected{GPUErrorInfo{
+            .code       = GPUError::NotInitialized,
+            .message    = "No GPU telemetry backend available (NVML or ROCm SMI not linked)",
+            .raw_status = -1,
+        }};
     }
 }
 
@@ -445,8 +457,12 @@ std::expected<float, GPUErrorInfo> GPUMonitor::query_power() {
 #endif
 
     default:
-        std::print("[GPUMonitor] WARNING No GPU backend available — returning 0W power.\n");
-        return 0.0f;
+        std::print("[GPUMonitor] WARNING No GPU backend available — returning error.\n");
+        return std::unexpected{GPUErrorInfo{
+            .code       = GPUError::NotInitialized,
+            .message    = "No GPU telemetry backend available (NVML or ROCm SMI not linked)",
+            .raw_status = -1,
+        }};
     }
 }
 
@@ -526,8 +542,12 @@ std::expected<std::pair<float, float>, GPUErrorInfo> GPUMonitor::query_memory() 
 #endif
 
     default:
-        std::print("[GPUMonitor] WARNING No GPU backend available — returning 0 MiB used/total memory.\n");
-        return std::pair{0.0f, 0.0f};
+        std::print("[GPUMonitor] WARNING No GPU backend available — returning error.\n");
+        return std::unexpected{GPUErrorInfo{
+            .code       = GPUError::NotInitialized,
+            .message    = "No GPU telemetry backend available (NVML or ROCm SMI not linked)",
+            .raw_status = -1,
+        }};
     }
 }
 
@@ -550,54 +570,72 @@ std::expected<GPUTelemetry, GPUErrorInfo> GPUMonitor::query_all() {
     telem.timestamp_ms = static_cast<std::uint64_t>(
         std::chrono::duration_cast<std::chrono::milliseconds>(now).count());
 
+    int success_count = 0;
+
     auto util = query_utilization();
     if (!util) {
         std::print("[GPUMonitor] Utilization query failed: {}\n", util.error().message);
-        telem.utilization_percent = 0.0f;
+        telem.utilization_percent = -1.0f;
     } else {
         telem.utilization_percent = *util;
+        ++success_count;
     }
 
     auto temp_edge = query_temperature_edge();
     if (!temp_edge) {
         std::print("[GPUMonitor] Edge temperature query failed: {}\n", temp_edge.error().message);
-        telem.temperature_celsius = 0.0f;
+        telem.temperature_celsius = -1.0f;
     } else {
         telem.temperature_celsius = *temp_edge;
+        ++success_count;
     }
 
     auto temp_junc = query_temperature_junction();
     if (!temp_junc) {
         std::print("[GPUMonitor] Junction temperature query failed: {}\n", temp_junc.error().message);
-        telem.junction_temperature_c = 0.0f;
+        telem.junction_temperature_c = -1.0f;
     } else {
         telem.junction_temperature_c = *temp_junc;
+        ++success_count;
     }
 
     auto power = query_power();
     if (!power) {
         std::print("[GPUMonitor] Power query failed: {}\n", power.error().message);
-        telem.power_watts = 0.0f;
+        telem.power_watts = -1.0f;
     } else {
         telem.power_watts = *power;
+        ++success_count;
     }
 
     auto mem = query_memory();
     if (!mem) {
         std::print("[GPUMonitor] Memory query failed: {}\n", mem.error().message);
-        telem.memory_used_mb  = 0.0f;
-        telem.memory_total_mb = 0.0f;
+        telem.memory_used_mb  = -1.0f;
+        telem.memory_total_mb = -1.0f;
     } else {
         telem.memory_used_mb  = mem->first;
         telem.memory_total_mb = mem->second;
+        ++success_count;
     }
 
     if (temp_junc) {
         telem.is_throttling = (*temp_junc > kDefaultThrottleThresholdC);
     } else {
-        telem.is_throttling = false;
+        telem.is_throttling = false;  // Invalid when temp unavailable
     }
 
+    // Contract: if zero queries succeeded, the entire snapshot is invalid.
+    if (success_count == 0) {
+        telem.invalidate();
+        return std::unexpected{GPUErrorInfo{
+            .code       = GPUError::NotInitialized,
+            .message    = "All GPU telemetry queries failed — no backend data available",
+            .raw_status = -1,
+        }};
+    }
+
+    telem.telemetry_valid = true;
     return telem;
 }
 

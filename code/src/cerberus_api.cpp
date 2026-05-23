@@ -440,7 +440,7 @@ cerberus_status_t cerberus_get_utilization(
         return CERBERUS_NOT_INITIALIZED;
     }
 
-    *utilization_percent = 0.0f;
+    *utilization_percent = -1.0f;  // Default sentinel: unknown
 
     switch (device) {
         case CERBERUS_DEVICE_CPU: {
@@ -449,50 +449,70 @@ cerberus_status_t cerberus_get_utilization(
             if (getloadavg(loadavg, 1) == 1) {
                 float load_pct = static_cast<float>(loadavg[0]) * 10.0f;
                 *utilization_percent = clamp_util(load_pct);
+                return CERBERUS_OK;
             } else {
-                *utilization_percent = 0.0f;
+                std::print("[cerberus] WARNING CPU utilization unavailable on this platform.\n");
+                return CERBERUS_NOT_INITIALIZED;
             }
 #else
-            *utilization_percent = 0.0f;
-            std::print("[cerberus] WARNING CPU utilization unavailable on this platform — returning 0%%.\n");
+            std::print("[cerberus] WARNING CPU utilization unavailable on non-Linux platforms.\n");
+            return CERBERUS_NOT_INITIALIZED;
 #endif
-            break;
         }
 
         case CERBERUS_DEVICE_GPU:
             if (gs.gpu_monitor) {
                 try {
                     auto util = gs.gpu_monitor->query_utilization();
-                    if (util) *utilization_percent = clamp_util(*util);
-                } catch (...) {}
+                    if (util) {
+                        *utilization_percent = clamp_util(*util);
+                        return CERBERUS_OK;
+                    } else {
+                        std::print("[cerberus] WARNING GPU utilization query failed: {}\n",
+                                   util.error().message);
+                        return CERBERUS_DEVICE_NOT_FOUND;
+                    }
+                } catch (...) {
+                    return CERBERUS_DEVICE_NOT_FOUND;
+                }
             }
-            break;
+            return CERBERUS_NOT_INITIALIZED;
 
         case CERBERUS_DEVICE_NPU:
             if (gs.shared_npu) {
-                *utilization_percent = clamp_util(
-                    gs.shared_npu->last_npu_utilization());
+                float npu_util = gs.shared_npu->last_npu_utilization();
+                if (npu_util >= 0.0f) {
+                    *utilization_percent = clamp_util(npu_util);
+                    return CERBERUS_OK;
+                }
             }
-            break;
+            return CERBERUS_NOT_INITIALIZED;
 
         case CERBERUS_DEVICE_ANY:
         default: {
-            float npu_util = 0.0f;
-            float gpu_util = 0.0f;
-            if (gs.shared_npu)
-                npu_util = clamp_util(gs.shared_npu->last_npu_utilization());
+            float npu_util = -1.0f;
+            float gpu_util = -1.0f;
+            if (gs.shared_npu) {
+                npu_util = gs.shared_npu->last_npu_utilization();
+            }
             if (gs.gpu_monitor) {
                 try {
                     auto util = gs.gpu_monitor->query_utilization();
                     if (util) gpu_util = clamp_util(*util);
                 } catch (...) {}
             }
-            *utilization_percent = std::max(npu_util, gpu_util);
-            break;
+            // Return the best available, or error if none
+            if (gpu_util >= 0.0f) {
+                *utilization_percent = gpu_util;
+                return CERBERUS_OK;
+            }
+            if (npu_util >= 0.0f) {
+                *utilization_percent = npu_util;
+                return CERBERUS_OK;
+            }
+            return CERBERUS_NOT_INITIALIZED;
         }
     }
-
-    return CERBERUS_OK;
 }
 
 cerberus_status_t cerberus_get_load_balance_hint(
