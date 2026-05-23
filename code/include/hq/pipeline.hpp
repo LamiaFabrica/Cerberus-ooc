@@ -282,6 +282,31 @@ private:
                                float util_at_fault,
                                hq::tensor::FloatTensor4D latents);
 
+    /// @brief Zero-copy denoising step using GPU device pointers (BUG B3 fix).
+    ///
+    /// When latents and embeddings already reside in GPU memory (e.g. from
+    /// PinnedStagingPool), this overload creates Ort::Value tensors using
+    /// the GPU allocator memory info so ONNX Runtime reads/writes directly
+    /// in device memory with no implicit H2D round-trip.
+    ///
+    /// @param step       Current denoising step index.
+    /// @param gpu_latents    Device pointer to latents [1,4,H/8,W/8] (in/out).
+    /// @param gpu_cond_emb   Device pointer to conditional embeddings [1,77,hidden].
+    /// @param gpu_uncond_emb Device pointer to unconditional embeddings; nullopt = CFG off.
+    /// @param guidance_scale CFG scale. <=1.0 disables CFG.
+    /// @param latent_count   Total float elements in gpu_latents.
+    /// @param emb_count      Total float elements in gpu_cond_emb / gpu_uncond_emb.
+    [[nodiscard]] std::expected<void, PipelineError>
+        denoise_step_(std::uint32_t step,
+                      float* gpu_latents,
+                      float* gpu_cond_emb,
+                      std::optional<float*> gpu_uncond_emb,
+                      float guidance_scale,
+                      std::size_t latent_count,
+                      std::size_t emb_count,
+                      std::int64_t latent_h,
+                      std::int64_t latent_w);
+
     /// @brief Encode text prompt to embedding tensor using Hailo.
     [[nodiscard]] std::expected<std::vector<float>, PipelineError>
         encode_prompt_(const std::string& prompt);

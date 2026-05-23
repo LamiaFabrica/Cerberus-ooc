@@ -112,24 +112,58 @@ bool CpuPostProcessor::can_handle(NpuTaskType task) const {
 // HailoNpuPostProcessor — production Hailo-8L post-processing
 // ===========================================================================
 
-HailoNpuPostProcessor::HailoNpuPostProcessor() {
+struct HailoNpuPostProcessor::Impl {
+    bool hailo_available{false};
+    bool post_hef_loaded{false};
+    std::string unavailable_reason{"Not initialized"};
+    CpuPostProcessor cpu_fallback{};  // Honest CPU delegate when HEF missing
+
 #if HAILO_ACCEL_HAS_HAILORT
-    // Probe for Hailo devices
+    std::unique_ptr<hailort::Device> device;
+    std::unique_ptr<hailort::VDevice> vdevice;
+#endif
+};
+
+HailoNpuPostProcessor::HailoNpuPostProcessor()
+    : impl_{std::make_unique<Impl>()}
+{
+#if HAILO_ACCEL_HAS_HAILORT
+    auto& m = *impl_;
     auto scan_result = hailort::Device::scan_pcie();
     if (scan_result && !scan_result.value().empty()) {
-        HQ_LOG_INFO("[HailoNpuPostProcessor] Hailo-8L detected — post-processing available when HEF loaded");
+        m.hailo_available = true;
+        const auto& dev = scan_result.value()[0];
+        auto create_result = hailort::Device::create_pcie(dev);
+        if (create_result) {
+            m.device.reset(create_result.release());
+        }
+        HQ_LOG_INFO("[HailoNpuPostProcessor] Hailo-8L detected at {} — "
+                    "post-processing available when post-HEF loaded",
+                    dev.dev_id);
     } else {
-        HQ_LOG_INFO("[HailoNpuPostProcessor] No Hailo-8L device detected");
+        m.hailo_available = false;
+        m.unavailable_reason = "No Hailo-8L device detected on PCIe bus";
+        HQ_LOG_INFO("[HailoNpuPostProcessor] {}", m.unavailable_reason);
     }
 #else
-    HQ_LOG_INFO("[HailoNpuPostProcessor] HailoRT SDK not available — post-processing unavailable");
+    impl_->hailo_available = false;
+    impl_->unavailable_reason = "HailoRT SDK not compiled — rebuild with -DHAILO_BUILD or install HailoRT";
+    HQ_LOG_INFO("[HailoNpuPostProcessor] {}", impl_->unavailable_reason);
 #endif
 }
 
+HailoNpuPostProcessor::~HailoNpuPostProcessor() = default;
+
 std::expected<NpuPostProcessResult, std::string>
 HailoNpuPostProcessor::post_process(const NpuPostProcessRequest& req) {
-    (void)req;
-    return std::unexpected{"Hailo-8L post-processing not yet implemented — HEF not loaded"};
+    auto& m = *impl_;
+    // No post-processing HEF loaded → delegate to honest CPU fallback
+    if (!m.post_hef_loaded) {
+        HQ_LOG_DEBUG("[HailoNpuPostProcessor] No post-HEF loaded — delegating to CPU fallback");
+        return m.cpu_fallback.post_process(req);
+    }
+    // HEF loaded path would go here in v2.2
+    return std::unexpected{"Hailo-8L post-HEF inference not yet implemented"};
 }
 
 std::expected<void, std::string>
@@ -137,15 +171,71 @@ HailoNpuPostProcessor::blend_noise_cfg(
     std::span<float>       noise_out,
     std::span<const float> noise_uncond,
     float                  guidance_scale) noexcept {
-    (void)noise_out;
-    (void)noise_uncond;
-    (void)guidance_scale;
-    return std::unexpected{"Hailo-8L SAXPY not yet implemented — HEF not loaded"};
+    auto& m = *impl_;
+    // No SAXPY HEF loaded → delegate to honest CPU fallback
+    if (!m.post_hef_loaded) {
+        return m.cpu_fallback.blend_noise_cfg(noise_out, noise_uncond, guidance_scale);
+    }
+    // HEF loaded path would go here in v2.2
+    return std::unexpected{"Hailo-8L SAXPY not yet implemented"};
 }
 
 bool HailoNpuPostProcessor::can_handle(NpuTaskType task) const {
+    // CPU fallback can handle all task types; Hailo path is task-specific
     (void)task;
-    return false;  // Not yet implemented — honest false
+    return true;  // Delegates to CpuPostProcessor for unsupported tasks
+}
+
+bool HailoNpuPostProcessor::is_available() const {
+    return impl_->hailo_available && impl_->post_hef_loaded;
+}
+
+std::string HailoNpuPostProcessor::name() const {
+    if (!impl_->hailo_available) return "Hailo-8L PostProcessor (no device)";
+    if (!impl_->post_hef_loaded) return "Hailo-8L PostProcessor (no post-HEF)";
+    return "Hailo-8L PostProcessor";
+}
+
+float HailoNpuPostProcessor::utilization() const {
+#if HAILO_ACCEL_HAS_HAILORT
+    if (impl_->device) {
+        auto power_result = impl_->device->get_power_measurement(
+            HAILO_POWER_MEASUREMENT_TYPES__TOTAL_POWER);
+        if (power_result) {
+            return std::clamp(power_result.value() / 1000.0f / HAILO8L_ACTIVE_POWER_W * 100.0f, 0.0f, 100.0f);
+        }
+    }
+#endif
+    return 0.0f;
+}
+
+bool HailoNpuPostProcessor::device_present() const noexcept {
+    return impl_->hailo_available;
+}
+
+bool HailoNpuPostProcessor::load_post_hef(const std::filesystem::path& hef_path) {
+#if HAILO_ACCEL_HAS_HAILORT
+    auto& m = *impl_;
+    if (!m.hailo_available || !m.device) {
+        m.unavailable_reason = "No Hailo device available to load post-HEF";
+        return false;
+    }
+    if (hef_path.empty() || !std::filesystem::exists(hef_path)) {
+        m.unavailable_reason = std::format("Post-HEF not found: {}", hef_path.string());
+        return false;
+    }
+    // TODO: v2.2 — compile post-processing network to HEF and load via VDevice
+    m.unavailable_reason = "Post-HEF loading not yet implemented (v2.2)";
+    return false;
+#else
+    (void)hef_path;
+    impl_->unavailable_reason = "HailoRT SDK not compiled";
+    return false;
+#endif
+}
+
+std::string HailoNpuPostProcessor::unavailable_reason() const {
+    return impl_->unavailable_reason;
 }
 
 // ===========================================================================
@@ -157,20 +247,18 @@ NpuPostProcessorFactory::create_best_available() {
     // ---- Priority 1: Hailo-8L ----
     {
         auto hailo = std::make_unique<HailoNpuPostProcessor>();
-        if (hailo->is_available()) {
-            HQ_LOG_INFO("[NpuPostProcessorFactory] Using Hailo-8L post-processor");
-            return hailo;
+        // Hailo device present but no post-HEF? Use it for delegation, but
+        // is_available() stays false until post-HEF is loaded.
+        if (hailo->device_present()) {
+            HQ_LOG_INFO("[NpuPostProcessorFactory] Hailo-8L detected — "
+                        "delegating to CPU fallback until post-HEF loaded");
+            return hailo;  // Returns HailoNpuPostProcessor that delegates to CPU
         }
     }
 
     // ---- Priority 2: CPU pass-through (no NPU acceleration) ----
-    // CpuPostProcessor performs memcpy and scalar SAXPY on CPU.
-    // It does NOT claim to be an NPU accelerator.
-    // is_available() returns false because it provides zero NPU acceleration.
-    HQ_LOG_INFO("[NpuPostProcessorFactory] No NPU hardware available — "
-                "using CPU pass-through (no acceleration). "
-                "post_process() will copy pixels unchanged; "
-                "blend_noise_cfg() will use CPU scalar math.");
+    HQ_LOG_INFO("[NpuPostProcessorFactory] No Hailo-8L device — "
+                "using CPU pass-through (no acceleration)");
     return std::make_unique<CpuPostProcessor>();
 }
 

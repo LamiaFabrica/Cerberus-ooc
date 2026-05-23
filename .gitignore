@@ -44,6 +44,9 @@ doc/
 # Binary archives that are LFS-tracked (downloaded, not committed directly)
 gcc-*/
 
+# ONNX Runtime debug symbols — massive (200–350 MB each), never commit
+ort/lib/*.pdb
+
 # Obsolete local test / battle reports (replaced by research/ reports)
 *Agent*Battle*
 *Battle*Test*Report*
