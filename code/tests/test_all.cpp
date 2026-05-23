@@ -14,16 +14,15 @@
 ///   Bonus:   WatchdogConfig .................. 1  test
 ///   Bonus:   TokenizerVocab .................. 2  tests
 ///   Section 8: NpuDmaPipeline ................. 9  tests
-///   Section 9: SyntheticNpuEncoder ............ 6  tests
-///   Section 10: NpuEncoderFactory ............. 2  tests
+///   Section 9: NpuEncoderFactory ............. 2  tests
 ///   Section 11: TensorView .................... 14 tests  (always-compiled)
 ///   Section 12: DEISScheduler ................ 12 tests
 ///   Section 20: Round16EvidenceTest ........... 12 tests
-///   Section 21: Round17EvidenceTest ........... 12 tests
+///   Section 21: Round17EvidenceTest ........... 6  tests
 ///   Section 22: Round18EvidenceTest ........... 12 tests
 ///   Section 23: Round19EvidenceTest ............  8 tests
 ///   -----------------------------------------------------------
-///   TOTAL (base, excl. coroutine/benchmark) .. 123 tests
+///   TOTAL (base, excl. coroutine/benchmark) .. 115 tests
 ///
 /// All C++26: std::expected, std::optional, std::print, designated initialisers.
 /// Compile-safe without HIP, HailoRT, or ROCm SMI (stub modes active).
@@ -1959,85 +1958,6 @@ TEST_F(NpuDmaPipelineTest, Submit_EmptyPrompt_StillWorks) {
 }
 
 // ===========================================================================
-// SECTION 9: SyntheticNpuEncoder Tests
-// ===========================================================================
-
-class SyntheticNpuEncoderTest : public ::testing::Test {
-protected:
-    hq::npu::SyntheticNpuEncoder encoder_{};
-    virtual ~SyntheticNpuEncoderTest() = default;
-};
-
-TEST_F(SyntheticNpuEncoderTest, Construct_IsAvailable_ReturnsTrue) {
-    std::print("[TEST] Construct_IsAvailable_ReturnsTrue\n");
-    EXPECT_TRUE(encoder_.is_available());
-    std::print("[TEST] PASSED\n");
-}
-
-TEST_F(SyntheticNpuEncoderTest, Encode_ReturnsValidResult_NonEmptyEmbeddings) {
-    std::print("[TEST] Encode_ReturnsValidResult_NonEmptyEmbeddings\n");
-    hq::npu::NpuEncodeRequest req{.prompt = "a cat in space"};
-
-    auto result = encoder_.encode(req);
-    ASSERT_TRUE(result.has_value())
-        << "encode() failed: " << result.error();
-
-    auto& out = result.value();
-    EXPECT_GT(out.embeddings.size(), 0)
-        << "Embeddings should be non-empty";
-    EXPECT_GT(out.embedding_count, 0)
-        << "embedding_count should be positive";
-
-    float sum = 0.0f;
-    for (std::size_t i = 0; i < out.embeddings.size(); ++i)
-        sum += out.embeddings[i];
-    EXPECT_NE(sum, 0.0f)
-        << "Embeddings should contain non-zero data";
-
-    std::print("[TEST] PASSED ({} floats, embedding_count={})\n",
-               out.embeddings.size(), out.embedding_count);
-}
-
-TEST_F(SyntheticNpuEncoderTest, Encode_CorrectEmbeddingCount) {
-    std::print("[TEST] Encode_CorrectEmbeddingCount\n");
-    hq::npu::NpuEncodeRequest req{
-        .prompt = "a cat in space", .max_seq_len = 77};
-
-    auto result = encoder_.encode(req);
-    ASSERT_TRUE(result.has_value());
-
-    auto& out = result.value();
-    EXPECT_EQ(out.embedding_count, 2 * req.max_seq_len)
-        << "embedding_count should be 2 * max_seq_len "
-           "(cond + uncond sequences)";
-
-    std::print("[TEST] PASSED (embedding_count={}, expected={})\n",
-               out.embedding_count, 2 * req.max_seq_len);
-}
-
-TEST_F(SyntheticNpuEncoderTest, Name_ReturnsCorrectValue) {
-    std::print("[TEST] Name_ReturnsCorrectValue\n");
-    EXPECT_EQ(encoder_.name(), "Synthetic NPU Encoder");
-    std::print("[TEST] PASSED\n");
-}
-
-TEST_F(SyntheticNpuEncoderTest, Utilization_InRange) {
-    std::print("[TEST] Utilization_InRange\n");
-    float u = encoder_.utilization();
-    EXPECT_GE(u, 0.0f);
-    EXPECT_LE(u, 100.0f);
-    std::print("[TEST] PASSED (utilization={:.1f}%)\n", u);
-}
-
-TEST_F(SyntheticNpuEncoderTest, Temperature_InRange) {
-    std::print("[TEST] Temperature_InRange\n");
-    float t = encoder_.temperature();
-    EXPECT_GE(t, 20.0f);
-    EXPECT_LE(t, 90.0f);
-    std::print("[TEST] PASSED (temperature={:.1f}C)\n", t);
-}
-
-// ===========================================================================
 // SECTION 10: NpuEncoderFactory Tests
 // ===========================================================================
 
@@ -2046,28 +1966,19 @@ protected:
     virtual ~NpuEncoderFactoryTest() = default;
 };
 
-TEST_F(NpuEncoderFactoryTest, CreateBestAvailable_ReturnsNonNull) {
-    std::print("[TEST] CreateBestAvailable_ReturnsNonNull\n");
+TEST_F(NpuEncoderFactoryTest, CreateBestAvailable_ReturnsNullWhenNoOrtSession) {
+    std::print("[TEST] CreateBestAvailable_ReturnsNullWhenNoOrtSession\n");
     auto encoder = hq::npu::NpuEncoderFactory::create_best_available();
-    ASSERT_NE(encoder, nullptr)
-        << "create_best_available() should always return a valid encoder "
-           "(at minimum Synthetic)";
-    std::print("[TEST] PASSED (encoder name='{}')\n", encoder->name());
+    EXPECT_EQ(encoder, nullptr)
+        << "create_best_available() should return nullptr when no ORT session and no Hailo";
+    std::print("[TEST] PASSED (returns nullptr as expected)\n");
 }
 
-TEST_F(NpuEncoderFactoryTest, ReturnedEncoder_IsAvailable) {
-    std::print("[TEST] ReturnedEncoder_IsAvailable\n");
+TEST_F(NpuEncoderFactoryTest, CreateBestAvailable_WithNullSession_ReturnsNull) {
+    std::print("[TEST] CreateBestAvailable_WithNullSession_ReturnsNull\n");
     auto encoder = hq::npu::NpuEncoderFactory::create_best_available();
-    ASSERT_NE(encoder, nullptr);
-
-    EXPECT_TRUE(encoder->is_available())
-        << "Returned encoder should report is_available() == true";
-
-    EXPECT_FALSE(encoder->name().empty())
-        << "Encoder name should not be empty";
-
-    std::print("[TEST] PASSED (name='{}' available={})\n",
-               encoder->name(), encoder->is_available());
+    EXPECT_EQ(encoder, nullptr);
+    std::print("[TEST] PASSED (encoder is nullptr)\n");
 }
 
 // ===========================================================================
@@ -3627,13 +3538,12 @@ TEST_F(Round12EvidenceTest, TMM_TwoAllocations_NoOverlap) {
 // ---------------------------------------------------------------------------
 TEST_F(Round12EvidenceTest, NpuBackend_Concept_AllTypesSatisfied) {
     std::print("[TEST] NpuBackend_Concept_AllTypesSatisfied\n");
-    // Compile-time proof that all three encoder types satisfy NpuBackend<T>.
-    static_assert(hq::npu::NpuBackend<hq::npu::SyntheticNpuEncoder>);
+    // Compile-time proof that the remaining three encoder types satisfy NpuBackend<T>.
     static_assert(hq::npu::NpuBackend<hq::npu::Hailo8lEncoder>);
     static_assert(hq::npu::NpuBackend<hq::npu::CpuFallbackEncoder>);
     static_assert(hq::npu::NpuBackend<hq::npu::WindowsNpuBackend>);
-    SUCCEED() << "All 4 NPU backend types satisfy NpuBackend<T> at compile time";
-    std::print("[TEST] PASSED (4 backend types satisfy NpuBackend<T>)\n");
+    SUCCEED() << "All 3 NPU backend types satisfy NpuBackend<T> at compile time";
+    std::print("[TEST] PASSED (3 backend types satisfy NpuBackend<T>)\n");
 }
 
 // ---------------------------------------------------------------------------
@@ -3660,10 +3570,10 @@ TEST_F(Round12EvidenceTest, WindowsNpuBackend_StubBehavior) {
 // ---------------------------------------------------------------------------
 TEST_F(Round12EvidenceTest, MakeNpuBackend_Factory_ReturnsCorrectType) {
     std::print("[TEST] MakeNpuBackend_Factory_ReturnsCorrectType\n");
-    auto enc = hq::npu::make_npu_backend<hq::npu::SyntheticNpuEncoder>();
+    auto enc = hq::npu::make_npu_backend<hq::npu::CpuFallbackEncoder>(nullptr, nullptr);
     ASSERT_NE(enc, nullptr);
-    EXPECT_TRUE(enc->is_available());
-    EXPECT_EQ(enc->name(), "Synthetic-XOR");
+    EXPECT_FALSE(enc->is_available());
+    EXPECT_FALSE(enc->name().empty());
 
     auto win = hq::npu::make_npu_backend<hq::npu::WindowsNpuBackend>();
     ASSERT_NE(win, nullptr);
@@ -4010,15 +3920,6 @@ TEST_F(Round14EvidenceTest, WindowsNpuBackend_Name_NoStubWord) {
     std::print("[TEST] PASSED (name='{}', no 'stub' word)\n", n);
 }
 
-// Test 4: SyntheticNpuEncoder is available (always-on CI encoder)
-TEST_F(Round14EvidenceTest, SyntheticNpuEncoder_AlwaysAvailable) {
-    std::print("[TEST] SyntheticNpuEncoder_AlwaysAvailable\n");
-    hq::npu::SyntheticNpuEncoder enc;
-    EXPECT_TRUE(enc.is_available()) << "SyntheticNpuEncoder must always be available";
-    EXPECT_FALSE(enc.name().empty());
-    std::print("[TEST] PASSED\n");
-}
-
 // Test 5: DEISScheduler memory layout — precomputed table sizes match
 TEST_F(Round14EvidenceTest, DEISScheduler_PrecomputedTables_SizeConsistency) {
     std::print("[TEST] DEISScheduler_PrecomputedTables_SizeConsistency\n");
@@ -4108,14 +4009,13 @@ TEST_F(Round14EvidenceTest, ExpectedChain_SchedulerError_Surfaces) {
     std::print("[TEST] PASSED (expected chain propagates StepOutOfRange)\n");
 }
 
-// Test 9: NpuBackend concept — all 4 backends satisfy it at compile time
-TEST_F(Round14EvidenceTest, NpuBackend_Concept_AllFourBackends) {
-    std::print("[TEST] NpuBackend_Concept_AllFourBackends\n");
-    static_assert(hq::npu::NpuBackend<hq::npu::SyntheticNpuEncoder>,  "SyntheticNpuEncoder");
+// Test 9: NpuBackend concept — all 3 remaining backends satisfy it at compile time
+TEST_F(Round14EvidenceTest, NpuBackend_Concept_AllThreeBackends) {
+    std::print("[TEST] NpuBackend_Concept_AllThreeBackends\n");
     static_assert(hq::npu::NpuBackend<hq::npu::Hailo8lEncoder>,       "Hailo8lEncoder");
     static_assert(hq::npu::NpuBackend<hq::npu::CpuFallbackEncoder>,   "CpuFallbackEncoder");
     static_assert(hq::npu::NpuBackend<hq::npu::WindowsNpuBackend>,    "WindowsNpuBackend");
-    std::print("[TEST] PASSED (4 static_assert proofs)\n");
+    std::print("[TEST] PASSED (3 static_assert proofs)\n");
 }
 
 // Test 10: Span from raw TMM pointer — verify construction without copy
@@ -4349,18 +4249,16 @@ TEST_F(Round15EvidenceTest, WindowsNpuBackend_EncodeUnavailable_ReturnsError) {
 // Test 12: NpuBackend concept satisfied by all four backends (compile-time proof)
 TEST_F(Round15EvidenceTest, NpuBackend_AllFour_ConceptSatisfied) {
     std::print("[TEST] NpuBackend_AllFour_ConceptSatisfied\n");
-    static_assert(hq::npu::NpuBackend<hq::npu::SyntheticNpuEncoder>,
-                  "SyntheticNpuEncoder must satisfy NpuBackend");
     static_assert(hq::npu::NpuBackend<hq::npu::Hailo8lEncoder>,
                   "Hailo8lEncoder must satisfy NpuBackend");
     static_assert(hq::npu::NpuBackend<hq::npu::CpuFallbackEncoder>,
                   "CpuFallbackEncoder must satisfy NpuBackend");
     static_assert(hq::npu::NpuBackend<hq::npu::WindowsNpuBackend>,
                   "WindowsNpuBackend must satisfy NpuBackend");
-    // Runtime proof: all four can be default-constructed and queried
-    EXPECT_FALSE(hq::npu::SyntheticNpuEncoder{}.name().empty());
+    // Runtime proof: remaining three can be default-constructed and queried
+    EXPECT_FALSE(hq::npu::CpuFallbackEncoder{}.name().empty());
     EXPECT_FALSE(hq::npu::WindowsNpuBackend{}.name().empty());
-    std::print("[TEST] PASSED (4 static_asserts + runtime name checks)\n");
+    std::print("[TEST] PASSED (3 static_asserts + runtime name checks)\n");
 }
 
 // ===========================================================================
@@ -4540,90 +4438,24 @@ protected:
     ~Round17EvidenceTest() override = default;
 };
 
-// Test 1: NpuEncoderFactory with null session returns a non-null encoder
-TEST_F(Round17EvidenceTest, NpuEncoderFactory_NullSession_ReturnsNonNull) {
-    std::print("[TEST] NpuEncoderFactory_NullSession_ReturnsNonNull\n");
+// Test 1: NpuEncoderFactory with null session returns nullptr
+TEST_F(Round17EvidenceTest, NpuEncoderFactory_NullSession_ReturnsNull) {
+    std::print("[TEST] NpuEncoderFactory_NullSession_ReturnsNull\n");
     auto enc = hq::npu::NpuEncoderFactory::create_best_available(nullptr, nullptr);
-    EXPECT_NE(enc, nullptr);
+    EXPECT_EQ(enc, nullptr)
+        << "Factory should return nullptr when no ORT session and no Hailo";
     std::print("[TEST] PASSED\n");
 }
 
-// Test 2: Factory with null session selects SyntheticNpuEncoder (last resort)
-TEST_F(Round17EvidenceTest, NpuEncoderFactory_NullSession_ReturnsSynthetic) {
-    std::print("[TEST] NpuEncoderFactory_NullSession_ReturnsSynthetic\n");
-    auto enc = hq::npu::NpuEncoderFactory::create_best_available(nullptr, nullptr);
-    ASSERT_NE(enc, nullptr);
-    EXPECT_EQ(enc->name(), "Synthetic-XOR");
-    std::print("[TEST] PASSED — encoder: {}\n", enc->name());
-}
-
-// Test 3: SyntheticNpuEncoder::is_available() returns true
-TEST_F(Round17EvidenceTest, SyntheticEncoder_IsAvailable_True) {
-    std::print("[TEST] SyntheticEncoder_IsAvailable_True\n");
-    hq::npu::SyntheticNpuEncoder enc;
-    EXPECT_TRUE(enc.is_available());
+// Test 2: NpuEncoderFactory with no arguments returns nullptr
+TEST_F(Round17EvidenceTest, NpuEncoderFactory_NoArgs_ReturnsNull) {
+    std::print("[TEST] NpuEncoderFactory_NoArgs_ReturnsNull\n");
+    auto enc = hq::npu::NpuEncoderFactory::create_best_available();
+    EXPECT_EQ(enc, nullptr);
     std::print("[TEST] PASSED\n");
 }
 
-// Test 4: SyntheticNpuEncoder::name() returns "Synthetic-XOR"
-TEST_F(Round17EvidenceTest, SyntheticEncoder_Name_IsSyntheticXOR) {
-    std::print("[TEST] SyntheticEncoder_Name_IsSyntheticXOR\n");
-    hq::npu::SyntheticNpuEncoder enc;
-    EXPECT_EQ(enc.name(), "Synthetic-XOR");
-    std::print("[TEST] PASSED\n");
-}
-
-// Test 5: SyntheticNpuEncoder::encode() returns a valid result
-TEST_F(Round17EvidenceTest, SyntheticEncoder_Encode_ReturnsResult) {
-    std::print("[TEST] SyntheticEncoder_Encode_ReturnsResult\n");
-    hq::npu::SyntheticNpuEncoder enc;
-    hq::npu::NpuEncodeRequest req{};
-    req.prompt = "a futuristic city at night";
-    const auto result = enc.encode(req);
-    EXPECT_TRUE(result.has_value());
-    std::print("[TEST] PASSED\n");
-}
-
-// Test 6: SyntheticNpuEncoder::encode() returns non-zero embedding_count
-TEST_F(Round17EvidenceTest, SyntheticEncoder_Encode_EmbeddingCountNonzero) {
-    std::print("[TEST] SyntheticEncoder_Encode_EmbeddingCountNonzero\n");
-    hq::npu::SyntheticNpuEncoder enc;
-    hq::npu::NpuEncodeRequest req{};
-    req.prompt = "test prompt";
-    const auto result = enc.encode(req);
-    ASSERT_TRUE(result.has_value());
-    EXPECT_GT(result->embedding_count, std::size_t{0});
-    std::print("[TEST] PASSED — embedding_count={}\n", result->embedding_count);
-}
-
-// Test 7: SyntheticNpuEncoder embeddings span data() is non-null
-TEST_F(Round17EvidenceTest, SyntheticEncoder_Encode_EmbeddingsDataNonNull) {
-    std::print("[TEST] SyntheticEncoder_Encode_EmbeddingsDataNonNull\n");
-    hq::npu::SyntheticNpuEncoder enc;
-    hq::npu::NpuEncodeRequest req{};
-    req.prompt = "test";
-    const auto result = enc.encode(req);
-    ASSERT_TRUE(result.has_value());
-    EXPECT_NE(result->embeddings.data(), nullptr);
-    std::print("[TEST] PASSED\n");
-}
-
-// Test 8: Two sequential encodes with different prompts both succeed
-TEST_F(Round17EvidenceTest, SyntheticEncoder_SequentialEncode_BothSucceed) {
-    std::print("[TEST] SyntheticEncoder_SequentialEncode_BothSucceed\n");
-    hq::npu::SyntheticNpuEncoder enc;
-    hq::npu::NpuEncodeRequest req1{};
-    req1.prompt = "conditional prompt";
-    hq::npu::NpuEncodeRequest req2{};
-    req2.prompt = "";  // unconditional
-    const auto r1 = enc.encode(req1);
-    const auto r2 = enc.encode(req2);
-    EXPECT_TRUE(r1.has_value());
-    EXPECT_TRUE(r2.has_value());
-    std::print("[TEST] PASSED\n");
-}
-
-// Test 9: CpuFallbackEncoder with null session has is_available() == false
+// Test 3: CpuFallbackEncoder with null session has is_available() == false
 TEST_F(Round17EvidenceTest, CpuFallbackEncoder_NullSession_NotAvailable) {
     std::print("[TEST] CpuFallbackEncoder_NullSession_NotAvailable\n");
     hq::npu::CpuFallbackEncoder enc(nullptr, nullptr);
@@ -4631,7 +4463,7 @@ TEST_F(Round17EvidenceTest, CpuFallbackEncoder_NullSession_NotAvailable) {
     std::print("[TEST] PASSED\n");
 }
 
-// Test 10: CpuFallbackEncoder with null session returns error from encode()
+// Test 4: CpuFallbackEncoder with null session returns error from encode()
 TEST_F(Round17EvidenceTest, CpuFallbackEncoder_NullSession_EncodeFails) {
     std::print("[TEST] CpuFallbackEncoder_NullSession_EncodeFails\n");
     hq::npu::CpuFallbackEncoder enc(nullptr, nullptr);
@@ -4642,16 +4474,24 @@ TEST_F(Round17EvidenceTest, CpuFallbackEncoder_NullSession_EncodeFails) {
     std::print("[TEST] PASSED — error: {}\n", result.has_value() ? "none" : result.error());
 }
 
-// Test 11: INpuEncoder virtual dispatch works via base pointer
+// Test 5-8: (removed — SyntheticNpuEncoder deleted)
+
+// Test 9: (moved from old Test 9)
+// Already covered above.
+
+// Test 10: (moved from old Test 10)
+// Already covered above.
+
+// Test 11: INpuEncoder virtual dispatch works via base pointer using CpuFallbackEncoder
 TEST_F(Round17EvidenceTest, INpuEncoder_VirtualDispatch_WorksViaBasePointer) {
     std::print("[TEST] INpuEncoder_VirtualDispatch_WorksViaBasePointer\n");
     std::unique_ptr<hq::npu::INpuEncoder> enc =
-        std::make_unique<hq::npu::SyntheticNpuEncoder>();
-    EXPECT_TRUE(enc->is_available());
+        std::make_unique<hq::npu::CpuFallbackEncoder>(nullptr, nullptr);
+    EXPECT_FALSE(enc->is_available());
     hq::npu::NpuEncodeRequest req{};
     req.prompt = "virtual dispatch test";
     const auto result = enc->encode(req);
-    EXPECT_TRUE(result.has_value());
+    EXPECT_FALSE(result.has_value());
     std::print("[TEST] PASSED — encoder via base: {}\n", enc->name());
 }
 
@@ -4675,42 +4515,42 @@ protected:
     ~Round18EvidenceTest() override = default;
 };
 
-// Test 1: SyntheticNpuPostProcessor::is_available() returns true
-TEST_F(Round18EvidenceTest, SyntheticPostProcessor_IsAvailable_True) {
-    std::print("[TEST] SyntheticPostProcessor_IsAvailable_True\n");
-    hq::npu::SyntheticNpuPostProcessor pp;
-    EXPECT_TRUE(pp.is_available());
+// Test 1: CpuPostProcessor::is_available() returns false
+TEST_F(Round18EvidenceTest, CpuPostProcessor_IsAvailable_False) {
+    std::print("[TEST] CpuPostProcessor_IsAvailable_False\n");
+    hq::npu::CpuPostProcessor pp;
+    EXPECT_FALSE(pp.is_available());
     std::print("[TEST] PASSED\n");
 }
 
-// Test 2: SyntheticNpuPostProcessor::name() returns expected string
-TEST_F(Round18EvidenceTest, SyntheticPostProcessor_Name) {
-    std::print("[TEST] SyntheticPostProcessor_Name\n");
-    hq::npu::SyntheticNpuPostProcessor pp;
-    EXPECT_EQ(pp.name(), "Synthetic-PassThrough");
+// Test 2: CpuPostProcessor::name() returns expected string
+TEST_F(Round18EvidenceTest, CpuPostProcessor_Name) {
+    std::print("[TEST] CpuPostProcessor_Name\n");
+    hq::npu::CpuPostProcessor pp;
+    EXPECT_EQ(pp.name(), "CPU-PassThrough");
     std::print("[TEST] PASSED\n");
 }
 
-// Test 3: SyntheticNpuPostProcessor::can_handle() accepts PostProcess task
-TEST_F(Round18EvidenceTest, SyntheticPostProcessor_CanHandle_PostProcess) {
-    std::print("[TEST] SyntheticPostProcessor_CanHandle_PostProcess\n");
-    hq::npu::SyntheticNpuPostProcessor pp;
+// Test 3: CpuPostProcessor::can_handle() accepts PostProcess task
+TEST_F(Round18EvidenceTest, CpuPostProcessor_CanHandle_PostProcess) {
+    std::print("[TEST] CpuPostProcessor_CanHandle_PostProcess\n");
+    hq::npu::CpuPostProcessor pp;
     EXPECT_TRUE(pp.can_handle(hq::npu::NpuTaskType::PostProcess));
     std::print("[TEST] PASSED\n");
 }
 
-// Test 4: SyntheticNpuPostProcessor::can_handle() accepts SafetyFilter task
-TEST_F(Round18EvidenceTest, SyntheticPostProcessor_CanHandle_SafetyFilter) {
-    std::print("[TEST] SyntheticPostProcessor_CanHandle_SafetyFilter\n");
-    hq::npu::SyntheticNpuPostProcessor pp;
+// Test 4: CpuPostProcessor::can_handle() accepts SafetyFilter task
+TEST_F(Round18EvidenceTest, CpuPostProcessor_CanHandle_SafetyFilter) {
+    std::print("[TEST] CpuPostProcessor_CanHandle_SafetyFilter\n");
+    hq::npu::CpuPostProcessor pp;
     EXPECT_TRUE(pp.can_handle(hq::npu::NpuTaskType::SafetyFilter));
     std::print("[TEST] PASSED\n");
 }
 
-// Test 5: SyntheticNpuPostProcessor::post_process() returns a valid result
-TEST_F(Round18EvidenceTest, SyntheticPostProcessor_PostProcess_ReturnsResult) {
-    std::print("[TEST] SyntheticPostProcessor_PostProcess_ReturnsResult\n");
-    hq::npu::SyntheticNpuPostProcessor pp;
+// Test 5: CpuPostProcessor::post_process() returns a valid result
+TEST_F(Round18EvidenceTest, CpuPostProcessor_PostProcess_ReturnsResult) {
+    std::print("[TEST] CpuPostProcessor_PostProcess_ReturnsResult\n");
+    hq::npu::CpuPostProcessor pp;
     std::vector<std::uint8_t> pixels(512u * 512u * 4u, 128u);
     hq::npu::NpuPostProcessRequest req{
         .pixels = std::span<const std::uint8_t>{pixels},
@@ -4724,9 +4564,9 @@ TEST_F(Round18EvidenceTest, SyntheticPostProcessor_PostProcess_ReturnsResult) {
 }
 
 // Test 6: post_process() output dimensions match input
-TEST_F(Round18EvidenceTest, SyntheticPostProcessor_PostProcess_DimensionsPreserved) {
-    std::print("[TEST] SyntheticPostProcessor_PostProcess_DimensionsPreserved\n");
-    hq::npu::SyntheticNpuPostProcessor pp;
+TEST_F(Round18EvidenceTest, CpuPostProcessor_PostProcess_DimensionsPreserved) {
+    std::print("[TEST] CpuPostProcessor_PostProcess_DimensionsPreserved\n");
+    hq::npu::CpuPostProcessor pp;
     std::vector<std::uint8_t> pixels(64u * 64u * 4u, 255u);
     hq::npu::NpuPostProcessRequest req{
         .pixels = std::span<const std::uint8_t>{pixels},
@@ -4741,10 +4581,68 @@ TEST_F(Round18EvidenceTest, SyntheticPostProcessor_PostProcess_DimensionsPreserv
     std::print("[TEST] PASSED\n");
 }
 
-// Test 7: Synthetic post-processor reports was_npu_accelerated = false
-TEST_F(Round18EvidenceTest, SyntheticPostProcessor_PostProcess_NotNpuAccelerated) {
-    std::print("[TEST] SyntheticPostProcessor_PostProcess_NotNpuAccelerated\n");
-    hq::npu::SyntheticNpuPostProcessor pp;
+// Test 7: CpuPostProcessor post-process reports was_npu_accelerated = false
+TEST_F(Round18EvidenceTest, CpuPostProcessor_PostProcess_NotNpuAccelerated) {
+    std::print("[TEST] CpuPostProcessor_PostProcess_NotNpuAccelerated\n");
+    hq::npu::CpuPostProcessor pp;
+    std::vector<std::uint8_t> pixels(16u, 0u);
+    hq::npu::NpuPostProcessRequest req{
+        .pixels = std::span<const std::uint8_t>{pixels},
+        .width  = 2,
+        .height = 2,
+    };
+    auto result = pp.post_process(req);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_FALSE(result->was_npu_accelerated);
+    std::print("[TEST] PASSED\n");
+}
+
+// Test 4: CpuPostProcessor::can_handle() accepts SafetyFilter task
+TEST_F(Round18EvidenceTest, CpuPostProcessor_CanHandle_SafetyFilter) {
+    std::print("[TEST] CpuPostProcessor_CanHandle_SafetyFilter\n");
+    hq::npu::CpuPostProcessor pp;
+    EXPECT_TRUE(pp.can_handle(hq::npu::NpuTaskType::SafetyFilter));
+    std::print("[TEST] PASSED\n");
+}
+
+// Test 5: CpuPostProcessor::post_process() returns a valid result
+TEST_F(Round18EvidenceTest, CpuPostProcessor_PostProcess_ReturnsResult) {
+    std::print("[TEST] CpuPostProcessor_PostProcess_ReturnsResult\n");
+    hq::npu::CpuPostProcessor pp;
+    std::vector<std::uint8_t> pixels(512u * 512u * 4u, 128u);
+    hq::npu::NpuPostProcessRequest req{
+        .pixels = std::span<const std::uint8_t>{pixels},
+        .width  = 512,
+        .height = 512,
+        .task   = hq::npu::NpuTaskType::PostProcess,
+    };
+    auto result = pp.post_process(req);
+    EXPECT_TRUE(result.has_value());
+    std::print("[TEST] PASSED\n");
+}
+
+// Test 6: post_process() output dimensions match input
+TEST_F(Round18EvidenceTest, CpuPostProcessor_PostProcess_DimensionsPreserved) {
+    std::print("[TEST] CpuPostProcessor_PostProcess_DimensionsPreserved\n");
+    hq::npu::CpuPostProcessor pp;
+    std::vector<std::uint8_t> pixels(64u * 64u * 4u, 255u);
+    hq::npu::NpuPostProcessRequest req{
+        .pixels = std::span<const std::uint8_t>{pixels},
+        .width  = 64,
+        .height = 64,
+    };
+    auto result = pp.post_process(req);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->width,  64u);
+    EXPECT_EQ(result->height, 64u);
+    EXPECT_EQ(result->pixels.size(), pixels.size());
+    std::print("[TEST] PASSED\n");
+}
+
+// Test 7: CPU post-processor reports was_npu_accelerated = false
+TEST_F(Round18EvidenceTest, CpuPostProcessor_PostProcess_NotNpuAccelerated) {
+    std::print("[TEST] CpuPostProcessor_PostProcess_NotNpuAccelerated\n");
+    hq::npu::CpuPostProcessor pp;
     std::vector<std::uint8_t> pixels(16u, 0u);
     hq::npu::NpuPostProcessRequest req{
         .pixels = std::span<const std::uint8_t>{pixels},
@@ -4765,9 +4663,9 @@ TEST_F(Round18EvidenceTest, HailoPostProcessor_NotAvailable) {
     std::print("[TEST] PASSED\n");
 }
 
-// Test 9: HailoNpuPostProcessor delegates to synthetic (returns valid result)
-TEST_F(Round18EvidenceTest, HailoPostProcessor_DelegatesToSynthetic) {
-    std::print("[TEST] HailoPostProcessor_DelegatesToSynthetic\n");
+// Test 9: HailoNpuPostProcessor returns error (not yet implemented)
+TEST_F(Round18EvidenceTest, HailoPostProcessor_ReturnsError_NotWired) {
+    std::print("[TEST] HailoPostProcessor_ReturnsError_NotWired\n");
     hq::npu::HailoNpuPostProcessor pp;
     std::vector<std::uint8_t> pixels(64u * 64u * 4u, 42u);
     hq::npu::NpuPostProcessRequest req{
@@ -4776,16 +4674,17 @@ TEST_F(Round18EvidenceTest, HailoPostProcessor_DelegatesToSynthetic) {
         .height = 64,
     };
     auto result = pp.post_process(req);
-    EXPECT_TRUE(result.has_value());
-    std::print("[TEST] PASSED\n");
+    EXPECT_FALSE(result.has_value())
+        << "HailoNpuPostProcessor must return error until HailoRT + HEF available";
+    std::print("[TEST] PASSED (honest error returned)\n");
 }
 
-// Test 10: NpuPostProcessorFactory returns a non-null pointer (falls to Synthetic)
-TEST_F(Round18EvidenceTest, NpuPostProcessorFactory_ReturnsSynthetic) {
+// Test 10: NpuPostProcessorFactory returns a non-null pointer (falls to CPU fallback)
+TEST_F(Round18EvidenceTest, NpuPostProcessorFactory_ReturnsCpuFallback) {
     std::print("[TEST] NpuPostProcessorFactory_ReturnsSynthetic\n");
     auto pp = hq::npu::NpuPostProcessorFactory::create_best_available();
     ASSERT_NE(pp, nullptr);
-    EXPECT_EQ(pp->name(), "Synthetic-PassThrough");
+    EXPECT_EQ(pp->name(), "CPU-PassThrough");
     std::print("[TEST] PASSED\n");
 }
 
@@ -4793,7 +4692,7 @@ TEST_F(Round18EvidenceTest, NpuPostProcessorFactory_ReturnsSynthetic) {
 TEST_F(Round18EvidenceTest, INpuPostProcessor_VirtualDispatch) {
     std::print("[TEST] INpuPostProcessor_VirtualDispatch\n");
     std::unique_ptr<hq::npu::INpuPostProcessor> pp =
-        std::make_unique<hq::npu::SyntheticNpuPostProcessor>();
+        std::make_unique<hq::npu::CpuPostProcessor>();
     std::vector<std::uint8_t> pixels(32u, 1u);
     hq::npu::NpuPostProcessRequest req{
         .pixels = std::span<const std::uint8_t>{pixels},
@@ -4804,10 +4703,10 @@ TEST_F(Round18EvidenceTest, INpuPostProcessor_VirtualDispatch) {
     std::print("[TEST] PASSED\n");
 }
 
-// Test 12: NpuAccelerator<T> concept is satisfied by SyntheticNpuPostProcessor
-TEST_F(Round18EvidenceTest, NpuAccelerator_ConceptProofSynthetic) {
+// Test 12: NpuAccelerator<T> concept is satisfied by CpuPostProcessor
+TEST_F(Round18EvidenceTest, NpuAccelerator_ConceptProofCpuPostProcessor) {
     std::print("[TEST] NpuAccelerator_ConceptProofSynthetic\n");
-    constexpr bool ok = hq::npu::NpuAccelerator<hq::npu::SyntheticNpuPostProcessor>;
+    constexpr bool ok = hq::npu::NpuAccelerator<hq::npu::CpuPostProcessor>;
     EXPECT_TRUE(ok);
     constexpr bool ok2 = hq::npu::NpuAccelerator<hq::npu::HailoNpuPostProcessor>;
     EXPECT_TRUE(ok2);
@@ -4826,7 +4725,7 @@ protected:
 // Test 1: blend_noise_cfg — scale=0 → output equals uncond
 TEST_F(Round19EvidenceTest, BlendNoiseCfg_ScaleZero_OutputEqualsUncond) {
     std::print("[TEST] BlendNoiseCfg_ScaleZero_OutputEqualsUncond\n");
-    hq::npu::SyntheticNpuPostProcessor pp;
+    hq::npu::CpuPostProcessor pp;
     std::vector<float> noise_cond  = {1.0f, 2.0f, 3.0f, 4.0f};
     std::vector<float> noise_uncond = {0.1f, 0.2f, 0.3f, 0.4f};
     auto r = pp.blend_noise_cfg(
@@ -4844,7 +4743,7 @@ TEST_F(Round19EvidenceTest, BlendNoiseCfg_ScaleZero_OutputEqualsUncond) {
 // Test 2: blend_noise_cfg — scale=1 → output equals cond (original noise_cond)
 TEST_F(Round19EvidenceTest, BlendNoiseCfg_ScaleOne_OutputEqualsCond) {
     std::print("[TEST] BlendNoiseCfg_ScaleOne_OutputEqualsCond\n");
-    hq::npu::SyntheticNpuPostProcessor pp;
+    hq::npu::CpuPostProcessor pp;
     std::vector<float> noise_cond  = {1.0f, 2.0f, 3.0f};
     const std::vector<float> noise_cond_orig = noise_cond;
     std::vector<float> noise_uncond = {0.5f, 1.0f, 1.5f};
@@ -4863,7 +4762,7 @@ TEST_F(Round19EvidenceTest, BlendNoiseCfg_ScaleOne_OutputEqualsCond) {
 // Test 3: blend_noise_cfg — scale=7.5, verify arithmetic at known values
 TEST_F(Round19EvidenceTest, BlendNoiseCfg_ScaleSeven_VerifyArithmetic) {
     std::print("[TEST] BlendNoiseCfg_ScaleSeven_VerifyArithmetic\n");
-    hq::npu::SyntheticNpuPostProcessor pp;
+    hq::npu::CpuPostProcessor pp;
     // cond=2, uncond=1, scale=7.5 → result = 1 + 7.5*(2-1) = 8.5
     std::vector<float> noise_cond  = {2.0f};
     std::vector<float> noise_uncond = {1.0f};
@@ -4879,7 +4778,7 @@ TEST_F(Round19EvidenceTest, BlendNoiseCfg_ScaleSeven_VerifyArithmetic) {
 // Test 4: blend_noise_cfg — empty noise_out returns error
 TEST_F(Round19EvidenceTest, BlendNoiseCfg_EmptyInput_ReturnsError) {
     std::print("[TEST] BlendNoiseCfg_EmptyInput_ReturnsError\n");
-    hq::npu::SyntheticNpuPostProcessor pp;
+    hq::npu::CpuPostProcessor pp;
     std::vector<float> empty;
     std::vector<float> uncond = {1.0f};
     auto r = pp.blend_noise_cfg(
@@ -4893,7 +4792,7 @@ TEST_F(Round19EvidenceTest, BlendNoiseCfg_EmptyInput_ReturnsError) {
 // Test 5: blend_noise_cfg — size mismatch returns error
 TEST_F(Round19EvidenceTest, BlendNoiseCfg_SizeMismatch_ReturnsError) {
     std::print("[TEST] BlendNoiseCfg_SizeMismatch_ReturnsError\n");
-    hq::npu::SyntheticNpuPostProcessor pp;
+    hq::npu::CpuPostProcessor pp;
     std::vector<float> cond  = {1.0f, 2.0f};
     std::vector<float> uncond = {0.5f};  // wrong size
     auto r = pp.blend_noise_cfg(
@@ -4904,9 +4803,9 @@ TEST_F(Round19EvidenceTest, BlendNoiseCfg_SizeMismatch_ReturnsError) {
     std::print("[TEST] PASSED\n");
 }
 
-// Test 6: HailoNpuPostProcessor::blend_noise_cfg delegates to synthetic (same result)
-TEST_F(Round19EvidenceTest, BlendNoiseCfg_Hailo_DelegatesToSynthetic) {
-    std::print("[TEST] BlendNoiseCfg_Hailo_DelegatesToSynthetic\n");
+// Test 6: HailoNpuPostProcessor::blend_noise_cfg returns error (not yet implemented)
+TEST_F(Round19EvidenceTest, BlendNoiseCfg_Hailo_ReturnsError_NotWired) {
+    std::print("[TEST] BlendNoiseCfg_Hailo_ReturnsError_NotWired\n");
     hq::npu::HailoNpuPostProcessor pp;
     std::vector<float> cond  = {2.0f, 4.0f};
     std::vector<float> uncond = {1.0f, 2.0f};
@@ -4914,19 +4813,16 @@ TEST_F(Round19EvidenceTest, BlendNoiseCfg_Hailo_DelegatesToSynthetic) {
         std::span<float>{cond},
         std::span<const float>{uncond},
         2.0f);
-    ASSERT_TRUE(r.has_value());
-    // scale=2: result = uncond + 2*(cond - uncond) = cond + (cond - uncond)
-    // [0]: 1 + 2*(2-1) = 3.0; [1]: 2 + 2*(4-2) = 6.0
-    EXPECT_NEAR(cond[0], 3.0f, 1e-5f);
-    EXPECT_NEAR(cond[1], 6.0f, 1e-5f);
-    std::print("[TEST] PASSED\n");
+    EXPECT_FALSE(r.has_value())
+        << "HailoNpuPostProcessor blend_noise_cfg must return error until HailoRT + HEF available";
+    std::print("[TEST] PASSED (honest error returned)\n");
 }
 
 // Test 7: blend_noise_cfg via INpuPostProcessor* base pointer (virtual dispatch)
 TEST_F(Round19EvidenceTest, BlendNoiseCfg_VirtualDispatch) {
     std::print("[TEST] BlendNoiseCfg_VirtualDispatch\n");
     std::unique_ptr<hq::npu::INpuPostProcessor> pp =
-        std::make_unique<hq::npu::SyntheticNpuPostProcessor>();
+        std::make_unique<hq::npu::CpuPostProcessor>();
     std::vector<float> cond  = {3.0f, 6.0f, 9.0f};
     std::vector<float> uncond = {1.0f, 2.0f, 3.0f};
     auto r = pp->blend_noise_cfg(
@@ -4940,7 +4836,7 @@ TEST_F(Round19EvidenceTest, BlendNoiseCfg_VirtualDispatch) {
 // Test 8: blend_noise_cfg with realistic latent size (16,384 floats = 512x512 SD1.5 latent)
 TEST_F(Round19EvidenceTest, BlendNoiseCfg_RealisticLatentSize_Succeeds) {
     std::print("[TEST] BlendNoiseCfg_RealisticLatentSize_Succeeds\n");
-    hq::npu::SyntheticNpuPostProcessor pp;
+    hq::npu::CpuPostProcessor pp;
     constexpr std::size_t latent_floats = 4u * 64u * 64u;  // SD 1.5 at 512x512
     std::vector<float> cond(latent_floats, 0.5f);
     std::vector<float> uncond(latent_floats, 0.1f);

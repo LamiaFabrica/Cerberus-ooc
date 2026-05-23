@@ -5,8 +5,8 @@
 /// Provides concrete post-processor implementations and the factory that
 /// probes hardware to select the best available backend.
 ///
+/// @version 2.0.0 — synthetic data eradicated. No fabricated telemetry.
 /// @author LamiaFabrica Team
-/// @version 1.0.0
 
 #include "hq/npu_accelerator.hpp"
 #include "hq/logger.hpp"
@@ -15,19 +15,38 @@
 #include <chrono>
 #include <cstring>
 
+// ===========================================================================
+// HailoRT three-tier detection
+// ===========================================================================
+#ifdef HAILO_BUILD
+#  define HAILO_ACCEL_HAS_HAILORT 1
+#  include <hailort/hailort.h>
+#else
+#  if __has_include(<hailort/hailort.h>)
+#    define HAILO_ACCEL_HAS_HAILORT 1
+#    include <hailort/hailort.h>
+#  elif __has_include(<hailort/hailort.hpp>)
+#    define HAILO_ACCEL_HAS_HAILORT 1
+#    include <hailort/hailort.hpp>
+#  else
+#    define HAILO_ACCEL_HAS_HAILORT 0
+#    pragma message("HailoRT headers not found — HailoNpuPostProcessor compiled without HailoRT support")
+#  endif
+#endif
+
 namespace hq::npu {
 
 // ===========================================================================
-// SyntheticNpuPostProcessor
+// CpuPostProcessor — honest CPU pass-through (no NPU acceleration)
 // ===========================================================================
 
 std::expected<NpuPostProcessResult, std::string>
-SyntheticNpuPostProcessor::post_process(const NpuPostProcessRequest& req) {
+CpuPostProcessor::post_process(const NpuPostProcessRequest& req) {
     if (req.pixels.empty()) {
-        return std::unexpected{"SyntheticNpuPostProcessor: empty pixel input"};
+        return std::unexpected{"CpuPostProcessor: empty pixel input"};
     }
     if (req.width == 0 || req.height == 0) {
-        return std::unexpected{"SyntheticNpuPostProcessor: zero dimensions"};
+        return std::unexpected{"CpuPostProcessor: zero dimensions"};
     }
 
     const auto t0 = std::chrono::high_resolution_clock::now();
@@ -36,8 +55,10 @@ SyntheticNpuPostProcessor::post_process(const NpuPostProcessRequest& req) {
     result.width  = req.width;
     result.height = req.height;
 
-    // Pass-through: copy pixels unchanged.
-    // In production, this slot would run ESRGAN / noise-reduction on Hailo-8L.
+    // CPU pass-through: copy pixels unchanged.
+    // When a real NPU post-processing network (e.g. ESRGAN on Hailo-8L) is
+    // available, HailoNpuPostProcessor will perform the work. Until then,
+    // the pipeline uses this honest CPU fallback.
     result.pixels.resize(req.pixels.size());
     std::memcpy(result.pixels.data(), req.pixels.data(), req.pixels.size());
 
@@ -51,7 +72,7 @@ SyntheticNpuPostProcessor::post_process(const NpuPostProcessRequest& req) {
 }
 
 std::expected<void, std::string>
-SyntheticNpuPostProcessor::blend_noise_cfg(
+CpuPostProcessor::blend_noise_cfg(
     std::span<float>       noise_out,
     std::span<const float> noise_uncond,
     float                  guidance_scale) noexcept {
@@ -64,49 +85,51 @@ SyntheticNpuPostProcessor::blend_noise_cfg(
             + " uncond=" + std::to_string(noise_uncond.size())};
     }
 
-    // SAXPY in-place: noise_out[i] = noise_uncond[i] + scale*(noise_out[i] - noise_uncond[i])
+    // CFG blend: noise_out[i] = noise_uncond[i] + scale*(noise_out[i] - noise_uncond[i])
     //
-    // This is the CFG blend formerly at pipeline_integration.cpp:1065-1070.
-    // Production path on Hailo-8L: submitted as a SAXPY kernel on the NN core.
-    // The Hailo-8L can execute element-wise float32 ops at ~13 TOPS; for 16,384 floats
-    // this is <<1µs compute (bandwidth-bound at ~2GB/s PCIe — ~33µs transfer).
-    // Current path: CPU scalar loop, timed.
+    // This is pure CPU scalar math. A real Hailo-8L implementation would
+    // submit this as a SAXPY kernel on the NN core, but that requires:
+    //   1. HailoRT SDK installed (Linux only)
+    //   2. A compiled SAXPY HEF for Hailo-8L
+    //   3. PCIe DMA path for input/output tensors
+    //
+    // Until those conditions are met, this honest CPU fallback performs
+    // the blend without claiming NPU acceleration.
     for (std::size_t i = 0; i < noise_out.size(); ++i) {
         noise_out[i] = noise_uncond[i] + guidance_scale * (noise_out[i] - noise_uncond[i]);
     }
     return {};
 }
 
-bool SyntheticNpuPostProcessor::can_handle(NpuTaskType task) const {
-    // Synthetic handles all task types as a CPU fallback.
+bool CpuPostProcessor::can_handle(NpuTaskType task) const {
+    // CPU fallback handles all task types because it is a general-purpose
+    // compute path. It does not claim to accelerate anything.
     (void)task;
     return true;
 }
 
 // ===========================================================================
-// HailoNpuPostProcessor — skeleton (HailoRT not installed)
+// HailoNpuPostProcessor — production Hailo-8L post-processing
 // ===========================================================================
 
 HailoNpuPostProcessor::HailoNpuPostProcessor() {
-    // Production path (not yet implemented):
-    //   1. Call hailort::Device::scan_pcie() to enumerate devices
-    //   2. Load a compiled HEF (post-processing network)
-    //   3. Set hailo_available_ = true
-    //
-    // Skeleton: always unavailable until HailoRT SDK + HEF present on Linux.
-    HQ_LOG_INFO("[HailoNpuPostProcessor] Skeleton mode: HailoRT not installed, "
-                "post-processing will delegate to synthetic fallback");
+#if HAILO_ACCEL_HAS_HAILORT
+    // Probe for Hailo devices
+    auto scan_result = hailort::Device::scan_pcie();
+    if (scan_result && !scan_result.value().empty()) {
+        HQ_LOG_INFO("[HailoNpuPostProcessor] Hailo-8L detected — post-processing available when HEF loaded");
+    } else {
+        HQ_LOG_INFO("[HailoNpuPostProcessor] No Hailo-8L device detected");
+    }
+#else
+    HQ_LOG_INFO("[HailoNpuPostProcessor] HailoRT SDK not available — post-processing unavailable");
+#endif
 }
 
 std::expected<NpuPostProcessResult, std::string>
 HailoNpuPostProcessor::post_process(const NpuPostProcessRequest& req) {
-    // Production path:
-    //   Submit req.pixels as input tensor to Hailo async infer runner.
-    //   Wait for callback, copy output to NpuPostProcessResult::pixels.
-    //
-    // Skeleton: delegate to synthetic (CPU pass-through).
-    HQ_LOG_INFO("[HailoNpuPostProcessor] Skeleton — delegating to synthetic post-processor");
-    return synthetic_fallback_.post_process(req);
+    (void)req;
+    return std::unexpected{"Hailo-8L post-processing not yet implemented — HEF not loaded"};
 }
 
 std::expected<void, std::string>
@@ -114,25 +137,15 @@ HailoNpuPostProcessor::blend_noise_cfg(
     std::span<float>       noise_out,
     std::span<const float> noise_uncond,
     float                  guidance_scale) noexcept {
-    // Production path (when HailoRT installed + SAXPY HEF compiled):
-    //   1. Copy noise_out and noise_uncond to Hailo input buffers via PCIe DMA
-    //   2. Submit SAXPY HEF with guidance_scale as a constant parameter
-    //   3. Wait for async completion callback
-    //   4. Copy Hailo output buffer back to noise_out
-    //
-    // Blockers (as of 2026-05-22):
-    //   - HailoRT SDK not installed (Windows; Linux-only)
-    //   - No SAXPY HEF compiled for Hailo-8L
-    //   - PCIe latency (~33µs for 16,384 floats) dominates compute time at this tensor size
-    //
-    // Skeleton: delegate to SyntheticNpuPostProcessor (CPU SAXPY).
-    return synthetic_fallback_.blend_noise_cfg(noise_out, noise_uncond, guidance_scale);
+    (void)noise_out;
+    (void)noise_uncond;
+    (void)guidance_scale;
+    return std::unexpected{"Hailo-8L SAXPY not yet implemented — HEF not loaded"};
 }
 
 bool HailoNpuPostProcessor::can_handle(NpuTaskType task) const {
-    // Skeleton reports false for all real tasks — synthetic fallback handles everything.
     (void)task;
-    return false;
+    return false;  // Not yet implemented — honest false
 }
 
 // ===========================================================================
@@ -150,9 +163,15 @@ NpuPostProcessorFactory::create_best_available() {
         }
     }
 
-    // ---- Priority 2: Synthetic (always available) ----
-    HQ_LOG_INFO("[NpuPostProcessorFactory] Hailo-8L unavailable, using Synthetic pass-through");
-    return std::make_unique<SyntheticNpuPostProcessor>();
+    // ---- Priority 2: CPU pass-through (no NPU acceleration) ----
+    // CpuPostProcessor performs memcpy and scalar SAXPY on CPU.
+    // It does NOT claim to be an NPU accelerator.
+    // is_available() returns false because it provides zero NPU acceleration.
+    HQ_LOG_INFO("[NpuPostProcessorFactory] No NPU hardware available — "
+                "using CPU pass-through (no acceleration). "
+                "post_process() will copy pixels unchanged; "
+                "blend_noise_cfg() will use CPU scalar math.");
+    return std::make_unique<CpuPostProcessor>();
 }
 
 } // namespace hq::npu

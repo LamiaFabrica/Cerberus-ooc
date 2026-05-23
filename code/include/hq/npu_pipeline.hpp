@@ -292,6 +292,10 @@ struct NpuEncodeResult {
     std::size_t         embedding_count{0};
     std::size_t         hidden_dim{768};
     bool                cfg_enabled{false};
+    // Sentinel values for npu_utilization and npu_temperature:
+    //   >= 0.0f : Real measured value from NPU hardware
+    //   -1.0f   : No NPU hardware present (CPU fallback encoder)
+    //   0.0f    : Honest zero when no NPU sensor data available
     float               npu_utilization{0.0f};
     float               npu_temperature{0.0f};
     float               encode_time_us{0.0f};
@@ -356,8 +360,8 @@ public:
     NpuDmaPipeline& operator=(NpuDmaPipeline&&) noexcept;
 
     /// @brief Inject an encoder implementation.
-    /// If not called (or nullptr passed), the pipeline defaults to
-    /// a self-owned SyntheticNpuEncoder.
+    /// If not called (or nullptr passed), the pipeline will fail encode
+    /// requests until a real encoder (Hailo8lEncoder or CpuFallbackEncoder) is set.
     void set_encoder(INpuEncoder* encoder);
 
     // ---- NPU encode submission ---------------------------------------------

@@ -253,6 +253,7 @@ std::expected<float, GPUErrorInfo> GPUMonitor::query_utilization() {
 #endif
 
     default:
+        std::print("[GPUMonitor] WARNING No GPU backend available — returning 0% utilization.\n");
         return 0.0f;
     }
 }
@@ -315,6 +316,7 @@ std::expected<float, GPUErrorInfo> GPUMonitor::query_temperature_edge() {
 #endif
 
     default:
+        std::print("[GPUMonitor] WARNING No GPU backend available — returning 0C edge temperature.\n");
         return 0.0f;
     }
 }
@@ -381,6 +383,7 @@ std::expected<float, GPUErrorInfo> GPUMonitor::query_temperature_junction() {
 #endif
 
     default:
+        std::print("[GPUMonitor] WARNING No GPU backend available — returning 0C junction temperature.\n");
         return 0.0f;
     }
 }
@@ -442,6 +445,7 @@ std::expected<float, GPUErrorInfo> GPUMonitor::query_power() {
 #endif
 
     default:
+        std::print("[GPUMonitor] WARNING No GPU backend available — returning 0W power.\n");
         return 0.0f;
     }
 }
@@ -522,6 +526,7 @@ std::expected<std::pair<float, float>, GPUErrorInfo> GPUMonitor::query_memory() 
 #endif
 
     default:
+        std::print("[GPUMonitor] WARNING No GPU backend available — returning 0 MiB used/total memory.\n");
         return std::pair{0.0f, 0.0f};
     }
 }

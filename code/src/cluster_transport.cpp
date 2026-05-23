@@ -536,10 +536,12 @@ ClusterTransport::send(std::uint32_t target_node_id,
         auto it = m.worker_sockets.find(target_node_id);
         if (it == m.worker_sockets.end()) {
             if (m.cfg.preferred_link == LinkType::LoopbackUnix) {
-                // LoopbackUnix path: no real socket, record stats and succeed.
+                // LoopbackUnix path: no real socket in loopback mode.
+                // Record stats for flow control but data is NOT transmitted.
                 m.stat_sent.fetch_add(1, std::memory_order_relaxed);
                 m.stat_bytes_sent.fetch_add(sizeof(MessageHeader) + payload.size(),
                                             std::memory_order_relaxed);
+                HQ_LOG_WARN("ClusterTransport: LoopbackUnix send() — data NOT transmitted (loopback mode has no real socket)");
                 return {};
             }
             return std::unexpected{ClusterError::NotConnected};
@@ -610,6 +612,7 @@ ClusterTransport::collect_telemetry() noexcept {
 
     if (m.cfg.preferred_link == LinkType::LoopbackUnix) {
         // LoopbackUnix: return whatever telemetry has been registered for workers.
+        // If no real telemetry has been pushed, report health as -1.0f sentinel.
         std::unique_lock lock{m.workers_mutex};
         std::vector<WorkerTelemetry> result;
         for (const auto& [id, node] : m.worker_map) {
@@ -619,7 +622,7 @@ ClusterTransport::collect_telemetry() noexcept {
             } else {
                 WorkerTelemetry t{};
                 t.node_id         = id;
-                t.composite_health = 75.0f; // neutral default for unknown nodes
+                t.composite_health = -1.0f; // sentinel: no real telemetry available
                 result.push_back(t);
             }
         }
@@ -676,7 +679,7 @@ ClusterTransport::select_worker() noexcept {
         return std::unexpected{ClusterError::NoWorkers};
 
     constexpr float kQueuePenalty = 5.0f;
-    constexpr float kDefaultHealth = 50.0f;
+    constexpr float kDefaultHealth = 0.0f;
 
     std::uint32_t best_id    = std::numeric_limits<std::uint32_t>::max();
     float         best_score = std::numeric_limits<float>::lowest();

@@ -5,11 +5,14 @@
 /// @brief Dual-Indicator Hailo-8L Monitor — power + inference delta fusion.
 ///
 /// Rationale: Single-indicator (power-only) monitoring conflates DMA stalls
-/// with actual inference work.  This monitor fuses power draw + inference
+/// with actual inference work. This monitor fuses power draw + inference
 /// delta rate to produce an accurate utilization figure.
 ///
 /// Hardware: Hailo-8L M.2 (13 TOPS, PCIe Gen3 x2)
 ///   Idle ~0.5W, active ~6W, max TDP 8.65W
+///
+/// NO SYNTHETIC DATA: When HailoRT is not available, all calls return
+/// HailoError honestly. There is no fabricated telemetry.
 ///
 /// C++26 features used:
 ///   - std::expected<T,E> for error handling (no exceptions for control flow)
@@ -18,6 +21,7 @@
 ///   - std::chrono for sample timestamps
 ///
 /// @author LamiaFabrica Team
+/// @version 2.0.0
 
 #include "hq/cxx26_features.hpp"
 
@@ -75,6 +79,7 @@ enum class HailoErrorCode : int {
     TemperatureReadFailed,
     InfoReadFailed,
     InferenceCountFailed,
+    NotInitialized,       ///< HailoRT SDK not available
     SensorMismatch,       ///< Dual indicators diverge beyond sanity threshold
     PcieResetFailed,
     InvalidArgument,
@@ -177,7 +182,7 @@ public:
     /// @brief Close the device and release all resources.
     void close() noexcept;
 
-    /// @brief Check whether a device is currently open.
+    /// @brief Check whether a real HailoRT device is currently open.
     [[nodiscard]] bool is_open() const noexcept;
 
     /// @brief Get the identifier of the currently open device.
@@ -223,11 +228,11 @@ private:
 
     /// Compute fused utilization from dual indicators.
     [[nodiscard]] float fuse_indicators(float power_util,
-                                        float inference_util) const noexcept;
+                                         float inference_util) const noexcept;
 
     /// Detect sensor mismatch (indicators diverge beyond sanity).
     [[nodiscard]] bool detect_sensor_mismatch(float power_util,
-                                              float inference_util) const noexcept;
+                                               float inference_util) const noexcept;
 
     /// Reset internal inference-delta tracking state.
     void reset_state() noexcept;
@@ -236,7 +241,7 @@ private:
     // Data members
     // -----------------------------------------------------------------------
 
-    DevicePtr device_;                ///< HailoRT device handle
+    DevicePtr device_;                ///< HailoRT device handle (null when SDK absent)
     std::string device_id_;           ///< User-supplied device identifier
     std::string opened_device_id_;    ///< Actual PCIe address from scan
 
@@ -280,6 +285,7 @@ template<typename... Args>
         case HailoErrorCode::TemperatureReadFailed: return "TemperatureReadFailed";
         case HailoErrorCode::InfoReadFailed:      return "InfoReadFailed";
         case HailoErrorCode::InferenceCountFailed: return "InferenceCountFailed";
+        case HailoErrorCode::NotInitialized:      return "NotInitialized";
         case HailoErrorCode::SensorMismatch:      return "SensorMismatch";
         case HailoErrorCode::PcieResetFailed:     return "PcieResetFailed";
         case HailoErrorCode::InvalidArgument:     return "InvalidArgument";

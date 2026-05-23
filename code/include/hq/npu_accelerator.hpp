@@ -12,18 +12,18 @@
 ///   NpuBackend<T> (npu_backend.hpp)  — text encoding contract
 ///   NpuAccelerator<T>                — post-processing contract (this file)
 ///
-/// Current implementation status (2026-05-22):
-///   SyntheticNpuPostProcessor — always available, CPU pass-through (no real NPU)
-///   HailoNpuPostProcessor     — skeleton: delegates to synthetic (HailoRT not installed)
+/// Current implementation status (2026-05-23):
+///   CpuPostProcessor        — CPU pass-through (no real NPU, honest about it)
+///   HailoNpuPostProcessor   — skeleton: returns error until HailoRT + HEF available
 ///
 /// Extension path (production):
 ///   1. Install HailoRT SDK on Ubuntu 22.04 / 24.04 (not Windows)
 ///   2. Compile Hailo Executable Format (HEF) for the desired post-processing network
 ///   3. Implement HailoNpuPostProcessor::post_process() via hailo_async_infer_runner
-///   4. Set is_available() = true when device found via hailort::Device::scan_pcie()
+///   4. Set is_available() = true when device found + HEF loaded
 ///
 /// @author LamiaFabrica Team
-/// @version 1.0.0
+/// @version 2.0.0
 
 #include "hq/cxx26_features.hpp"
 
@@ -68,9 +68,9 @@ struct NpuPostProcessResult {
     std::vector<std::uint8_t> pixels;      ///< RGBA8 output (same size as input)
     std::uint32_t width{0};
     std::uint32_t height{0};
-    float processing_time_us{0.0f};        ///< Wall-clock duration of the NPU call
+    float processing_time_us{0.0f};        ///< Wall-clock duration of the call
     float npu_utilization{0.0f};           ///< NN-core utilization % during this pass
-    bool  was_npu_accelerated{false};      ///< True only when real NPU ran (not synthetic)
+    bool  was_npu_accelerated{false};      ///< True only when real NPU ran (not CPU)
 };
 
 // ===========================================================================
@@ -80,7 +80,8 @@ struct NpuPostProcessResult {
 /// @brief Runtime-polymorphic interface for image post-processing on the NPU.
 ///
 /// Mirrors the INpuEncoder pattern: a single virtual table, factory-selected
-/// at pipeline init, with a synthetic fallback that is always available.
+/// at pipeline init, with a CPU fallback that honestly reports it performs
+/// no NPU work.
 class INpuPostProcessor {
 public:
     virtual ~INpuPostProcessor() = default;
@@ -99,9 +100,9 @@ public:
     /// CFG-blended noise prediction fed to the scheduler.
     ///
     /// Production (HailoNpuPostProcessor): submitted as SAXPY on Hailo-8L NN core.
-    /// Current (SyntheticNpuPostProcessor): CPU scalar SAXPY, measured and logged.
+    /// Current (CpuPostProcessor): CPU scalar SAXPY, measured and logged.
     ///
-    /// For SD 1.5 at 512×512: 16,384 floats per step × 20 steps = 327,680 ops/generation.
+    /// For SD 1.5 at 512x512: 16,384 floats per step x 20 steps = 327,680 ops/generation.
     [[nodiscard]] virtual std::expected<void, std::string>
     blend_noise_cfg(std::span<float>       noise_out,
                     std::span<const float> noise_uncond,
@@ -121,18 +122,20 @@ public:
 };
 
 // ===========================================================================
-// SyntheticNpuPostProcessor — CPU pass-through, always available
+// CpuPostProcessor — CPU pass-through, honest about zero NPU acceleration
 // ===========================================================================
 
 /// @brief CPU pass-through post-processor.
 ///
-/// Copies pixels unchanged.  Used when HailoRT is not installed or the
-/// requested task type is unsupported.  Always available; sets
-/// was_npu_accelerated = false.
-class SyntheticNpuPostProcessor final : public INpuPostProcessor {
+/// Copies pixels unchanged. Used when HailoRT is not installed or the
+/// requested task type is unsupported. is_available() returns FALSE because
+/// this component performs NO NPU acceleration. It exists as a safe fallback
+/// so the pipeline can run without NPU hardware, but it provides zero
+/// acceleration and must not be presented as an NPU component.
+class CpuPostProcessor final : public INpuPostProcessor {
 public:
-    SyntheticNpuPostProcessor() = default;
-    ~SyntheticNpuPostProcessor() override = default;
+    CpuPostProcessor() = default;
+    ~CpuPostProcessor() override = default;
 
     [[nodiscard]] std::expected<NpuPostProcessResult, std::string>
     post_process(const NpuPostProcessRequest& req) override;
@@ -143,28 +146,33 @@ public:
                     float                  guidance_scale) noexcept override;
 
     [[nodiscard]] bool can_handle(NpuTaskType task) const override;
-    [[nodiscard]] bool is_available() const override { return true; }
-    [[nodiscard]] std::string name() const override { return "Synthetic-PassThrough"; }
+    /// @return false — this CPU pass-through performs no NPU acceleration.
+    ///   Callers must not treat this component as an NPU accelerator.
+    ///   It exists as a safe fallback so the pipeline runs without NPU hardware,
+    ///   but it provides zero acceleration.
+    [[nodiscard]] bool is_available() const override { return false; }
+    [[nodiscard]] std::string name() const override { return "CPU-PassThrough"; }
+    /// @return 0.0f — this is a CPU pass-through, not real NPU hardware.
     [[nodiscard]] float utilization() const override { return 0.0f; }
 };
 
 // ===========================================================================
-// HailoNpuPostProcessor — skeleton (HailoRT not yet installed)
+// HailoNpuPostProcessor — production Hailo-8L post-processing (not yet wired)
 // ===========================================================================
 
-/// @brief Hailo-8L post-processing backend (skeleton).
+/// @brief Hailo-8L post-processing backend.
 ///
 /// Production path: compile a post-processing network (noise reduction, ESRGAN
 /// upscaler, etc.) to a Hailo Executable Format (HEF) and invoke via
-/// hailo_async_infer_runner.  Currently delegates to SyntheticNpuPostProcessor
-/// because HailoRT is not installed on the build host.
+/// hailo_async_infer_runner. Currently returns errors because HailoRT is not
+/// installed on the build host and no HEF is compiled.
 ///
 /// @experimental
-///   HailoNpuPostProcessor is always unavailable on this build:
+///   HailoNpuPostProcessor is unavailable on this build:
 ///     - HailoRT SDK not installed (pkg_check_modules(HAILORT hailort) fails)
 ///     - No HEF compiled for any post-processing network
 ///     - Windows PCIe enumeration blocked (HailoRT Linux-only)
-///   is_available() returns false; all calls delegate to SyntheticNpuPostProcessor.
+///   is_available() returns false; all calls return errors.
 class HailoNpuPostProcessor final : public INpuPostProcessor {
 public:
     HailoNpuPostProcessor();
@@ -180,11 +188,11 @@ public:
 
     [[nodiscard]] bool can_handle(NpuTaskType task) const override;
     [[nodiscard]] bool is_available() const override { return false; }
-    [[nodiscard]] std::string name() const override { return "Hailo-8L PostProcessor (skeleton)"; }
+    [[nodiscard]] std::string name() const override { return "Hailo-8L PostProcessor (not yet wired)"; }
     [[nodiscard]] float utilization() const override { return 0.0f; }
 
 private:
-    SyntheticNpuPostProcessor synthetic_fallback_;
+    // No synthetic fallback — CpuPostProcessor handles fallback in the factory.
 };
 
 // ===========================================================================
@@ -194,8 +202,8 @@ private:
 /// @brief Selects the highest-capability post-processor available at runtime.
 ///
 /// Priority:
-///   1. HailoNpuPostProcessor (is_available() = false until HailoRT installed)
-///   2. SyntheticNpuPostProcessor (always available)
+///   1. HailoNpuPostProcessor (is_available() = false until HailoRT + HEF ready)
+///   2. CpuPostProcessor (honest CPU fallback — is_available() = false)
 class NpuPostProcessorFactory {
 public:
     /// @brief Construct and return the best post-processor for this hardware.
@@ -212,7 +220,7 @@ public:
 /// Distinct from NpuBackend<T> (which covers text encoding) — post-processors
 /// do not perform text encoding, so the two contracts are kept separate.
 ///
-/// Satisfied by SyntheticNpuPostProcessor, HailoNpuPostProcessor, and any
+/// Satisfied by CpuPostProcessor, HailoNpuPostProcessor, and any
 /// future class that implements post_process() + can_handle().
 template<typename T>
 concept NpuAccelerator =
@@ -230,8 +238,8 @@ concept NpuAccelerator =
     };
 
 // Concept proofs — compilation fails if any class violates the contract.
-static_assert(NpuAccelerator<SyntheticNpuPostProcessor>,
-    "SyntheticNpuPostProcessor must satisfy NpuAccelerator");
+static_assert(NpuAccelerator<CpuPostProcessor>,
+    "CpuPostProcessor must satisfy NpuAccelerator");
 static_assert(NpuAccelerator<HailoNpuPostProcessor>,
     "HailoNpuPostProcessor must satisfy NpuAccelerator");
 

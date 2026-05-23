@@ -92,6 +92,28 @@ struct GenerationRequest {
 };
 
 // ---------------------------------------------------------------------------
+/// @brief Honest hardware acceleration report for a single generate() call.
+///
+/// Every stage reports whether real hardware was used or a CPU/synthetic
+/// fallback. Callers should treat any stage marked `false` as "no acceleration
+/// — data was produced by CPU compute or deterministic synthesis."
+// ---------------------------------------------------------------------------
+struct HardwareAccelerationReport {
+    bool  text_encode_used_npu{false};       ///< True only if real NPU hardware encoded text
+    bool  text_encode_used_gpu{false};       ///< True only if GPU-accelerated text encoding
+    bool  denoise_used_gpu{false};           ///< True only if UNet ran on GPU (CUDA/ROCm EP)
+    bool  vae_decode_used_gpu{false};         ///< True only if VAE ran on GPU
+    bool  post_process_used_npu{false};      ///< True only if real NPU post-processing
+    bool  cfg_blend_used_npu{false};         ///< True only if CFG blend ran on NPU
+    bool  hailo_telemetry_real{false};       ///< True only if HailoMonitor is reading real sensors
+    bool  gpu_telemetry_real{false};         ///< True only if GPUMonitor is reading real sensors
+
+    std::string encoder_name;                ///< npu_encoder_->name() — "Hailo-8L", "ONNX-CPU", "none"
+    std::string post_processor_name;          ///< npu_post_processor_->name()
+    std::string gpu_backend_name;            ///< "NVML", "ROCM_SMI", "None"
+};
+
+// ---------------------------------------------------------------------------
 /// @brief Result of a successful image generation.
 // ---------------------------------------------------------------------------
 struct GeneratedImage {
@@ -99,6 +121,7 @@ struct GeneratedImage {
     uint32_t                  width{0};   ///< Image width
     uint32_t                  height{0};  ///< Image height
     float                     generation_time_ms{0.0f};  ///< Wall-clock time
+    HardwareAccelerationReport acceleration;  ///< Honest hardware usage report
 };
 
 // ---------------------------------------------------------------------------
@@ -118,6 +141,7 @@ struct PipelinePhaseTimings {
     uint32_t num_denoise_steps{0};      ///< actual steps executed
     std::string encoder_name;           ///< npu_encoder_->name() selected at init
     std::string post_processor_name;    ///< npu_post_processor_->name() selected at init
+    HardwareAccelerationReport acceleration;  ///< hardware usage report from last generate()
 };
 
 // ---------------------------------------------------------------------------
@@ -324,6 +348,9 @@ private:
     // --- Latent checkpoint for recovery (TMM Cool-tier, RAII) ---
     std::optional<ScopedTierAlloc> latent_checkpoint_;
     std::size_t latent_checkpoint_floats_{0};
+
+    // --- Current latents reference for watchdog recovery callback ---
+    hq::tensor::FloatTensor4D current_latents_{};
 
     // --- Lifecycle ---
     bool shutdown_{false};

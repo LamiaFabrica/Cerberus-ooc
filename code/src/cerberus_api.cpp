@@ -454,6 +454,7 @@ cerberus_status_t cerberus_get_utilization(
             }
 #else
             *utilization_percent = 0.0f;
+            std::print("[cerberus] WARNING CPU utilization unavailable on this platform — returning 0%%.\n");
 #endif
             break;
         }
@@ -520,6 +521,9 @@ cerberus_status_t cerberus_get_load_balance_hint(
             cpu_util = clamp_util(load_pct);
         }
     }
+#else
+    cpu_util = 0.0f;
+    std::print("[cerberus] WARNING CPU utilization unavailable on this platform — load balance hint may be inaccurate.\n");
 #endif
 
     if (gs.shared_npu)

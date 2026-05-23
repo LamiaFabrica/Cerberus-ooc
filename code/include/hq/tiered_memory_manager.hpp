@@ -11,7 +11,7 @@
 ///
 /// Tier hierarchy (hot → cold):
 ///   Hot  — NPU SRAM + GPU VRAM (device-local, fastest)
-///   Warm — CXL coherent pool (128–256 GiB coherent DRAM expander)
+///   Warm — System RAM fallback (CXL would be 128–256 GiB coherent DRAM expander when available)
 ///   Cool — System RAM (64 GiB DDR5)
 ///   Cold — NVMe / external SSD (4 TB+ persistent tier)
 ///
@@ -130,7 +130,7 @@ struct TierAllocation {
 struct TieredMemoryConfig {
     // Tier capacities (0 = tier disabled)
     std::size_t hot_capacity_bytes  = 0;              ///< GPU VRAM budget (0=auto from ROCm)
-    std::size_t warm_capacity_bytes = 128ULL << 30;   ///< CXL pool (128 GiB default)
+    std::size_t warm_capacity_bytes = 128ULL << 30;   ///< Warm tier (CXL if available, else RAM; 128 GiB default)
     std::size_t cool_capacity_bytes =  64ULL << 30;   ///< System RAM pool (64 GiB)
     std::size_t cold_capacity_bytes =   4ULL << 40;   ///< NVMe budget (4 TiB)
 
