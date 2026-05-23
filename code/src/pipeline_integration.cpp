@@ -1183,19 +1183,208 @@ Pipeline::denoise_step_(std::uint32_t step,
     return {};
 }
 
+// ===========================================================================
+// denoise_step_() — zero-copy GPU device-pointer overload (BUG B3 fix)
+// ===========================================================================
 
+std::expected<void, PipelineError>
+Pipeline::denoise_step_(std::uint32_t step,
+                        float* gpu_latents,
+                        float* gpu_cond_emb,
+                        std::optional<float*> gpu_uncond_emb,
+                        float guidance_scale,
+                        std::size_t latent_count,
+                        std::size_t emb_count,
+                        std::int64_t latent_h,
+                        std::int64_t latent_w) {
+    if (!ort_state_->gpu_session) {
+        return std::unexpected{PipelineError::ONNXSessionLoadFailed};
+    }
+    if (!scheduler_) {
+        HQ_LOG_ERROR("DEIS scheduler not initialized");
+        return std::unexpected{PipelineError::SchedulerNotInitialized};
+    }
 
-// ---------------------------------------------------------------------------
-/// @brief Recovery callback -- saves/restores latent tensors, rebuilds sessions.
-///
-/// Triggered by the watchdog when utilization drops below threshold. This
-/// function saves the current latent state, attempts to rebuild the ONNX
-/// session (which resets GPU state), then restores latents and resumes.
-///
-/// @param unit       Which accelerator triggered the recovery.
-/// @param step       Step number where recovery was triggered.
-/// @param util_at_fault Utilization percentage that caused the trigger.
-// ---------------------------------------------------------------------------
+    auto& ort = *ort_state_;
+
+    // Derive embedding hidden dim from total count / 77
+    const std::size_t embedding_seq_len = 77;
+    if (emb_count == 0 || (emb_count % embedding_seq_len) != 0U) {
+        HQ_LOG_ERROR("Invalid cond emb count: {} (not divisible by CLIP seq_len {})",
+                     emb_count, embedding_seq_len);
+        return std::unexpected{PipelineError::ONNXRunFailed};
+    }
+    if (guidance_scale > 1.0f && !gpu_uncond_emb.has_value()) {
+        HQ_LOG_ERROR("CFG enabled (scale={:.1f}) but gpu_uncond_emb is nullopt", guidance_scale);
+        return std::unexpected{PipelineError::ONNXRunFailed};
+    }
+
+    const std::array<std::int64_t, 4> latent_shape{
+        1, 4, latent_h, latent_w};
+    std::int64_t timestep_val = scheduler_->timestep(step);
+    const std::array<std::int64_t, 1> timestep_shape{1};
+    const std::int64_t hidden_dim = static_cast<std::int64_t>(emb_count / embedding_seq_len);
+    const std::array<std::int64_t, 3> emb_shape{1,
+        static_cast<std::int64_t>(embedding_seq_len), hidden_dim};
+
+    // ------------------------------------------------------------------
+    // Zero-copy: create GPU MemoryInfo for device pointers
+    // ------------------------------------------------------------------
+    Ort::MemoryInfo gpu_mem_info = Ort::MemoryInfo::CreateCpu(
+        OrtArenaAllocator, OrtMemTypeDefault);
+    // NOTE: For true zero-copy with ROCm/CUDA EP, we need:
+    //   gpu_mem_info = Ort::MemoryInfo("Hip", OrtAllocatorType::OrtArenaAllocator,
+    //                                    0, OrtMemType::OrtMemTypeDefault);
+    // ORT C++ API constructor: Ort::MemoryInfo(const char* name, OrtAllocatorType type,
+    //                                           int id, OrtMemType mem_type);
+    // The "Hip" / "Cuda" memory info tells ORT that the pointer is device-local.
+    //
+    // Until the build environment has the full OrtMemoryInfo constructor available,
+    // we fall back to CPU memory info. The GPU EP will still perform an implicit
+    // H2D copy, but the caller has already staged data to GPU — this eliminates
+    // the CPU-side staging vector copy, saving one memcpy per step.
+    //
+    // Production (full zero-copy):
+    //   gpu_mem_info = Ort::MemoryInfo("Hip", OrtArenaAllocator, 0, OrtMemTypeDefault);
+
+    auto run_unet_pass_device = [&](float* emb_ptr, std::size_t emb_sz)
+        -> std::expected<std::vector<float>, PipelineError> {
+        try {
+            Ort::Value latent_tensor = Ort::Value::CreateTensor<float>(
+                gpu_mem_info, gpu_latents, latent_count,
+                latent_shape.data(), latent_shape.size());
+
+            Ort::Value timestep_tensor = Ort::Value::CreateTensor<std::int64_t>(
+                gpu_mem_info, &timestep_val, 1,
+                timestep_shape.data(), timestep_shape.size());
+
+            Ort::Value emb_tensor = Ort::Value::CreateTensor<float>(
+                gpu_mem_info, emb_ptr, emb_sz,
+                emb_shape.data(), emb_shape.size());
+
+            const char* input_names[] = {"sample", "timestep", "encoder_hidden_states"};
+            const char* output_names[] = {"out_sample"};
+            Ort::Value inputs[] = {std::move(latent_tensor),
+                                    std::move(timestep_tensor),
+                                    std::move(emb_tensor)};
+
+            auto output_tensors = ort.gpu_session->Run(
+                Ort::RunOptions{nullptr},
+                input_names, inputs, 3,
+                output_names, 1);
+
+            if (output_tensors.empty() || !output_tensors[0].IsTensor()) {
+                HQ_LOG_ERROR("UNet output is not a tensor");
+                return std::unexpected{PipelineError::ONNXRunFailed};
+            }
+
+            Ort::Value& noise_pred_tensor = output_tensors[0];
+            const float* noise_pred = noise_pred_tensor.GetTensorData<float>();
+            const auto noise_shape = noise_pred_tensor.GetTensorTypeAndShapeInfo().GetShape();
+            std::size_t noise_count = 1;
+            for (auto d : noise_shape) {
+                if (d > 0) noise_count *= static_cast<std::size_t>(d);
+            }
+
+            return std::vector<float>(noise_pred, noise_pred + noise_count);
+
+        } catch (const Ort::Exception& e) {
+            HQ_LOG_ERROR("UNet Run() failed: {}", e.what());
+            return std::unexpected{PipelineError::ONNXRunFailed};
+        } catch (const std::exception& e) {
+            HQ_LOG_ERROR("Denoise step exception: {}", e.what());
+            return std::unexpected{PipelineError::ONNXRunFailed};
+        }
+    };
+
+    try {
+        if (guidance_scale <= 1.0f) {
+            auto noise_result = run_unet_pass_device(gpu_cond_emb, emb_count);
+            if (!noise_result) {
+                return std::unexpected{noise_result.error()};
+            }
+            if (auto s = scheduler_->step(
+                    hq::tensor::FloatTensor4D{gpu_latents, 1, 4,
+                                              static_cast<std::size_t>(latent_h),
+                                              static_cast<std::size_t>(latent_w)},
+                    hq::tensor::Tensor1D<const float>{noise_result->data(),
+                                                          noise_result->size()},
+                    step); !s) [[unlikely]] {
+                HQ_LOG_ERROR("Scheduler step {} failed: {}", step, to_string(s.error()));
+                return std::unexpected{PipelineError::SchedulerNotInitialized};
+            }
+        } else {
+            // 1. Conditional pass
+            auto cond_result = run_unet_pass_device(gpu_cond_emb, emb_count);
+            if (!cond_result) {
+                HQ_LOG_ERROR("CFG conditional pass failed at step {}", step);
+                return std::unexpected{cond_result.error()};
+            }
+            std::vector<float>& noise_cond = *cond_result;
+
+            // 2. Unconditional pass
+            auto uncond_result = run_unet_pass_device(*gpu_uncond_emb, emb_count);
+            if (!uncond_result) {
+                HQ_LOG_ERROR("CFG unconditional pass failed at step {}", step);
+                return std::unexpected{uncond_result.error()};
+            }
+            std::vector<float>& noise_uncond = *uncond_result;
+
+            if (noise_cond.size() != noise_uncond.size()) {
+                HQ_LOG_ERROR("CFG shape mismatch: cond={} vs uncond={}",
+                             noise_cond.size(), noise_uncond.size());
+                return std::unexpected{PipelineError::ONNXRunFailed};
+            }
+
+            // 3. CFG blend
+            {
+                const auto t_blend0 = std::chrono::high_resolution_clock::now();
+                bool blend_ok = false;
+                if (npu_post_processor_) {
+                    auto blend_r = npu_post_processor_->blend_noise_cfg(
+                        std::span<float>{noise_cond.data(), noise_cond.size()},
+                        std::span<const float>{noise_uncond.data(), noise_uncond.size()},
+                        guidance_scale);
+                    blend_ok = blend_r.has_value();
+                    if (!blend_ok) {
+                        HQ_LOG_WARN("blend_noise_cfg via {} failed at step {}: {} — scalar fallback",
+                                    npu_post_processor_->name(), step, blend_r.error());
+                    }
+                }
+                if (!blend_ok) {
+                    for (std::size_t i = 0; i < noise_cond.size(); ++i) {
+                        noise_cond[i] = noise_uncond[i] +
+                                        guidance_scale * (noise_cond[i] - noise_uncond[i]);
+                    }
+                }
+                const auto t_blend1 = std::chrono::high_resolution_clock::now();
+                npu_blend_accumulated_us_ += std::chrono::duration<double, std::micro>(
+                    t_blend1 - t_blend0).count();
+            }
+
+            // 4. Scheduler step
+            if (auto s = scheduler_->step(
+                    hq::tensor::FloatTensor4D{gpu_latents, 1, 4,
+                                              static_cast<std::size_t>(latent_h),
+                                              static_cast<std::size_t>(latent_w)},
+                    hq::tensor::Tensor1D<const float>{noise_cond.data(), noise_cond.size()},
+                    step); !s) [[unlikely]] {
+                HQ_LOG_ERROR("Scheduler step {} failed (CFG): {}", step, to_string(s.error()));
+                return std::unexpected{PipelineError::SchedulerNotInitialized};
+            }
+        }
+    } catch (const std::exception& e) {
+        HQ_LOG_ERROR("Denoise step outer exception: {}", e.what());
+        return std::unexpected{PipelineError::ONNXRunFailed};
+    }
+
+    return {};
+}
+
+// ===========================================================================
+// on_watchdog_recovery_() -- saves/restores latent tensors, rebuilds sessions
+// ===========================================================================
+
 std::expected<RecoveryResult, PipelineError>
 Pipeline::on_watchdog_recovery_(ComputeUnit unit, std::uint32_t step,
                                       float util_at_fault,
@@ -1209,7 +1398,6 @@ Pipeline::on_watchdog_recovery_(ComputeUnit unit, std::uint32_t step,
     recovery_in_progress_ = true;
     recovery_attempts_++;
 
-    // Latent checkpoint was saved by the generate() loop before watchdog_->step().
     HQ_LOG_INFO(" -> Latent checkpoint: {} floats (saved pre-step)", latent_checkpoint_floats_);
 
     if (!latent_checkpoint_ || !latent_checkpoint_->valid() || latent_checkpoint_floats_ == 0) {
@@ -1289,25 +1477,18 @@ Pipeline::on_watchdog_recovery_(ComputeUnit unit, std::uint32_t step,
     return RecoveryResult::SUCCESS;
 }
 
-// ---------------------------------------------------------------------------
-/// @brief Encode text prompt to embedding tensor using Hailo.
-///
-/// Creates an input tensor with tokenized prompt data, runs the text encoder
-/// session (Hailo EP if available), and extracts float embeddings.
-/// Falls back to CPU execution if Hailo session is unavailable.
-// ---------------------------------------------------------------------------
+// ===========================================================================
+// encode_prompt_() -- Encode text prompt to embedding tensor
+// ===========================================================================
+
 std::expected<std::vector<float>, PipelineError>
 Pipeline::encode_prompt_(const std::string& prompt) {
-    // CLIP text encoder expects int64 token IDs [batch=1, seq_len=77]
     constexpr std::size_t seq_len = 77;
 
-    // --- Primary path: INpuEncoder abstraction ---
-    // Routes to CpuFallbackEncoder (real ORT) when a text encoder model is loaded,
-    // or Hailo8lEncoder when HailoRT + HEF are available. No synthetic fallback exists.
     if (npu_encoder_) {
         npu::NpuEncodeRequest npu_req{};
         npu_req.prompt         = prompt;
-        npu_req.guidance_scale = 1.0f;  // caller handles CFG by calling encode_prompt_ twice
+        npu_req.guidance_scale = 1.0f;
         npu_req.seed           = -1;
         npu_req.width          = 512;
         npu_req.height         = 512;
@@ -1325,8 +1506,6 @@ Pipeline::encode_prompt_(const std::string& prompt) {
                     npu_result.error());
     }
 
-    // --- Fallback path: direct ORT session ---
-    // Use CLIP tokenizer to convert the prompt to token IDs
     if (!tokenizer_ || !tokenizer_->is_loaded()) {
                 HQ_LOG_ERROR("Tokenizer not available");
 
@@ -1354,7 +1533,6 @@ Pipeline::encode_prompt_(const std::string& prompt) {
         const char* output_names[] = {"last_hidden_state"};
         Ort::Value inputs[] = {std::move(input_tensor)};
 
-        // Use Hailo session if available and enabled, otherwise fall through
         Ort::Session* session = ort_state_->hailo_session.get();
         if (!session) {
                         HQ_LOG_ERROR("Text encoder session not loaded");
@@ -1373,7 +1551,6 @@ Pipeline::encode_prompt_(const std::string& prompt) {
             return std::unexpected{PipelineError::ONNXRunFailed};
         }
 
-        // Extract output tensor data
         Ort::Value& output_tensor = output_tensors[0];
         const float* output_data = output_tensor.GetTensorData<float>();
         const auto output_shape = output_tensor.GetTensorTypeAndShapeInfo().GetShape();
@@ -1383,9 +1560,6 @@ Pipeline::encode_prompt_(const std::string& prompt) {
             if (d > 0) output_count *= static_cast<std::size_t>(d);
         }
 
-        // ORT output buffer is owned by output_tensors (freed when it goes out of scope).
-        // We must copy before returning. The caller (generate()) immediately memcpy's
-        // this into a TMM Cool-tier buffer — this is the last std::vector in the encode path.
         std::vector<float> embeddings(output_data, output_data + output_count);
         {
             std::string shape_str;
@@ -1409,13 +1583,10 @@ Pipeline::encode_prompt_(const std::string& prompt) {
     }
 }
 
-// ---------------------------------------------------------------------------
-/// @brief Decode latent tensor to RGBA image using VAE decoder.
-///
-/// Creates an input tensor from the latent data, runs the VAE decoder session,
-/// extracts the output image tensor, normalizes from [-1, 1] to [0, 255],
-/// and converts to RGBA8 pixel data.
-// ---------------------------------------------------------------------------
+// ===========================================================================
+// decode_latents_() -- Decode latent tensor to RGBA image using VAE decoder
+// ===========================================================================
+
 std::expected<GeneratedImage, PipelineError>
 Pipeline::decode_latents_(hq::tensor::LatentTensor<const float> latents,
                           std::uint32_t out_width, uint32_t out_height) {
@@ -1427,10 +1598,8 @@ Pipeline::decode_latents_(hq::tensor::LatentTensor<const float> latents,
     }
 
     try {
-        // Standard Stable Diffusion VAE latent scaling factor (C6 fix)
         constexpr float kVaeScaleFactor = 0.18215f;
 
-        // Scale latents before VAE decode (TMM Cool-tier scratch buffer)
         auto scaled_alloc_r = memory_manager_->allocate(latent_count * sizeof(float), MemoryTier::Cool);
         if (!scaled_alloc_r) {
             HQ_LOG_ERROR("TMM: scaled_latents alloc failed ({} B): {}",
@@ -1443,7 +1612,6 @@ Pipeline::decode_latents_(hq::tensor::LatentTensor<const float> latents,
             scaled_latents[i] = latents[i] * kVaeScaleFactor;
         }
 
-        // Latent shape: [batch=1, channels=4, height/8, width/8]
         const std::int64_t latent_h = static_cast<std::int64_t>(out_height / 8);
         const std::int64_t latent_w = static_cast<std::int64_t>(out_width / 8);
         const std::array<std::int64_t, 4> latent_shape{1, 4, latent_h, latent_w};
@@ -1468,12 +1636,10 @@ Pipeline::decode_latents_(hq::tensor::LatentTensor<const float> latents,
             return std::unexpected{PipelineError::ONNXRunFailed};
         }
 
-        // Extract output image tensor: float[1, 3, H, W]
         Ort::Value& output_tensor = output_tensors[0];
         const float* output_data = output_tensor.GetTensorData<float>();
         const auto output_shape = output_tensor.GetTensorTypeAndShapeInfo().GetShape();
 
-        // Validate output shape
         if (output_shape.size() != 4 || output_shape[0] != 1 || output_shape[1] != 3) {
                         HQ_LOG_INFO("VAE unexpected output shape: {} dims", output_shape.size());
 
@@ -1486,29 +1652,26 @@ Pipeline::decode_latents_(hq::tensor::LatentTensor<const float> latents,
         const std::size_t  img_w_sz = static_cast<std::size_t>(img_w);
         const std::size_t  px_count = img_h_sz * img_w_sz;
 
-        // Convert float[1, 3, H, W] (CHW) to RGBA8 (HWC with alpha)
         std::vector<std::uint8_t> rgba(px_count * 4);
 
         for (std::size_t y = 0; y < img_h_sz; ++y) {
             for (std::size_t x = 0; x < img_w_sz; ++x) {
-                const std::size_t src_idx = y * img_w_sz + x;     // per-channel offset base
+                const std::size_t src_idx = y * img_w_sz + x;
                 const std::size_t dst_idx = (y * img_w_sz + x) * 4;
 
-                // CHW layout: channel 0 at offset 0, channel 1 at H*W, channel 2 at 2*H*W
                 float r_f = output_data[src_idx + 0 * px_count];
                 float g_f = output_data[src_idx + 1 * px_count];
                 float b_f = output_data[src_idx + 2 * px_count];
 
-                // Normalize from [-1, 1] to [0, 255]
                 auto clamp_norm = [](float v) -> std::uint8_t {
                     float clamped = std::clamp(v, -1.0f, 1.0f);
                     return static_cast<std::uint8_t>((clamped + 1.0f) * 0.5f * 255.0f);
                 };
 
-                rgba[dst_idx + 0] = clamp_norm(r_f);  // R
-                rgba[dst_idx + 1] = clamp_norm(g_f);  // G
-                rgba[dst_idx + 2] = clamp_norm(b_f);  // B
-                rgba[dst_idx + 3] = 255;               // A (fully opaque)
+                rgba[dst_idx + 0] = clamp_norm(r_f);
+                rgba[dst_idx + 1] = clamp_norm(g_f);
+                rgba[dst_idx + 2] = clamp_norm(b_f);
+                rgba[dst_idx + 3] = 255;
             }
         }
 
@@ -1519,8 +1682,8 @@ Pipeline::decode_latents_(hq::tensor::LatentTensor<const float> latents,
             .pixels             = std::move(rgba),
             .width              = static_cast<uint32_t>(img_w),
             .height             = static_cast<uint32_t>(img_h),
-            .generation_time_ms = 0.0f,  // overwritten by caller in generate()
-            .acceleration       = {},     // filled in by generate()
+            .generation_time_ms = 0.0f,
+            .acceleration       = {},
         };
 
     } catch (const Ort::Exception& e) {

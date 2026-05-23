@@ -30,6 +30,7 @@
 #include <concepts>
 #include <cstdint>
 #include <expected>
+#include <filesystem>
 #include <memory>
 #include <span>
 #include <string>
@@ -164,19 +165,18 @@ public:
 ///
 /// Production path: compile a post-processing network (noise reduction, ESRGAN
 /// upscaler, etc.) to a Hailo Executable Format (HEF) and invoke via
-/// hailo_async_infer_runner. Currently returns errors because HailoRT is not
-/// installed on the build host and no HEF is compiled.
+/// hailo_async_infer_runner.
 ///
-/// @experimental
-///   HailoNpuPostProcessor is unavailable on this build:
-///     - HailoRT SDK not installed (pkg_check_modules(HAILORT hailort) fails)
-///     - No HEF compiled for any post-processing network
-///     - Windows PCIe enumeration blocked (HailoRT Linux-only)
-///   is_available() returns false; all calls return errors.
+/// Delegation strategy:
+///   - No post-HEF loaded → delegates blend_noise_cfg and post_process to
+///     CpuPostProcessor (honest CPU fallback, zero NPU acceleration claimed).
+///   - post-HEF loaded → real Hailo-8L inference (v2.2).
+///
+/// is_available() returns true ONLY when Hailo device found AND post-HEF loaded.
 class HailoNpuPostProcessor final : public INpuPostProcessor {
 public:
     HailoNpuPostProcessor();
-    ~HailoNpuPostProcessor() override = default;
+    ~HailoNpuPostProcessor() override;
 
     [[nodiscard]] std::expected<NpuPostProcessResult, std::string>
     post_process(const NpuPostProcessRequest& req) override;
@@ -187,12 +187,23 @@ public:
                     float                  guidance_scale) noexcept override;
 
     [[nodiscard]] bool can_handle(NpuTaskType task) const override;
-    [[nodiscard]] bool is_available() const override { return false; }
-    [[nodiscard]] std::string name() const override { return "Hailo-8L PostProcessor (not yet wired)"; }
-    [[nodiscard]] float utilization() const override { return 0.0f; }
+    [[nodiscard]] bool is_available() const override;
+    [[nodiscard]] std::string name() const override;
+    [[nodiscard]] float utilization() const override;
+
+    /// @brief True when a Hailo device is physically present (regardless of post-HEF).
+    [[nodiscard]] bool device_present() const noexcept;
+
+    /// @brief Load a compiled post-processing HEF.
+    /// @return true on success, false on failure (check unavailable_reason()).
+    [[nodiscard]] bool load_post_hef(const std::filesystem::path& hef_path);
+
+    /// @brief Diagnostic: why is_available() returned false.
+    [[nodiscard]] std::string unavailable_reason() const;
 
 private:
-    // No synthetic fallback — CpuPostProcessor handles fallback in the factory.
+    struct Impl;
+    std::unique_ptr<Impl> impl_;
 };
 
 // ===========================================================================

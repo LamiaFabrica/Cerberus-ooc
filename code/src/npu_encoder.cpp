@@ -61,11 +61,11 @@ struct Hailo8lEncoder::Impl {
 
 #if HAILO_ENCODER_HAS_HAILORT
     // HailoRT production handles
-    std::unique_ptr\u003chailort::Device\u003e        device;
-    std::unique_ptr\u003chailort::VDevice\u003e       vdevice;
-    std::unique_ptr\u003chailort::InferModel\u003e    infer_model;
-    std::unique_ptr\u003chailort::AsyncInferRunner\u003e runner;
-    std::vector\u003cstd::uint8_t\u003e                hef_buffer;
+    std::unique_ptr<hailort::Device>        device;
+    std::unique_ptr<hailort::VDevice>       vdevice;
+    std::unique_ptr<hailort::InferModel>    infer_model;
+    std::unique_ptr<hailort::AsyncInferRunner> runner;
+    std::vector<std::uint8_t>                hef_buffer;
 #endif
 
     explicit Impl(std::string addr, std::filesystem::path hef)
@@ -538,6 +538,55 @@ NpuEncoderFactory::create_best_available(
     // ---- No encoder available ----
     HQ_LOG_WARN("[NpuEncoderFactory] No NPU or ORT encoder available — returning nullptr");
     return nullptr;
+}
+
+// ===========================================================================
+// NpuEncoderFactory::enumerate_devices — multi-device enumeration for clustering
+// ===========================================================================
+
+std::vector<NpuEncoderFactory::DeviceInfo>
+NpuEncoderFactory::enumerate_devices(const std::filesystem::path& hef_path) {
+    std::vector<DeviceInfo> devices;
+
+#if HAILO_ENCODER_HAS_HAILORT
+    auto scan_result = hailort::Device::scan_pcie();
+    if (!scan_result || scan_result.value().empty()) {
+        HQ_LOG_DEBUG("[NpuEncoderFactory] enumerate_devices: no Hailo devices found");
+        return devices;
+    }
+
+    for (const auto& dev : scan_result.value()) {
+        DeviceInfo info;
+        info.pcie_address = dev.dev_id;
+
+        // Try to open the device to check if HEF loads
+        auto probe = std::make_unique<Hailo8lEncoder>(dev.dev_id, hef_path);
+        if (probe->is_available()) {
+            info.hef_loaded = true;
+            info.status = "ready";
+        } else {
+            info.hef_loaded = false;
+            std::string reason = probe->unavailable_reason();
+            if (reason.find("HEF") != std::string::npos ||
+                reason.find("hef") != std::string::npos) {
+                info.status = "no HEF";
+            } else if (reason.find("open") != std::string::npos ||
+                       reason.find("Failed") != std::string::npos) {
+                info.status = "busy";
+            } else {
+                info.status = "unavailable";
+            }
+        }
+        devices.push_back(std::move(info));
+    }
+
+    HQ_LOG_INFO("[NpuEncoderFactory] enumerate_devices: {} Hailo device(s) found", devices.size());
+#else
+    (void)hef_path;
+    HQ_LOG_DEBUG("[NpuEncoderFactory] enumerate_devices: HailoRT SDK not compiled");
+#endif
+
+    return devices;
 }
 
 } // namespace hq::npu

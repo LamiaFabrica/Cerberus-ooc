@@ -170,6 +170,14 @@ public:
     /// @return std::expected<void, HailoError>
     [[nodiscard]] std::expected<void, HailoError> open(const std::string& device_id = "");
 
+    /// @brief Open a Hailo device and associate a VDevice for inference counting.
+    /// @param device_id  PCIe identifier.
+    /// @param vdevice    Shared VDevice handle from Hailo8lEncoder or other inference context.
+    /// @return std::expected<void, HailoError>
+    [[nodiscard]] std::expected<void, HailoError> open_with_vdevice(
+        const std::string& device_id,
+        std::shared_ptr<void> vdevice);  // opaque shared_ptr to avoid HailoRT header leak
+
     /// @brief Take a sample: read power, temperature, inference count,
     ///        and compute dual-indicator fused utilization.
     /// @return std::expected<HailoStats, HailoError>
@@ -248,6 +256,9 @@ private:
     // Inference delta tracking
     std::uint64_t prev_inferences_{0};   ///< Previous sample inference count
     bool have_prev_inferences_{false};   ///< True after first sample
+
+    // VDevice integration for real inference counting
+    std::shared_ptr<void> vdevice_;     ///< Opaque shared_ptr<hailort::VDevice> from encoder
 
     // Timestamp tracking
     std::chrono::steady_clock::time_point prev_timestamp_;

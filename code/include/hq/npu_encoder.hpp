@@ -170,6 +170,20 @@ public:
         Ort::Session*    ort_session     = nullptr,
         Ort::MemoryInfo* ort_memory_info = nullptr,
         const std::filesystem::path& hef_path = "");
+
+    /// @brief Probe the system and return descriptions of all available Hailo devices.
+    ///
+    /// Each entry contains the PCIe address and availability status. This enables
+    /// multi-node clustering where the coordinator selects devices across workers.
+    struct DeviceInfo {
+        std::string pcie_address;      ///< e.g. "0000:01:00.0"
+        bool        hef_loaded{false};   ///< True if HEF is currently loaded on this device
+        std::string status;            ///< Human-readable status ("ready", "no HEF", "busy")
+    };
+
+    /// @return Vector of detected Hailo devices. Empty if none found or SDK absent.
+    [[nodiscard]] static std::vector<DeviceInfo> enumerate_devices(
+        const std::filesystem::path& hef_path = "");
 };
 
 } // namespace hq::npu
