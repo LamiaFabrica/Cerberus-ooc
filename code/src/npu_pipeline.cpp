@@ -108,12 +108,11 @@ struct NpuDmaPipeline::Impl {
         }
 
         if (!encoder) {
-            owned_encoder = std::make_unique<SyntheticNpuEncoder>();
-            encoder = owned_encoder.get();
-            std::print("[NpuDmaPipeline] No encoder provided — "
-                       "defaulting to SyntheticNpuEncoder\n");
+            std::print("[NpuDmaPipeline] WARNING: No encoder provided. "
+                       "Pipeline will fail encode requests until an encoder is set.\n");
+        } else {
+            std::print("[NpuDmaPipeline] Active encoder: {}\n", encoder->name());
         }
-        std::print("[NpuDmaPipeline] Active encoder: {}\n", encoder->name());
     }
 
 #if defined(UM790_HAS_HIP)

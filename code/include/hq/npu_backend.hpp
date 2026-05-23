@@ -43,8 +43,8 @@ namespace hq::npu {
 
 /// @brief Statically constrains any type that satisfies the NPU backend contract.
 ///
-/// Satisfied by Hailo8lEncoder, SyntheticNpuEncoder, CpuFallbackEncoder, and
-/// any future backend (WindowsNpuBackend, DirectML, etc.) without requiring
+/// Satisfied by Hailo8lEncoder, CpuFallbackEncoder, WindowsNpuBackend, and
+/// any future backend (DirectML, OpenVINO, etc.) without requiring
 /// virtual dispatch.
 template<typename T>
 concept NpuBackend =
@@ -58,8 +58,6 @@ concept NpuBackend =
     };
 
 // Concept proofs — if any of these fail the class violates the NPU backend contract.
-static_assert(NpuBackend<SyntheticNpuEncoder>,
-    "SyntheticNpuEncoder must satisfy NpuBackend");
 static_assert(NpuBackend<Hailo8lEncoder>,
     "Hailo8lEncoder must satisfy NpuBackend");
 static_assert(NpuBackend<CpuFallbackEncoder>,
@@ -104,7 +102,9 @@ public:
             std::string{"WindowsNpuBackend unavailable: "} + probe_.reason};
     }
 
+    /// @return 0.0f — no NPU utilization data available (backend not operational).
     [[nodiscard]] float       utilization()  const override { return 0.0f; }
+    /// @return 0.0f — no NPU temperature data available (backend not operational).
     [[nodiscard]] float       temperature()  const override { return 0.0f; }
 
     [[nodiscard]] std::string name() const override {
@@ -175,7 +175,7 @@ template<NpuBackend T, typename... Args>
 /// @brief Construct an NpuAccelerator, checking the concept at compile time.
 ///
 /// Usage:
-///   auto pp = hq::npu::make_npu_accelerator<SyntheticNpuPostProcessor>();
+///   auto pp = hq::npu::make_npu_accelerator<CpuPostProcessor>();
 ///   auto pp = hq::npu::make_npu_accelerator<HailoNpuPostProcessor>();
 template<NpuAccelerator T, typename... Args>
 [[nodiscard]] std::unique_ptr<INpuPostProcessor> make_npu_accelerator(Args&&... args) {

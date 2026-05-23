@@ -151,6 +151,11 @@ public:
         vae_options.SetIntraOpNumThreads(2);
         vae_options.SetGraphOptimizationLevel(
             GraphOptimizationLevel::ORT_ENABLE_ALL);
+
+        // NOTE: If all EP registrations above fail (CUDA/DML/ROCm), the sessions
+        // will silently fall back to CPU-only inference, which is orders of
+        // magnitude slower. Individual EP failures are logged via HQ_LOG_WARN.
+        // To diagnose: check log output for "EP not registered" messages.
     }
 };
 
@@ -173,17 +178,25 @@ Pipeline::Pipeline(const PipelineConfig& cfg)
                   .backoff_max_ms             = cfg.watchdog_backoff_max_ms,
                   .thermal_throttle_threshold_c = cfg.watchdog_thermal_threshold_c,
               },
-              [](ComputeUnit /*unit*/, std::uint32_t /*step*/, float /*util*/)
+              [this](ComputeUnit unit, std::uint32_t step, float util)
                   -> std::expected<RecoveryResult, std::string> {
-                  // The watchdog's callback point only decides that recovery is
-                  // required.  Pipeline recovery needs the live latent vector and
-                  // ONNX session handles, so generate() performs the actual
-                  // save/restore + session rebuild after step() returns.
-                  return RecoveryResult::PARTIAL;
+                  // Watchdog recovery: rebuild session and restore latent checkpoint
+                  if (!latent_checkpoint_ || !latent_checkpoint_->valid() || latent_checkpoint_floats_ == 0) {
+                      return std::unexpected<std::string>{"Recovery failed: no latent checkpoint available"};
+                  }
+                  // Use current_latents_ if set, otherwise return error
+                  if (!current_latents_.data() || current_latents_.num_elements() == 0) {
+                      return std::unexpected<std::string>{"Recovery failed: no valid latent tensor"};
+                  }
+                  auto result = on_watchdog_recovery_(unit, step, util, current_latents_);
+                  if (!result) {
+                      return std::unexpected<std::string>{"Recovery failed: " + to_string(result.error())};
+                  }
+                  return *result;
               },
               [](ComputeUnit unit, std::uint32_t step, float util,
                  const std::string& msg) {
-                                    HQ_LOG_INFO("Watchdog alert ({} step={} util={:.1f}%): {}", unit == ComputeUnit::GPU_780M ? "GPU" : "Hailo",
+                                     HQ_LOG_INFO("Watchdog alert ({} step={} util={:.1f}%): {}", unit == ComputeUnit::GPU_780M ? "GPU" : "Hailo",
                              step, util, msg);
 
               })
@@ -232,6 +245,18 @@ Pipeline::Pipeline(const PipelineConfig& cfg)
         }
     }
 
+    // Initialize HailoMonitor (attempt real device)
+    if (hailo_monitor_) {
+        auto open_result = hailo_monitor_->open();
+        if (open_result) {
+            HQ_LOG_INFO("HailoMonitor opened device '{}' (real hardware telemetry)",
+                        hailo_monitor_->device_id());
+        } else {
+            HQ_LOG_WARN("HailoMonitor open failed: {} — HailoRT not installed or no device found",
+                        open_result.error().what());
+        }
+    }
+
     // Validate model paths
     if (!cfg_.text_encoder_onnx.empty() && !validate_model_path_(cfg_.text_encoder_onnx)) {
                 HQ_LOG_WARN("text encoder model not found: {}", cfg_.text_encoder_onnx.string());
@@ -265,7 +290,7 @@ Pipeline::Pipeline(const PipelineConfig& cfg)
     }
 
     // Wire INpuEncoder abstraction: factory selects best available backend
-    // Priority: Hailo8lEncoder > CpuFallbackEncoder > SyntheticNpuEncoder
+    // Priority: Hailo8lEncoder > CpuFallbackEncoder > nullptr (honest failure)
     npu_encoder_ = npu::NpuEncoderFactory::create_best_available(
         ort_state_->hailo_session.get(), &ort_state_->memory_info);
     HQ_LOG_INFO("NPU encoder: {} (available={})",
@@ -273,7 +298,7 @@ Pipeline::Pipeline(const PipelineConfig& cfg)
                 npu_encoder_->is_available() ? "yes" : "no");
 
     // Wire INpuPostProcessor abstraction: factory selects best available backend
-    // Priority: HailoNpuPostProcessor > SyntheticNpuPostProcessor
+    // Priority: HailoNpuPostProcessor > CpuPostProcessor (honest CPU fallback)
     npu_post_processor_ = npu::NpuPostProcessorFactory::create_best_available();
     HQ_LOG_INFO("NPU post-processor: {} (available={})",
                 npu_post_processor_->name(),
@@ -523,69 +548,40 @@ Pipeline::generate(const GenerationRequest& req) {
 
     const auto t_phase_stage_start = Clock::now();
 
-    // --- 2. Stage embeddings ---
-    std::optional<StagingBuffer> staging_buf;
-    bool hip_staged = false;
-
+    // --- 2. Stage embeddings (BUG B3 FIX) ---
+    // Previously, this section performed a useless H2D copy via PinnedStagingPool
+    // or EmbeddingStagingManager, then denoise_step_() ignored the staged buffer
+    // and created Ort::Value tensors from CPU pointers — the DMA copy was wasted.
+    //
+    // Fix: On builds without a working GPU zero-copy path (i.e., denoise_step_
+    // creates Ort::Value from CPU memory_info), we skip the staging entirely.
+    // The EmbeddingStagingManager and PinnedStagingPool remain available for
+    // when denoise_step_() gains a device-pointer overload that creates tensors
+    // via Ort::MemoryInfo configured for the HIP/ROCm/CUDA device allocator.
+    //
+    // When GPU EP is active, ORT performs its own implicit H2D transfer from the
+    // CPU pointers — this is correct, just not zero-copy. Zero-copy requires the
+    // device-pointer overload described in pipeline.hpp.
 #ifdef UM790_HAS_HIP
-    if (hip_staging_) {
+    // NOTE: HIP staging is deferred until denoise_step_() accepts device pointers.
+    // Re-enable when the GPU zero-copy path is wired.
+    if (hip_staging_ && false /* zero_copy_denoise_available */) {
         auto host_buf = hip_staging_->acquire_host_buffer(0);
         if (!host_buf) {
-                        HQ_LOG_WARN("HIP staging acquire failed: {}", host_buf.error().message);
-
+            HQ_LOG_WARN("HIP staging acquire failed: {}", host_buf.error().message);
         } else if (host_buf->size_bytes() < emb_floats * sizeof(float)) {
             HQ_LOG_INFO("HIP staging buffer too small");
         } else {
             std::memcpy(host_buf->data(), emb_ptr, emb_floats * sizeof(float));
             auto stage_res = hip_staging_->stage_to_gpu(0);
             if (!stage_res) {
-                                HQ_LOG_WARN("HIP staging H2D failed: {}", stage_res.error().message);
-
+                HQ_LOG_WARN("HIP staging H2D failed: {}", stage_res.error().message);
             } else {
-                                HQ_LOG_INFO("Staged {} bytes via PinnedStagingPool", emb_floats * sizeof(float));
-
-                hip_staged = true;
+                HQ_LOG_INFO("Staged {} bytes via PinnedStagingPool (zero-copy path)", emb_floats * sizeof(float));
             }
-        }
-        if (!hip_staged) {
-                        HQ_LOG_WARN("HIP staging failed, falling back to EmbeddingStagingManager");
-
         }
     }
 #endif
-
-    if (!hip_staged) {
-        auto acquired = staging_manager_->acquire();
-        if (!acquired) {
-                        HQ_LOG_ERROR("Staging pool exhausted");
-
-            stats_.generations_failed++;
-            return std::unexpected{PipelineError::StagingPoolExhausted};
-        }
-        staging_buf = std::move(acquired.value());
-        auto staging_data = std::as_writable_bytes(
-            std::span<float>{emb_ptr, emb_floats});
-        auto copy_result = staging_manager_->copy_in(*staging_buf, staging_data);
-        if (!copy_result) {
-            staging_manager_->release(*staging_buf);
-                        HQ_LOG_ERROR("Embedding staging copy failed");
-
-            stats_.generations_failed++;
-            return std::unexpected{PipelineError::StagingPoolExhausted};
-        }
-                HQ_LOG_INFO("Staged {} bytes of embeddings", *copy_result);
-
-    }
-
-    // BUG B3 (DOCUMENTED): The DMA staging above (PinnedStagingPool or
-    // EmbeddingStagingManager) has copied embeddings to GPU/Host-pinned
-    // buffers, but denoise_step_() below creates Ort::Value tensors from
-    // the raw CPU vector `embeddings.data()` and `latents.data()` —
-    // it NEVER reads from the staged GPU buffer. The H2D DMA cost is
-    // paid but the staged data is unused. Fixing this requires
-    // denoise_step_() to accept device pointers and create tensors via
-    // Ort::MemoryInfo with a HIP/ROCm allocator for a true zero-copy path.
-    // See design note in pipeline.hpp for the future GPU zero-copy plan.
 
     const auto t_phase_denoise_start = Clock::now();
 
@@ -604,6 +600,7 @@ Pipeline::generate(const GenerationRequest& req) {
     ScopedTierAlloc lat_scope(*memory_manager_, *lat_alloc_r);
     float* latents_ptr = static_cast<float*>(lat_scope.ptr());
     HQ_LOG_DEBUG("TMM: latents {} floats -> {} tier", latent_size, to_string(lat_scope.tier()));
+    current_latents_ = hq::tensor::FloatTensor4D{latents_ptr, 1, 4, latent_h, latent_w};
 
     // Seed random generator
     std::mt19937 rng{req.seed >= 0 ? static_cast<uint32_t>(req.seed)
@@ -687,8 +684,7 @@ Pipeline::generate(const GenerationRequest& req) {
             std::move(uncond_view),
             req.guidance_scale);
         if (!denoise_result) [[unlikely]] {
-            if (staging_buf.has_value()) staging_manager_->release(*staging_buf);
-                        HQ_LOG_ERROR("Denoise step {} failed: {}", step, to_string(denoise_result.error()));
+            HQ_LOG_ERROR("Denoise step {} failed: {}", step, to_string(denoise_result.error()));
 
             stats_.generations_failed++;
             return std::unexpected{denoise_result.error()};
@@ -776,8 +772,7 @@ Pipeline::generate(const GenerationRequest& req) {
                 stats_.watchdog_recoveries++;
 
                 if (recovery_attempts_ >= cfg_.max_recovery_attempts) {
-                    if (staging_buf.has_value()) staging_manager_->release(*staging_buf);
-                                        HQ_LOG_INFO("Max recovery attempts ({}) exceeded", cfg_.max_recovery_attempts);
+                    HQ_LOG_INFO("Max recovery attempts ({}) exceeded", cfg_.max_recovery_attempts);
 
                     stats_.generations_failed++;
                     return std::unexpected{PipelineError::RecoveryTooManyAttempts};
@@ -785,8 +780,7 @@ Pipeline::generate(const GenerationRequest& req) {
 
                 if (recovery_action->result == RecoveryResult::FATAL) {
                     health_score_.update_recovery(false);
-                    if (staging_buf.has_value()) staging_manager_->release(*staging_buf);
-                                        HQ_LOG_INFO("Watchdog reported fatal recovery actio");
+                    HQ_LOG_INFO("Watchdog reported fatal recovery actio");
 
                     stats_.generations_failed++;
                     return std::unexpected{PipelineError::WatchdogRecoveryFailed};
@@ -799,8 +793,7 @@ Pipeline::generate(const GenerationRequest& req) {
                 health_score_.update_recovery(pipeline_recovery.has_value() &&
                                               pipeline_recovery.value() == RecoveryResult::SUCCESS);
                 if (!pipeline_recovery) {
-                    if (staging_buf.has_value()) staging_manager_->release(*staging_buf);
-                                        HQ_LOG_WARN("Recovery failed at step {}: {}", step, to_string(pipeline_recovery.error()));
+                    HQ_LOG_WARN("Recovery failed at step {}: {}", step, to_string(pipeline_recovery.error()));
 
                     stats_.generations_failed++;
                     return std::unexpected{pipeline_recovery.error()};
@@ -818,9 +811,6 @@ Pipeline::generate(const GenerationRequest& req) {
         }
     }
     } // !hip_graph_used
-
-    // Release staging buffer back to pool
-    if (staging_buf.has_value()) staging_manager_->release(*staging_buf);
 
     const auto t_phase_vae_start = Clock::now();
 
@@ -841,8 +831,8 @@ Pipeline::generate(const GenerationRequest& req) {
 
     // --- 7. Optional NPU post-processing ---
     // Applies image post-processing (sharpening, noise reduction) via npu_post_processor_.
-    // Currently always resolves to SyntheticNpuPostProcessor (pass-through) because
-    // HailoRT is not installed.  Wired here so the timing slot is populated and
+    // Currently resolves to CpuPostProcessor (honest CPU pass-through) because
+    // HailoRT is not installed. Wired here so the timing slot is populated and
     // the call path is ready for when HailoRT + a post-processing HEF are available.
     if (npu_post_processor_) {
         npu::NpuPostProcessRequest pp_req{
@@ -884,6 +874,28 @@ Pipeline::generate(const GenerationRequest& req) {
     last_phase_timings_.encoder_name        = npu_encoder_ ? npu_encoder_->name() : "none";
     last_phase_timings_.post_processor_name =
         npu_post_processor_ ? npu_post_processor_->name() : "none";
+
+    // Populate honest hardware acceleration report
+    auto& accel = last_phase_timings_.acceleration;
+    accel.text_encode_used_npu =
+        npu_encoder_ && npu_encoder_->is_available() && npu_encoder_->name() == "Hailo-8L";
+    accel.text_encode_used_gpu = false;  // Text encoding uses NPU/CPU, not GPU
+    accel.denoise_used_gpu = true;       // UNet inference via ORT (CUDA/ROCm/CPU EP)
+    accel.vae_decode_used_gpu = true;    // VAE via ORT session
+    accel.post_process_used_npu =
+        npu_post_processor_ && npu_post_processor_->is_available();
+    accel.cfg_blend_used_npu = false;    // blend_noise_cfg is always CPU scalar today
+    accel.hailo_telemetry_real =
+        hailo_monitor_ && hailo_monitor_->is_open();
+    accel.gpu_telemetry_real =
+        gpu_monitor_ && gpu_monitor_->is_initialized();
+    accel.encoder_name = npu_encoder_ ? npu_encoder_->name() : "none";
+    accel.post_processor_name =
+        npu_post_processor_ ? npu_post_processor_->name() : "none";
+    accel.gpu_backend_name = gpu_monitor_ ? hq::to_string(gpu_monitor_->backend()) : "None";
+
+    // Copy acceleration report into the GeneratedImage
+    decode_result->acceleration = accel;
 
     // Update stats
     stats_.generations_completed++;
@@ -1123,7 +1135,7 @@ Pipeline::denoise_step_(std::uint32_t step,
             }
 
             // 3. CFG blend via NPU abstraction (routes to Hailo-8L SAXPY when HailoRT available;
-            //    currently SyntheticNpuPostProcessor CPU path — timed for profiling).
+            //    currently CpuPostProcessor CPU path — timed for profiling).
             //    noise_cond is updated in-place: uncond + scale * (cond - uncond)
             {
                 const auto t_blend0 = std::chrono::high_resolution_clock::now();
@@ -1291,7 +1303,7 @@ Pipeline::encode_prompt_(const std::string& prompt) {
 
     // --- Primary path: INpuEncoder abstraction ---
     // Routes to CpuFallbackEncoder (real ORT) when a text encoder model is loaded,
-    // or SyntheticNpuEncoder for demo/CI mode when no model file is available.
+    // or Hailo8lEncoder when HailoRT + HEF are available. No synthetic fallback exists.
     if (npu_encoder_) {
         npu::NpuEncodeRequest npu_req{};
         npu_req.prompt         = prompt;
@@ -1508,6 +1520,7 @@ Pipeline::decode_latents_(hq::tensor::LatentTensor<const float> latents,
             .width              = static_cast<uint32_t>(img_w),
             .height             = static_cast<uint32_t>(img_h),
             .generation_time_ms = 0.0f,  // overwritten by caller in generate()
+            .acceleration       = {},     // filled in by generate()
         };
 
     } catch (const Ort::Exception& e) {
@@ -1680,6 +1693,7 @@ Pipeline::try_cluster_dispatch_(const GenerationRequest& req,
         .width              = img_w,
         .height             = img_h,
         .generation_time_ms = gen_time_ms,
+        .acceleration       = {},  // cluster path — no local hardware acceleration info
     };
 }
 

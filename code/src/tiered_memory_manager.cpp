@@ -92,14 +92,16 @@ private:
 };
 
 // ---------------------------------------------------------------------------
-// WarmPmrResource — CXL coherent pool (falls back to aligned_alloc when CXL
-//                   hardware is absent; a real implementation would call the
-//                   CXL memory-tiering ioctl or numactl-aware mmap).
+// RamFallbackPmrResource — System RAM pool (aligned_alloc fallback).
+//                   When CXL hardware is present, a real implementation would
+//                   call the CXL memory-tiering ioctl or numactl-aware mmap.
+//                   Currently detect_cxl() always returns false, so this is
+//                   honest RAM-backed allocation.
 // ---------------------------------------------------------------------------
 
-class WarmPmrResource final : public std::pmr::memory_resource {
+class RamFallbackPmrResource final : public std::pmr::memory_resource {
 public:
-    explicit WarmPmrResource(std::size_t capacity_bytes,
+    explicit RamFallbackPmrResource(std::size_t capacity_bytes,
                               std::size_t default_alignment,
                               bool cxl_present) noexcept
         : capacity_{capacity_bytes}
@@ -166,7 +168,7 @@ struct TieredMemoryManager::Impl {
 
     // PMR resources
     std::unique_ptr<CoolPmrResource> cool_res;
-    std::unique_ptr<WarmPmrResource> warm_res;
+    std::unique_ptr<RamFallbackPmrResource> warm_res;
 
     // Per-tier availability flags
     bool hot_available{false};   // GPU VRAM (requires HIP)
@@ -260,7 +262,7 @@ TieredMemoryManager::TieredMemoryManager(const TieredMemoryConfig& cfg,
 
     // Warm tier (CXL or RAM fallback)
     const bool cxl = detect_cxl();
-    m.warm_res = std::make_unique<WarmPmrResource>(
+    m.warm_res = std::make_unique<RamFallbackPmrResource>(
         cfg.warm_capacity_bytes, cfg.warm_alignment, cxl);
     m.warm_available = true; // Always provide Warm (even without real CXL)
     m.acct[static_cast<int>(MemoryTier::Warm)].capacity  = cfg.warm_capacity_bytes;
@@ -301,7 +303,7 @@ TieredMemoryManager::TieredMemoryManager(const TieredMemoryConfig& cfg,
     std::print("[TieredMemory] Hot={} Warm={}{} Cool={} Cold={}\n",
                m.hot_available ? "GPU" : "off",
                m.warm_available ? "on" : "off",
-               cxl ? "(CXL)" : "(RAM)",
+               cxl ? "(CXL)" : "(RAM-fallback)",
                m.cool_available ? "on" : "off",
                m.cold_available ? cfg.cold_spill_dir : "off");
 }

@@ -3,13 +3,18 @@
 /// @brief HailoMonitor implementation — hardware monitoring via HailoRT.
 ///
 /// Dual-indicator monitoring: fuses power draw + inference delta rate to
-/// produce an accurate NN-core utilization figure.  Handles DMA stall
+/// produce an accurate NN-core utilization figure. Handles DMA stall
 /// detection and sensor mismatch sanity checks.
 ///
 /// Build modes:
 ///   -DHAILO_BUILD          : Force HailoRT mode (headers must be available)
 ///   No flag (auto-detect)  : Use __has_include to probe for HailoRT
-///   No headers found       : Compile with simulated telemetry (CI/offline mode)
+///   No headers found       : Compile without HailoRT support — all calls
+///                            return HailoError::NotInitialized honestly.
+///
+/// NO SYNTHETIC DATA: When HailoRT is not available, this monitor returns
+/// errors instead of fabricated telemetry. There is no "synthetic_mode_"
+/// and no time-varying sine waves masquerading as real sensor readings.
 ///
 /// @author LamiaFabrica Team
 
@@ -31,10 +36,11 @@
 // HailoRT integration — three-tier detection:
 //   1. #ifdef HAILO_BUILD  → build system explicitly requests HailoRT
 //   2. __has_include       → auto-detect if HailoRT is on the include path
-//   3. Neither             → compile with simulated telemetry (CI/offline mode)
+//   3. Neither             → compile WITHOUT HailoRT support
 //
 // This ensures the translation unit always builds, whether HailoRT is
-// installed or not.
+// installed or not. When HailoRT is absent, all monitoring calls return
+/// honest errors instead of fabricated data.
 // ---------------------------------------------------------------------------
 #ifdef HAILO_BUILD
 #  define HAILO_MONITOR_HAS_HAILORT 1
@@ -50,7 +56,7 @@
 #    include <hailort/hailort.hpp>
 #  else
 #    define HAILO_MONITOR_HAS_HAILORT 0
-#    pragma message("HailoRT headers not found \u2014 compiling with simulated telemetry")
+#    pragma message("HailoRT headers not found — HailoMonitor will return errors for all calls")
 #  endif
 #endif
 
@@ -201,9 +207,10 @@ std::expected<void, HailoError> HailoMonitor::open(const std::string& device_id)
                selected.bus_rev,
                devices.size());
 #else
-    // Non-HailoRT build: synthesize a connected state for offline/CI testing
-    opened_device_id_ = device_id.empty() ? "sim:hailo0" : device_id;
-    std::print("[hailo] Non-HailoRT build — device '{}' simulated for CI.\n", opened_device_id_);
+    // Non-HailoRT build: HONESTLY fail. Do NOT synthesize a connected state.
+    return std::unexpected(
+        make_error(HailoErrorCode::NotInitialized,
+                   "HailoRT SDK not available. Install HailoRT 4.20+ for real hardware telemetry."));
 #endif
 
     // Reset inference delta tracking for a fresh baseline
@@ -229,14 +236,12 @@ void HailoMonitor::close() noexcept {
 // ===========================================================================
 // is_open() — connection state
 //
-// CORRECTNESS NOTE: must check BOTH device_ (HailoRT mode) and
-// opened_device_id_ (offline/non-HailoRT mode).  In non-HailoRT builds device_ is always
-// null, so relying solely on device_ would incorrectly return false after a
-// successful open().
+// CORRECTNESS: Only true when a real HailoRT device handle exists.
+// In non-HailoRT builds device_ is always null, so this always returns false.
 // ===========================================================================
 
 bool HailoMonitor::is_open() const noexcept {
-    return static_cast<bool>(device_) || !opened_device_id_.empty();
+    return static_cast<bool>(device_);
 }
 
 // ===========================================================================
@@ -257,21 +262,6 @@ std::expected<HailoStats, HailoError> HailoMonitor::sample() {
             make_error(HailoErrorCode::NotOpen,
                        "No device open. Call open() before sample()."));
     }
-
-#if HAILO_MONITOR_HAS_HAILORT
-    // This consistency check only applies when a real HailoRT device handle
-    // could become invalid. In non-HailoRT builds device_ is always null and
-    // opened_device_id_ signals the simulation open state.
-    // Defensive: pool corruption or re-entrant call guard
-    if (!device_ && !opened_device_id_.empty() && have_prev_inferences_) {
-        return std::unexpected(
-            make_error(HailoErrorCode::InternalError,
-                       "Inconsistent state: delta tracking active but device "
-                       "handle is null."));
-    }
-#else
-    // Non-HailoRT mode: device_ is always null — skip consistency check
-#endif // HAILO_MONITOR_HAS_HAILORT
 
     HailoStats stats;
     stats.timestamp = std::chrono::steady_clock::now();
@@ -384,10 +374,14 @@ std::expected<void, HailoError> HailoMonitor::hard_reset() {
                        static_cast<int>(status),
                        hailo_get_status_message(status)));
     }
-#endif
 
     std::print("[hailo] Hard reset (chip level) completed on {}.\n",
                opened_device_id_);
+#else
+    return std::unexpected(
+        make_error(HailoErrorCode::NotInitialized,
+                   "HailoRT SDK not available — hard_reset() cannot execute."));
+#endif
 
     // Reset delta tracking after reset — inference counters may have reset
     reset_state();
@@ -396,7 +390,7 @@ std::expected<void, HailoError> HailoMonitor::hard_reset() {
 }
 
 // ===========================================================================
-// Sensor helpers
+// Sensor helpers — REAL HARDWARE ONLY. No synthetic fallback.
 // ===========================================================================
 
 std::expected<float, HailoError> HailoMonitor::read_power_watts() {
@@ -412,34 +406,9 @@ std::expected<float, HailoError> HailoMonitor::read_power_watts() {
     // power measurement is typically in milliwatts; convert to watts
     return result.value() / 1000.0f;
 #else
-    // ── Synthetic telemetry ────────────────────────────────────────────
-    // CI/TEST PATH: Provides time-varying synthetic power data when HailoRT
-    // SDK is not installed. Install HailoRT 4.20+ for real Hailo-8L power
-    // telemetry.
-    //
-    // Produce time-varying power readings so simulation-mode tests can exercise
-    // all utilization paths (idle, normal, high, DMA-stall).
-    //
-    // Cycle: idle → low → mid → high → peak → cool → repeat
-    // Each phase lasts ~1 s.  This gives predictable but varying data.
-    using namespace std::chrono;
-    auto now = steady_clock::now().time_since_epoch();
-    auto ms = duration_cast<milliseconds>(now).count();
-    constexpr std::int64_t phase_ms = 1000;   // 1 second per phase
-    constexpr int num_phases = 6;
-
-    // Synthetic power levels (watts) for each phase
-    constexpr float synthetic_power_watts[num_phases] = {
-        0.6f,   // phase 0: near-idle
-        2.0f,   // phase 1: low activity
-        3.5f,   // phase 2: moderate
-        5.5f,   // phase 3: high load
-        6.2f,   // phase 4: near-peak (DMA stall candidate when inf is low)
-        1.0f,   // phase 5: cooling down
-    };
-
-    int phase = static_cast<int>((ms / phase_ms) % num_phases);
-    return synthetic_power_watts[phase];
+    return std::unexpected(
+        make_error(HailoErrorCode::NotInitialized,
+                   "HailoRT SDK not available — cannot read power."));
 #endif
 }
 
@@ -455,85 +424,27 @@ std::expected<float, HailoError> HailoMonitor::read_temperature_celsius() {
     const auto& temp = result.value();
     return static_cast<float>(temp.ts0_temperature);
 #else
-    // ── Synthetic telemetry ────────────────────────────────────────────
-    // CI/TEST PATH: Provides time-varying synthetic temperature data when
-    // HailoRT SDK is not installed. Install HailoRT 4.20+ for real Hailo-8L
-    // thermal telemetry.
-    //
-    // Typical operating temperature with a small time-based oscillation
-    // to simulate realistic thermal behaviour.
-    using namespace std::chrono;
-    auto now = steady_clock::now().time_since_epoch();
-    auto ms = duration_cast<milliseconds>(now).count();
-    constexpr float base_temp = 55.0f;
-    constexpr float amplitude = 3.0f;
-    constexpr float period_ms = 5000.0f;  // 5-second thermal cycle
-
-    float offset = amplitude *
-        std::sin(static_cast<float>(ms) * 2.0f * 3.14159265f / period_ms);
-    return base_temp + offset;
+    return std::unexpected(
+        make_error(HailoErrorCode::NotInitialized,
+                   "HailoRT SDK not available — cannot read temperature."));
 #endif
 }
 
 std::expected<std::uint64_t, HailoError> HailoMonitor::read_inference_count() {
 #if HAILO_MONITOR_HAS_HAILORT
-    // Attempt real inference count from HailoRT VDevice if available
-    // (Production path: integrate with hailort::VDevice/NetworkGroup)
-    // For now, fall through to synthetic counter
+    // NOTE: The HailoRT Device API does not expose a frame counter.
+    // Real inference counts require integration with hailort::VDevice/NetworkGroup.
+    // Until the VDevice API is integrated, this function returns an error
+    // instead of fabricated data.
+    return std::unexpected(
+        make_error(HailoErrorCode::NotInitialized,
+                   "HailoRT VDevice API not yet integrated — inference count unavailable. "
+                   "Install HailoRT 4.20+ and integrate VDevice for real counts."));
+#else
+    return std::unexpected(
+        make_error(HailoErrorCode::NotInitialized,
+                   "HailoRT SDK not available — cannot read inference count."));
 #endif
-    // Synthetic telemetry fallback (used when real HailoRT counter unavailable)
-    // The HailoRT Device API does not expose a frame counter.  Future
-    // integration with hailort::VDevice/NetworkGroup will provide real
-    // counts.  Until then, a time-based synthetic counter models typical
-    // Hailo-8L inference patterns across 6 phases (idle→low→mid→high→peak→cool).
-    // ── Synthetic telemetry ────────────────────────────────────────────
-    // Produce a time-based cumulative inference count that varies in rate
-    // across phases.  This ensures the inference_indicator exercises
-    // different paths (idle, normal, high, stall).
-    //
-    // The count is derived from time, not stored state, so it is:
-    //   - deterministic (same time → same count)
-    //   - per-instance (different open() times → different counts)
-    //   - monotonically increasing
-    using namespace std::chrono;
-    auto now = steady_clock::now().time_since_epoch();
-    auto ms = duration_cast<milliseconds>(now).count();
-    constexpr std::int64_t phase_ms = 1000;   // 1 second per phase
-    constexpr int num_phases = 6;
-
-    // Inference rate multipliers (fraction of expected_inferences_per_sec_)
-    constexpr float rate_multiplier[num_phases] = {
-        0.0f,    // phase 0: idle (no inferences)
-        0.25f,   // phase 1: quarter rate
-        0.5f,    // phase 2: half rate
-        1.0f,    // phase 3: full rate
-        1.25f,   // phase 4: above nominal (buffered work)
-        0.1f,    // phase 5: very low (cooling / drained)
-    };
-
-    // Compute full elapsed phases + current partial phase
-    std::int64_t full_phases = ms / phase_ms;
-    std::int64_t remainder_ms = ms % phase_ms;
-    int current_phase = static_cast<int>(full_phases % num_phases);
-
-    // Count from completed full phases
-    std::uint64_t count = 0;
-    for (std::int64_t p = 0; p < full_phases; ++p) {
-        int phase_idx = static_cast<int>(p % num_phases);
-        float rate = static_cast<float>(expected_inferences_per_sec_)
-                     * rate_multiplier[phase_idx];
-        count += static_cast<std::uint64_t>(rate * static_cast<float>(phase_ms)
-                                            / 1000.0f);
-    }
-
-    // Add partial progress for current phase
-    float current_rate = static_cast<float>(expected_inferences_per_sec_)
-                         * rate_multiplier[current_phase];
-    count += static_cast<std::uint64_t>(current_rate
-                                        * static_cast<float>(remainder_ms)
-                                        / 1000.0f);
-
-    return count;
 }
 
 // ===========================================================================
