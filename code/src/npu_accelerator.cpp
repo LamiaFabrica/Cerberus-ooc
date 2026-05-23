@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cstring>
+#include <type_traits>
 
 // ===========================================================================
 // HailoRT three-tier detection
@@ -65,7 +66,7 @@ CpuPostProcessor::post_process(const NpuPostProcessRequest& req) {
     const auto t1 = std::chrono::high_resolution_clock::now();
     result.processing_time_us = static_cast<float>(
         std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count());
-    result.npu_utilization    = 0.0f;   // CPU path — no NPU activity
+    result.npu_utilization    = -1.0f;  // sentinel: no NPU hardware in CPU fallback
     result.was_npu_accelerated = false;
 
     return result;
@@ -268,16 +269,25 @@ NpuPostProcessorFactory::create_best_available() {
         // Hailo device present but no post-HEF? Use it for delegation, but
         // is_available() stays false until post-HEF is loaded.
         if (hailo->device_present()) {
-            HQ_LOG_INFO("[NpuPostProcessorFactory] Hailo-8L detected — "
-                        "delegating to CPU fallback until post-HEF loaded");
+            HQ_LOG_INFO("[NpuPostProcessorFactory] → SELECTED: Hailo-8L (device_present=true, "
+                        "available={}, synthetic={}, reason='{}') — "
+                        "delegating to CPU until post-HEF loaded",
+                        hailo->is_available(), hailo->synthetic_mode(),
+                        hailo->unavailable_reason());
             return hailo;  // Returns HailoNpuPostProcessor that delegates to CPU
         }
     }
 
     // ---- Priority 2: CPU pass-through (no NPU acceleration) ----
-    HQ_LOG_INFO("[NpuPostProcessorFactory] No Hailo-8L device — "
-                "using CPU pass-through (no acceleration)");
-    return std::make_unique<CpuPostProcessor>();
+    {
+        auto cpu = std::make_unique<CpuPostProcessor>();
+        HQ_LOG_INFO("[NpuPostProcessorFactory] → SELECTED: CPU pass-through "
+                    "(no acceleration, synthetic={})", cpu->synthetic_mode());
+        return cpu;
+    }
 }
+
+static_assert(!std::is_abstract_v<hq::npu::CpuPostProcessor>, "CpuPostProcessor must override all pure virtuals (post_process, blend_noise_cfg, can_handle, is_available, name, utilization, synthetic_mode, unavailable_reason)");
+static_assert(!std::is_abstract_v<hq::npu::HailoNpuPostProcessor>, "HailoNpuPostProcessor must override all pure virtuals");
 
 } // namespace hq::npu

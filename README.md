@@ -59,7 +59,19 @@ what is and is not working today.
 |-------------|-----------------------------------|---------------------------------------------------------|
 | **CPU**     | AMD Ryzen 9 7940HS (Zen 4)        | Tokenization, DEIS scheduling, orchestration            |
 | **GPU**     | AMD Radeon 780M (RDNA 3)          | UNet/DiT denoising, VAE decoding, HIP compute           |
-| **NPU**     | Hailo-8L M.2                      | CLIP/T5 text encoding, edge inference                   |
+| **NPU**     | Hailo-8L M.2                      | CLIP/T5 text encoding, edge inference *(currently blocked)* |
+
+## Current Heterogeneous Reality (Round 25 — Brutal Honesty)
+
+| Phase | Dominant Cost? | Hardware Claim | Actual Reality | Blocker |
+|-------|---------------|----------------|----------------|---------|
+| **UNet denoising** | **Yes (~90%)** | GPU (Radeon 780M) | **CPU fallback** on this build | ROCm EP requires Ubuntu + ROCm stack |
+| **VAE decode** | **Yes (~5%)** | GPU (same) | **CPU fallback** on this build | Same as UNet |
+| Text encoding | No (~2%) | NPU target | **CPU/synthetic** | HailoRT not installed; ORT stub |
+| CFG blend | No (~1%) | NPU target | **CPU pass-through** | HailoNpuPostProcessor skeleton, no HEF |
+| Post-processing | No (~2%) | NPU target | **CPU pass-through** | HailoNpuPostProcessor skeleton, no HEF |
+
+**Total expensive compute on NPU: 0%.** The NPU is architecturally present but cannot run the expensive work (UNet, VAE) without compiled HEF models that do not exist.
 
 ## Key Components
 

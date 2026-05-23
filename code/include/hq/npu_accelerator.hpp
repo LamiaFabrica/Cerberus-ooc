@@ -121,16 +121,14 @@ public:
     /// @brief Instantaneous hardware utilization (0.0–100.0%).
     [[nodiscard]] virtual float utilization() const = 0;
 
-    // --- NEW: Honesty markers ---
+    // --- NEW: Honesty markers (PURE VIRTUAL — all concrete classes MUST override) ---
     /// @brief Returns true if this post-processor operates without real NPU hardware.
     ///        CPU fallback, delegation, or stub path = true. Real Hailo inference = false.
-    ///        ALL concrete implementations MUST override this.
-    [[nodiscard]] virtual bool synthetic_mode() const noexcept { return false; }
+    [[nodiscard]] virtual bool synthetic_mode() const noexcept = 0;
 
     /// @brief Diagnostic: why is_available() returned false.
     ///        Returns empty string when is_available() == true.
-    ///        ALL concrete implementations MUST override this.
-    [[nodiscard]] virtual std::string unavailable_reason() const { return {}; }
+    [[nodiscard]] virtual std::string unavailable_reason() const = 0;
 };
 
 // ===========================================================================

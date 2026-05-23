@@ -18,6 +18,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstring>
+#include <type_traits>
 #include <vector>
 
 #include <onnxruntime_cxx_api.h>
@@ -481,8 +482,8 @@ CpuFallbackEncoder::encode(const NpuEncodeRequest& req) {
         }
     }
 
-    result.npu_utilization  = 0.0f;
-    result.npu_temperature  = 0.0f;
+    result.npu_utilization  = -1.0f;  // sentinel: no NPU hardware in CPU fallback
+    result.npu_temperature  = -1.0f;  // sentinel: no NPU hardware in CPU fallback
     result.encode_time_us   = 0.0f;
     result.slot_index       = 0;
 
@@ -530,8 +531,10 @@ NpuEncoderFactory::create_best_available(
     // ---- Priority 1: Hailo-8L ----
     {
         auto hailo = std::make_unique<Hailo8lEncoder>("", hef_path);
+        HQ_LOG_INFO("[NpuEncoderFactory] Probe Hailo-8L: available={}, synthetic={}, reason='{}'",
+                    hailo->is_available(), hailo->synthetic_mode(), hailo->unavailable_reason());
         if (hailo->is_available()) {
-            HQ_LOG_INFO("[NpuEncoderFactory] Using Hailo-8L encoder with HEF: {}",
+            HQ_LOG_INFO("[NpuEncoderFactory] → SELECTED: Hailo-8L encoder (HEF={}, real NPU)",
                         hef_path.string());
             return hailo;
         }
@@ -546,13 +549,14 @@ NpuEncoderFactory::create_best_available(
 
     // ---- Priority 2: ONNX Runtime CPU EP ----
     if (ort_session != nullptr) {
-        HQ_LOG_INFO("[NpuEncoderFactory] Using ONNX Runtime CPU encoder");
-        return std::make_unique<CpuFallbackEncoder>(
-            ort_session, ort_memory_info);
+        auto cpu = std::make_unique<CpuFallbackEncoder>(ort_session, ort_memory_info);
+        HQ_LOG_INFO("[NpuEncoderFactory] → SELECTED: CPU fallback (ONNX-CPU, synthetic={})",
+                    cpu->synthetic_mode());
+        return cpu;
     }
 
     // ---- No encoder available ----
-    HQ_LOG_WARN("[NpuEncoderFactory] No NPU or ORT encoder available — returning nullptr");
+    HQ_LOG_WARN("[NpuEncoderFactory] → SELECTED: NONE (no NPU or ORT encoder available)");
     return nullptr;
 }
 
@@ -604,5 +608,8 @@ NpuEncoderFactory::enumerate_devices(const std::filesystem::path& hef_path) {
 
     return devices;
 }
+
+static_assert(!std::is_abstract_v<hq::npu::Hailo8lEncoder>, "Hailo8lEncoder must override all pure virtuals (encode, utilization, temperature, name, is_available, synthetic_mode, unavailable_reason)");
+static_assert(!std::is_abstract_v<hq::npu::CpuFallbackEncoder>, "CpuFallbackEncoder must override all pure virtuals");
 
 } // namespace hq::npu

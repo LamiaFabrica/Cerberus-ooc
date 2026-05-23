@@ -108,6 +108,26 @@ struct HardwareAccelerationReport {
     bool  hailo_telemetry_real{false};       ///< True only if HailoMonitor is reading real sensors
     bool  gpu_telemetry_real{false};         ///< True only if GPUMonitor is reading real sensors
 
+    // --- NEW: Round 24 hostile-review hardening ---
+    /// @brief Percentage [0–100] of NPU-acceleratable *cheap* components that used NPU.
+    ///        Components counted: text_encode, post_process, cfg_blend.
+    ///        IMPORTANT: This does NOT include UNet denoising or VAE decode,
+    ///        which are ~90% of wall-clock compute. A value of 100% here
+    ///        means the NPU handled 3 lightweight tasks while the expensive
+    ///        work still ran on CPU/GPU. Do not misinterpret as total NPU share.
+    std::uint8_t npu_cheap_ops_percent{0};
+
+    /// @brief True only when UNet denoising ran on real NPU hardware.
+    ///        Currently always false — UNet on Hailo-8L requires a compiled
+    ///        HEF that does not exist and HailoRT (Linux only) is not installed.
+    bool unet_denoise_used_npu{false};
+
+    /// @brief True when the selected encoder is a fallback (synthetic_mode() == true).
+    bool encoder_is_fallback{false};
+
+    /// @brief True when the selected post-processor is a fallback (synthetic_mode() == true).
+    bool post_processor_is_fallback{false};
+
     std::string encoder_name;                ///< npu_encoder_->name() — "Hailo-8L", "ONNX-CPU", "none"
     std::string post_processor_name;          ///< npu_post_processor_->name()
     std::string gpu_backend_name;            ///< "NVML", "ROCM_SMI", "None"

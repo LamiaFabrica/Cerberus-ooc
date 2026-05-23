@@ -43,7 +43,7 @@ namespace hq::npu {
 
 /// @brief Statically constrains any type that satisfies the NPU backend contract.
 ///
-/// Satisfied by Hailo8lEncoder, CpuFallbackEncoder, WindowsNpuBackend, and
+///   Satisfied by Hailo8lEncoder, CpuFallbackEncoder, WindowsNpuBackend, and
 /// any future backend (DirectML, OpenVINO, etc.) without requiring
 /// virtual dispatch.
 template<typename T>
@@ -55,6 +55,9 @@ concept NpuBackend =
         { backend.temperature()  } -> std::convertible_to<float>;
         { backend.name()         } -> std::convertible_to<std::string>;
         { backend.is_available() } -> std::same_as<bool>;
+        // Honesty markers — compile-time guarantee they exist
+        { backend.synthetic_mode() } -> std::same_as<bool>;
+        { backend.unavailable_reason() } -> std::convertible_to<std::string>;
     };
 
 // Concept proofs — if any of these fail the class violates the NPU backend contract.

@@ -75,16 +75,14 @@ public:
     /// driver ready, ORT session valid, etc.
     [[nodiscard]] virtual bool is_available() const = 0;
 
-    // --- NEW: Honesty markers ---
+    // --- NEW: Honesty markers (PURE VIRTUAL — all concrete classes MUST override) ---
     /// @brief Returns true if this encoder operates without real NPU/GPU hardware.
     ///        CPU fallback, stub, or synthetic path = true. Real silicon = false.
-    ///        ALL concrete implementations MUST override this.
-    [[nodiscard]] virtual bool synthetic_mode() const noexcept { return false; }
+    [[nodiscard]] virtual bool synthetic_mode() const noexcept = 0;
 
     /// @brief Diagnostic: why is_available() returned false.
     ///        Returns empty string when is_available() == true.
-    ///        ALL concrete implementations MUST override this.
-    [[nodiscard]] virtual std::string unavailable_reason() const { return {}; }
+    [[nodiscard]] virtual std::string unavailable_reason() const = 0;
 };
 
 // ===========================================================================

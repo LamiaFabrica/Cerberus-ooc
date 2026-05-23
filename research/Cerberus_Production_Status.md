@@ -1,4 +1,4 @@
-# Cerberus Production Readiness Status — Round 21
+# Cerberus Production Readiness Status — Round 24
 
 ## Where We Are
 
@@ -110,6 +110,67 @@ Skipped if Pipeline construction fails (no ONNX models) — by design.
 16. Wire HailoRT SDK for real Hailo-8L inference
 17. Wire ROCm 6.0+ for Radeon 780M GPU compute on UM790
 18. Build and test on Kubuntu with ROCm + HailoRT
+
+---
+
+## Sentinel Convention (Round 24 — Hostile Review Hardened)
+
+| Field Value | Meaning |
+|-------------|---------|
+| `-1.0f` | **No hardware present** or **query failed** — this is the sentinel, not "idle" |
+| `>= 0.0f` | **Valid measurement** — `0.0f` is legitimate "idle", not "unknown" |
+| `-1.0f` in `GPUTelemetry` | Set by `invalidate()` when hardware is absent or all sub-queries fail. `query_all()` returns `std::unexpected` only on **total** failure; partial failures set failed fields to `-1.0f` and keep `telemetry_valid = true`. |
+
+**`synthetic_mode()` truth table:**
+- `true` = CPU fallback, delegation, stub, or any path without real silicon acceleration
+- `false` = real NPU/GPU work is happening
+- **Pure virtual** in `INpuEncoder` and `INpuPostProcessor` — every concrete class MUST override. `static_assert(!std::is_abstract_v<T>)` in each `.cpp` enforces this at compile time.
+
+**`can_handle()` honesty:**
+- `CpuPostProcessor::can_handle()` returns `false` — it does NOT claim NPU capability. Factory selects it explicitly.
+- `HailoNpuPostProcessor::can_handle()` returns `true` only when `post_hef_loaded`.
+
+---
+
+## Round 25 — Brutal Honesty: NPU Cannot Run Expensive Work
+
+**Decision: Option B.** No meaningful NPU work in the hot path is achievable without compiled HEF models that do not exist.
+
+### Why UNet denoising on Hailo-8L is architecturally blocked
+
+| Blocker | Evidence |
+|---------|----------|
+| No compiled HEF | `Hailo8lEncoder::encode()` returns `std::unexpected` when `!m.hef_loaded` (`npu_encoder.cpp:247-250`) |
+| HailoRT Linux-only | `HAILO_ENCODER_HAS_HAILORT = 0` on Windows/MinGW host; all Hailo paths return honest errors (`npu_encoder.cpp:230-233`) |
+| No public SD 1.5 UNet HEF | No `.hef` file in repo; no build step to generate one |
+| SRAM limits | Hailo-8L has limited on-chip SRAM; UNet ~860M params exceeds typical edge constraints |
+| Performance mismatch | Estimated ~177 ms/step on Hailo-8L vs ~28 ms/step on Radeon 780M (`README.md:140`) |
+
+### What `npu_cheap_ops_percent` actually measures
+
+`pipeline_integration.cpp:903-911` counts **3 cheap components**: text_encode, post_process, cfg_blend.  
+**It explicitly excludes UNet denoising (~90% of wall time) and VAE decode (~5%).**  
+A value of 100% here means the NPU handled lightweight tasks while the expensive work ran elsewhere.  
+The new field `unet_denoise_used_npu` is always `false` and documented as blocked.
+
+### Current compute distribution
+
+| Component | % of wall time | NPU capable? | Status |
+|-----------|---------------|--------------|--------|
+| UNet denoising | ~90% | No (no HEF) | CPU fallback |
+| VAE decode | ~5% | No (same path) | CPU fallback |
+| Text encoding | ~2% | Yes (HEF exists in theory) | CPU fallback (no HEF) |
+| CFG blend | ~1% | Yes (SAXPY HEF feasible) | CPU fallback (no HEF) |
+| Post-processing | ~2% | Yes (small network) | CPU fallback (no HEF) |
+
+**NPU share of expensive work: 0%.**
+
+### Honesty mechanisms that prevent over-claiming
+
+- `HardwareAccelerationReport::unet_denoise_used_npu` — always `false`, explicitly documented as blocked.
+- `HardwareAccelerationReport::npu_cheap_ops_percent` — renamed from `npu_participation_percent` with explicit "cheap ops" qualifier.
+- `probe-backends` CLI — renamed from `honesty-report` with explicit disclaimer that it probes factories, not runtime state.
+- `README.md` — adds "Current Heterogeneous Reality" table with "Dominant Cost?" column.
 
 ---
 

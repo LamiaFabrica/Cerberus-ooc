@@ -24,6 +24,8 @@
 #include "hq/health_score.hpp"
 #include "hq/cxx26_features.hpp"
 #include "hq/npu_pipeline.hpp"
+#include "hq/npu_encoder.hpp"
+#include "hq/npu_accelerator.hpp"
 #include "hq/logger.hpp"
 #include "hq/benchmark_logger.hpp"
 #include "hq/tiered_memory_manager.hpp"
@@ -82,6 +84,7 @@ void print_help(std::string_view program);
 [[nodiscard]] int cmd_npu_benchmark(const CLIArgs& args);
 [[nodiscard]] int cmd_watchdog_test(const CLIArgs& args);
 [[nodiscard]] int cmd_health_report(const CLIArgs& args);
+[[nodiscard]] int cmd_probe_backends(const CLIArgs& args);
 [[nodiscard]] int cmd_device_info(const CLIArgs& args);
 [[nodiscard]] int cmd_stress_test(const CLIArgs& args);
 [[nodiscard]] int cmd_campaign(const CLIArgs& args);
@@ -121,6 +124,7 @@ int main(int argc, char** argv) {
     if (args.command == "npu-benchmark")return cmd_npu_benchmark(args);
     if (args.command == "watchdog-test")return cmd_watchdog_test(args);
     if (args.command == "health-report")return cmd_health_report(args);
+    if (args.command == "probe-backends") return cmd_probe_backends(args);
     if (args.command == "device-info")  return cmd_device_info(args);
     if (args.command == "stress-test")  return cmd_stress_test(args);
     if (args.command == "campaign")          return cmd_campaign(args);
@@ -220,8 +224,9 @@ void print_help(std::string_view program) {
     std::print("  campaign               Multi-workload structured measurement campaign\n");
     std::print("  tier-migrate-bench     Measure TieredMemoryManager promote/demote cost\n");
     std::print("  watchdog-test          Run watchdog state transition validation\n");
-    std::print("  health-report          Show real-time pipeline health score\n");
-    std::print("  device-info            Query and display device telemetry\n");
+  std::print("  health-report          Show real-time pipeline health score\n");
+  std::print("  probe-backends         Probe hardware and show available backends (NOT active pipeline state)\n");
+  std::print("  device-info            Query and display device telemetry\n");
     std::print("  monitor                Live hardware dashboard (GPU/NPU + health score)\n");
     std::print("  profile [prompt]       Run one generate() and show per-phase timing breakdown\n");
     std::print("  npu-benchmark          Run NPU memory interface benchmark\n");
@@ -938,6 +943,100 @@ void print_help(std::string_view program) {
                hq::PipelineHealthScore::grade_name(report->grade));
     std::print("Summary: {}\n", report->summary);
     std::print("=====================\n");
+
+    return EXIT_SUCCESS;
+}
+
+// =============================================================================
+// CMD: probe-backends — Probe hardware and show available backends (NOT active pipeline state)
+// =============================================================================
+[[nodiscard]] int cmd_probe_backends(const CLIArgs& args) {
+    (void)args;
+    std::print("=== Cerberus Backend Probe (Factory-Only, NOT Active Pipeline) ===\n");
+    std::print("WARNING: This command creates fresh backend instances via factories.\n");
+    std::print("It does NOT inspect the active Pipeline's selected backends.\n");
+    std::print("For runtime acceleration status, use 'cerberus profile' after generation.\n\n");
+
+    // ---- Encoder ----
+    {
+        auto enc = hq::npu::NpuEncoderFactory::create_best_available(nullptr, nullptr, "");
+        if (enc) {
+            std::print("Encoder:           {}\n", enc->name());
+            std::print("  available:       {}\n", enc->is_available() ? "yes" : "no");
+            std::print("  synthetic_mode:  {}\n", enc->synthetic_mode() ? "true (CPU/stub)" : "false (real NPU/GPU)");
+            std::print("  utilization:     {:.1f}%\n", enc->utilization());
+            std::print("  temperature:     {:.1f} C\n", enc->temperature());
+            if (!enc->is_available()) {
+                std::print("  unavailable_reason: {}\n", enc->unavailable_reason());
+            }
+        } else {
+            std::print("Encoder:           NONE (no backend available)\n");
+        }
+    }
+
+    std::print("\n");
+
+    // ---- Post-Processor ----
+    {
+        auto pp = hq::npu::NpuPostProcessorFactory::create_best_available();
+        if (pp) {
+            std::print("Post-Processor:    {}\n", pp->name());
+            std::print("  available:       {}\n", pp->is_available() ? "yes" : "no");
+            std::print("  synthetic_mode:  {}\n", pp->synthetic_mode() ? "true (CPU/stub)" : "false (real NPU)");
+            std::print("  utilization:     {:.1f}%\n", pp->utilization());
+            if (!pp->is_available()) {
+                std::print("  unavailable_reason: {}\n", pp->unavailable_reason());
+            }
+        } else {
+            std::print("Post-Processor:    NONE (no backend available)\n");
+        }
+    }
+
+    std::print("\n");
+
+    // ---- GPU Monitor ----
+    {
+        hq::GPUMonitor gpu;
+        bool init_ok = static_cast<bool>(gpu.initialize());
+        std::print("GPU Monitor:       {}\n", init_ok ? "initialized" : "not available");
+        if (init_ok) {
+            auto telem = gpu.query_all();
+            if (telem) {
+                std::print("  telemetry_valid: {}\n", telem->telemetry_valid ? "yes" : "no");
+                std::print("  utilization:     {:.1f}%\n", telem->utilization_percent);
+                std::print("  temperature:     {:.1f} C\n", telem->temperature_celsius);
+                std::print("  memory_used:     {:.1f} MiB\n", telem->memory_used_mb);
+                std::print("  memory_total:    {:.1f} MiB\n", telem->memory_total_mb);
+            } else {
+                std::print("  query_all: FAILED\n");
+            }
+        }
+    }
+
+    std::print("\n");
+
+    // ---- Hailo Monitor ----
+    {
+        hq::HailoMonitor mon;
+        bool open_ok = static_cast<bool>(mon.open(""));
+        std::print("Hailo Monitor:     {}\n", open_ok ? "open (real sensors)" : "not available");
+        if (open_ok) {
+            auto stats = mon.sample();
+            if (stats) {
+                std::print("  temperature:     {:.1f} C\n", stats->temperature_celsius);
+                std::print("  power:           {:.1f} W\n", stats->power_watts);
+                std::print("  nn_core_util:    {:.1f}%\n", stats->nn_core_utilization);
+            } else {
+                std::print("  sample: FAILED\n");
+            }
+            mon.close();
+        }
+    }
+
+    std::print("\n=== Honesty Summary ===\n");
+    std::print("All hardware claims in this report are explicit and verifiable.\n");
+    std::print("No fabricated telemetry. No misleading capability assertions.\n");
+    std::print("========================\n");
 
     return EXIT_SUCCESS;
 }

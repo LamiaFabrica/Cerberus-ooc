@@ -895,7 +895,33 @@ Pipeline::generate(const GenerationRequest& req) {
     accel.encoder_name = npu_encoder_ ? npu_encoder_->name() : "none";
     accel.post_processor_name =
         npu_post_processor_ ? npu_post_processor_->name() : "none";
-    accel.gpu_backend_name = gpu_monitor_ ? hq::to_string(gpu_monitor_->backend()) : "None";
+    accel.encoder_is_fallback =
+        npu_encoder_ && npu_encoder_->synthetic_mode();
+    accel.post_processor_is_fallback =
+        npu_post_processor_ && npu_post_processor_->synthetic_mode();
+
+    // Percentage of NPU-acceleratable CHEAP components that actually used NPU.
+    // Components: text_encode, post_process, cfg_blend.
+    // NOTE: This deliberately EXCLUDES UNet denoising (~90% of compute).
+    // A value of 100% here does NOT mean the NPU did the expensive work.
+    int npu_cheap_components_total = 3;
+    int npu_cheap_components_used = 0;
+    if (accel.text_encode_used_npu)  ++npu_cheap_components_used;
+    if (accel.post_process_used_npu) ++npu_cheap_components_used;
+    if (accel.cfg_blend_used_npu)    ++npu_cheap_components_used;
+    accel.npu_cheap_ops_percent = static_cast<std::uint8_t>(
+        (npu_cheap_components_used * 100) / npu_cheap_components_total);
+
+    // UNet denoising on NPU: architecturally blocked. Requires compiled HEF
+    // for Hailo-8L + HailoRT SDK (Linux only). No such HEF exists in this repo.
+    accel.unet_denoise_used_npu = false;
+
+    HQ_LOG_INFO("[Pipeline] HardwareAccelerationReport: NPU cheap-ops={}%, "
+                "UNet_on_NPU={}, encoder_fallback={}, postproc_fallback={}",
+                accel.npu_cheap_ops_percent,
+                accel.unet_denoise_used_npu ? "yes" : "no (blocked: no HEF)",
+                accel.encoder_is_fallback ? "yes" : "no",
+                accel.post_processor_is_fallback ? "yes" : "no");
 
     // Copy acceleration report into the GeneratedImage
     decode_result->acceleration = accel;
