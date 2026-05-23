@@ -320,6 +320,15 @@ set(UM790_PIPELINE_SOURCES
     src/async_pipeline.cpp
     src/tiered_memory_manager.cpp
     src/cluster_transport.cpp
+    src/cerberus_execution_coordinator.cpp
+    src/david_propup_engine.cpp
+    src/cerberus_native_kernels.cpp
+    src/cerberus_native_backend.cpp
+    src/cerberus_fused_kernels.cpp
+    src/cerberus_quantized_kernels.cpp
+    src/cerberus_graph_engine.cpp
+    src/cerberus_decision_engine.cpp
+    src/cerberus_runtime.cpp
 )
 
 list(APPEND UM790_PIPELINE_SOURCES src/hip_graph_denoiser.cpp)
@@ -418,18 +427,18 @@ enable_testing()
 include(GoogleTest)
 gtest_discover_tests(um790_test DISCOVERY_MODE PRE_TEST)
 
-add_executable(test_empty_main src/test_empty_main.cpp)
-target_link_libraries(test_empty_main PRIVATE um790_pipeline um790_compile_options um790_includes um790_link_options Threads::Threads)
-
-# ---------------------------------------------------------------------------
 # Target: test_smoke_ov
-# ---------------------------------------------------------------------------
-add_executable(test_cout src/test_cout.cpp)
-target_link_libraries(test_cout PRIVATE um790_compile_options um790_includes um790_link_options)
+add_executable(test_smoke_ov src/test_smoke_ov.cpp)
+target_link_libraries(test_smoke_ov PRIVATE um790_pipeline um790_compile_options um790_includes um790_link_options Threads::Threads)
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND WIN32)
+    target_link_options(test_smoke_ov PRIVATE -static-libgcc -static-libstdc++)
+endif()
 
-# ---------------------------------------------------------------------------
-# Target: cerberus_npu (shared library)
-# ---------------------------------------------------------------------------
+add_executable(david_propup_engine src/david_propup_engine_main.cpp)
+target_link_libraries(david_propup_engine PRIVATE um790_pipeline um790_compile_options um790_includes um790_link_options Threads::Threads)
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND WIN32)
+    target_link_options(david_propup_engine PRIVATE -static-libgcc -static-libstdc++)
+endif()
 add_library(cerberus_npu SHARED src/cerberus_api.cpp)
 
 target_sources(cerberus_npu PRIVATE
@@ -461,13 +470,6 @@ target_link_libraries(cerberus_server PRIVATE
     um790_compile_options
     $<$<PLATFORM_ID:Windows>:ws2_32>
 )
-
-add_executable(test_smoke_ov src/test_smoke_ov.cpp)
-target_link_libraries(test_smoke_ov PRIVATE um790_pipeline um790_compile_options um790_includes um790_link_options Threads::Threads)
-if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND WIN32)
-    # Statically link libstdc++ so test binary runs without GCC runtime DLL in PATH.
-    target_link_options(test_smoke_ov PRIVATE -static-libgcc -static-libstdc++)
-endif()
 
 # ---------------------------------------------------------------------------
 # Installation

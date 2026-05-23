@@ -1,0 +1,144 @@
+/// @file cerberus_quantized_kernels.cpp
+/// @copyright Copyright (c) 2026 D Hargreaves. All rights reserved.
+///
+/// Quantized native kernel implementations — asymmetric uint8_t path.
+///
+/// @version 1.0.0
+
+#include "hq/cerberus_quantized_kernels.hpp"
+
+#include <cstring>
+#include <vector>
+#include <algorithm>
+#include <cmath>
+
+namespace hq::cerberus::native {
+
+// ===========================================================================
+// Helpers: float -> uint8 quantization
+// ===========================================================================
+
+static void quantize_tensor_u8(
+    const float* src, std::uint8_t* dst,
+    std::size_t n, float scale, std::int32_t zero_point) {
+    for (std::size_t i = 0; i < n; ++i) {
+        float q = std::round(src[i] / scale) + static_cast<float>(zero_point);
+        if (q < 0.0f) q = 0.0f;
+        if (q > 255.0f) q = 255.0f;
+        dst[i] = static_cast<std::uint8_t>(static_cast<std::int32_t>(q));
+    }
+}
+
+static void dequantize_tensor(
+    const std::int32_t* src, float* dst,
+    std::size_t n, float scale) {
+    for (std::size_t i = 0; i < n; ++i) {
+        dst[i] = static_cast<float>(src[i]) * scale;
+    }
+}
+
+static std::pair<float, float> compute_minmax(
+    const float* src, std::size_t n) {
+    float mn = src[0], mx = src[0];
+    for (std::size_t i = 1; i < n; ++i) {
+        if (src[i] < mn) mn = src[i];
+        if (src[i] > mx) mx = src[i];
+    }
+    return {mn, mx};
+}
+
+static float compute_scale(float min_val, float max_val) {
+    if (min_val == max_val) return 1.0f;
+    return (max_val - min_val) / 255.0f;
+}
+
+static std::int32_t compute_zero_point(float min_val, float scale) {
+    return static_cast<std::int32_t>(std::round(-min_val / scale));
+}
+
+// ===========================================================================
+// Asymmetric uint8_t MatMul (reference)
+// ===========================================================================
+
+std::expected<void, std::string> kernel_matmul_int8(
+    const std::uint8_t* A, const std::uint8_t* B, float* C_out,
+    std::size_t M, std::size_t N, std::size_t K,
+    const QuantParams& q) {
+    if (!A || !B || !C_out) return std::unexpected{"null pointer"};
+    if (M == 0 || N == 0 || K == 0) return std::unexpected{"empty dimension"};
+
+    std::vector<std::int32_t> C_acc(M * N, 0);
+
+    // Naïve uint8_t GEMM with zero-point compensation
+    for (std::size_t m = 0; m < M; ++m) {
+        for (std::size_t n = 0; n < N; ++n) {
+            std::int32_t acc = 0;
+            for (std::size_t k = 0; k < K; ++k) {
+                acc += (static_cast<std::int32_t>(A[m * K + k]) - q.zero_point_a) *
+                       (static_cast<std::int32_t>(B[k * N + n]) - q.zero_point_b);
+            }
+            C_acc[m * N + n] = acc;
+        }
+    }
+
+    float dequant_scale = q.scale_a * q.scale_b;
+    dequantize_tensor(C_acc.data(), C_out, M * N, dequant_scale);
+    return {};
+}
+
+// ===========================================================================
+// Dynamic quantization MatMul (uint8_t internal)
+// ===========================================================================
+
+std::expected<void, std::string> kernel_matmul_dynamic_quant(
+    const float* A, const float* B, float* C,
+    std::size_t M, std::size_t N, std::size_t K) {
+    if (!A || !B || !C) return std::unexpected{"null pointer"};
+
+    auto [min_a, max_a] = compute_minmax(A, M * K);
+    auto [min_b, max_b] = compute_minmax(B, K * N);
+
+    float scale_a = compute_scale(min_a, max_a);
+    float scale_b = compute_scale(min_b, max_b);
+    if (scale_a == 0.0f) scale_a = 1.0f;
+    if (scale_b == 0.0f) scale_b = 1.0f;
+
+    std::int32_t zp_a = compute_zero_point(min_a, scale_a);
+    std::int32_t zp_b = compute_zero_point(min_b, scale_b);
+
+    std::vector<std::uint8_t> Aq(M * K);
+    std::vector<std::uint8_t> Bq(K * N);
+
+    quantize_tensor_u8(A, Aq.data(), M * K, scale_a, zp_a);
+    quantize_tensor_u8(B, Bq.data(), K * N, scale_b, zp_b);
+
+    return kernel_matmul_int8(
+        Aq.data(), Bq.data(), C, M, N, K,
+        QuantParams{scale_a, scale_b, 1.0f, zp_a, zp_b});
+}
+
+// ===========================================================================
+// Fused uint8_t MatMul + Bias + ReLU
+// ===========================================================================
+
+std::expected<void, std::string> kernel_matmul_bias_relu_int8(
+    const std::uint8_t* A, const std::uint8_t* B,
+    const float* bias,
+    float* C_out,
+    std::size_t M, std::size_t N, std::size_t K,
+    const QuantParams& q) {
+    auto r = kernel_matmul_int8(A, B, C_out, M, N, K, q);
+    if (!r) return r;
+
+    for (std::size_t m = 0; m < M; ++m) {
+        for (std::size_t n = 0; n < N; ++n) {
+            std::size_t idx = m * N + n;
+            float val = C_out[idx] + bias[n];
+            if (val < 0.0f) val = 0.0f;
+            C_out[idx] = val;
+        }
+    }
+    return {};
+}
+
+} // namespace hq::cerberus::native

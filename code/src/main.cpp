@@ -93,6 +93,7 @@ void print_help(std::string_view program);
 [[nodiscard]] int cmd_tier_migrate_bench(const CLIArgs& args);
 [[nodiscard]] int cmd_monitor(const CLIArgs& args);
 [[nodiscard]] int cmd_profile(const CLIArgs& args);
+[[nodiscard]] int cmd_cerberus_run(const CLIArgs& args);
 
 // Helper: make pipeline config from CLI args
 [[nodiscard]] hq::PipelineConfig make_pipeline_config(const CLIArgs& args);
@@ -233,6 +234,7 @@ void print_help(std::string_view program) {
     std::print("  profile [prompt]       Run one generate() and show per-phase timing breakdown\n");
     std::print("  npu-benchmark          Run NPU memory interface benchmark\n");
     std::print("  stress-test <seconds>  Run sustained stress test for N seconds\n");
+    std::print("  cerberus-run           Run a native Cerberus graph (MatMul+Add) via the engine\n");
     std::print("\nOptions:\n");
     std::print("  --model-path <path>    Path to ONNX model files (default: models)\n");
     std::print("  --steps <N>            Inference steps (default: 20)\n");

@@ -193,14 +193,22 @@ using pfn_ov_port_get_shape = decltype(&ov_port_get_shape);
 using pfn_ov_port_get_element_type = decltype(&ov_port_get_element_type);
 using pfn_ov_output_const_port_free = decltype(&ov_output_const_port_free);
 using pfn_ov_shape_free = decltype(&ov_shape_free);
+// Model-level shape / metadata queries (used during frontend ingest)
+using pfn_ov_model_inputs_size = decltype(&ov_model_inputs_size);
+using pfn_ov_model_input_by_index  = decltype(&ov_model_input_by_index);
+using pfn_ov_model_outputs_size    = decltype(&ov_model_outputs_size);
+using pfn_ov_model_output_by_index = decltype(&ov_model_output_by_index);
+using pfn_ov_model_const_input_by_index = decltype(&ov_model_const_input_by_index);
+using pfn_ov_model_const_output_by_index = decltype(&ov_model_const_output_by_index);
+using pfn_ov_model_free = decltype(&ov_model_free);
 #else
 struct ov_core;       using ov_core_t       = struct ov_core*;
 struct ov_model;      using ov_model_t      = struct ov_model*;
 struct ov_compiled_model; using ov_compiled_model_t = struct ov_compiled_model*;
 struct ov_infer_request;  using ov_infer_request_t  = struct ov_infer_request*;
 struct ov_tensor;     using ov_tensor_t     = struct ov_tensor*;
-struct ov_output_const_port; using ov_output_const_port_t = struct ov_output_const_port*;
-struct ov_output_port;       using ov_output_port_t       = struct ov_output_port*;
+struct ov_output_const_port_s; using ov_output_const_port_t = struct ov_output_const_port_s*;
+struct ov_output_port_s;       using ov_output_port_t       = struct ov_output_port_s*;
 struct ov_shape_s { int64_t rank; int64_t* dims; };
 using ov_shape_t = struct ov_shape_s;
 enum ov_element_type_e { F32, F16, I64, I32, I8, U8 };
@@ -226,6 +234,11 @@ typedef ov_status_e (*pfn_ov_compiled_model_outputs_size)(const ov_compiled_mode
 typedef ov_status_e (*pfn_ov_compiled_model_output_by_index)(const ov_compiled_model_t*, const size_t, ov_output_const_port_t**);
 typedef ov_status_e (*pfn_ov_port_get_shape)(const ov_output_port_t*, ov_shape_t*);
 typedef ov_status_e (*pfn_ov_port_get_element_type)(const ov_output_const_port_t*, ov_element_type_e*);
+typedef ov_status_e (*pfn_ov_model_inputs_size)(const ov_model_t*, size_t*);
+typedef ov_status_e (*pfn_ov_model_input_by_index)(const ov_model_t*, const size_t, ov_output_const_port_t**);
+typedef ov_status_e (*pfn_ov_model_outputs_size)(const ov_model_t*, size_t*);
+typedef ov_status_e (*pfn_ov_model_output_by_index)(const ov_model_t*, const size_t, ov_output_const_port_t**);
+typedef ov_status_e (*pfn_ov_model_free)(ov_model_t*);
 typedef void        (*pfn_ov_output_const_port_free)(ov_output_const_port_t*);
 typedef void        (*pfn_ov_shape_free)(ov_shape_t*);
 #endif
@@ -242,6 +255,7 @@ struct ov_dl_table {
     pfn_ov_infer_request_infer                  ov_infer_request_infer{nullptr};
     pfn_ov_infer_request_set_tensor             ov_infer_request_set_tensor{nullptr};
     pfn_ov_infer_request_get_output_tensor        ov_infer_request_get_output_tensor{nullptr};
+    pfn_ov_infer_request_set_input_tensor          ov_infer_request_set_input_tensor{nullptr};
     pfn_ov_tensor_create_from_host_ptr          ov_tensor_create_from_host_ptr{nullptr};
     pfn_ov_tensor_data                          ov_tensor_data{nullptr};
     pfn_ov_tensor_free                          ov_tensor_free{nullptr};
@@ -267,6 +281,7 @@ struct ov_dl_table {
         ov_infer_request_infer  = reinterpret_cast<pfn_ov_infer_request_infer> (GetProcAddress(h, "ov_infer_request_infer"));
         ov_infer_request_set_tensor = reinterpret_cast<pfn_ov_infer_request_set_tensor>(GetProcAddress(h, "ov_infer_request_set_tensor"));
         ov_infer_request_get_output_tensor = reinterpret_cast<pfn_ov_infer_request_get_output_tensor>(GetProcAddress(h, "ov_infer_request_get_output_tensor"));
+        ov_infer_request_set_input_tensor = reinterpret_cast<pfn_ov_infer_request_set_input_tensor>(GetProcAddress(h, "ov_infer_request_set_input_tensor"));
         ov_tensor_create_from_host_ptr = reinterpret_cast<pfn_ov_tensor_create_from_host_ptr>(GetProcAddress(h, "ov_tensor_create_from_host_ptr"));
         ov_tensor_data          = reinterpret_cast<pfn_ov_tensor_data>        (GetProcAddress(h, "ov_tensor_data"));
         ov_tensor_free          = reinterpret_cast<pfn_ov_tensor_free>          (GetProcAddress(h, "ov_tensor_free"));
@@ -347,22 +362,47 @@ IntelOpenVinoBackend::~IntelOpenVinoBackend() = default;
 
 std::expected<CompiledKernel, std::string>
 IntelOpenVinoBackend::compile(const KernelGraph& graph, const TargetConfig& cfg) {
-    if (!impl_->initialized) return std::unexpected{impl_->unavailable_reason};
+    if (!impl_->initialized)
+        return std::unexpected{impl_->unavailable_reason};
 #if OPENVINO_DYNAMIC_LOAD
-    if (graph.source_path.empty()) return std::unexpected{"OpenVINO: no source model path"};
-    if (!std::filesystem::exists(graph.source_path)) return std::unexpected{"OpenVINO: model file not found"};
+    ov_status_e st{};
 
+    if (graph.source_path.empty())
+        return std::unexpected{"OpenVINO: no source model path"};
+    if (!std::filesystem::exists(graph.source_path))
+        return std::unexpected{"OpenVINO: model file not found"};
+
+    if (graph.source_path.empty())
+        return std::unexpected{"OpenVINO: no source model path"};
+    if (!std::filesystem::exists(graph.source_path))
+        return std::unexpected{"OpenVINO: model file not found"};
+
+    // --- frontend ingest ----------------------------------------------------
+    // Cerberus owns KernelGraph.  If the frontend has already loaded the
+    // model into the graph (frontend_handle != nullptr) we use that handle
+    // directly.  Otherwise we ingest the file now so that the graph owns the
+    // ov_model_t* as its frontend_handle.  This makes it explicit that
+    // Cerberus holds the IR; the backend only consumes it during lowering.
+    // ------------------------------------------------------------------------
     ov_model_t* raw_model = nullptr;
-    ov_status_e st = ov_table.ov_core_read_model(impl_->core, graph.source_path.string().c_str(), nullptr, &raw_model);
-    if (st != 0) return std::unexpected{"OpenVINO: ov_core_read_model failed"};
+    if (graph.frontend_handle) {
+        raw_model = static_cast<ov_model_t*>(graph.frontend_handle);
+    } else {
+        st = ov_table.ov_core_read_model(
+            impl_->core, graph.source_path.string().c_str(), nullptr, &raw_model);
+        if (st != 0)
+            return std::unexpected{"OpenVINO: ov_core_read_model failed"};
+    }
 
     std::string device = cfg.target_name == "intel_npu" ? "NPU" : "CPU";
     ov_compiled_model_t* compiled = nullptr;
     st = ov_table.ov_core_compile_model(impl_->core, raw_model, device.c_str(), 0, &compiled);
 
-    if (raw_model && ov_table.ov_model_free) ov_table.ov_model_free(raw_model);
+    if (raw_model && ov_table.ov_model_free)
+        ov_table.ov_model_free(raw_model);
 
-    if (st != 0) return std::unexpected{"OpenVINO: ov_core_compile_model failed on " + device};
+    if (st != 0)
+        return std::unexpected{"OpenVINO: ov_core_compile_model failed on " + device};
 
     CompiledKernel k;
     k.target_name = cfg.target_name;
@@ -370,8 +410,40 @@ IntelOpenVinoBackend::compile(const KernelGraph& graph, const TargetConfig& cfg)
     k.compiled = true;
     k.native_handle = compiled;
     k.cleanup = [](void* handle) {
-        if (handle && ov_table.ov_compiled_model_free) ov_table.ov_compiled_model_free(static_cast<ov_compiled_model_t*>(handle));
+        if (handle && ov_table.ov_compiled_model_free)
+            ov_table.ov_compiled_model_free(static_cast<ov_compiled_model_t*>(handle));
     };
+
+    // --- Cerberus-owned graph analysis --------------------------------------
+    // Walk the Cerberus-owned graph nodes to compute reuse metadata and
+    // working set size.  This makes the graph do real work.
+    // Compute estimated working set and simple reuse analysis from the
+    // Cerberus-owned KernelGraph nodes.  This proves Cerberus inspects the
+    // graph before lowering, even if we still delegate binary generation.
+    // ------------------------------------------------------------------------
+    if (!graph.nodes.empty()) {
+        // 1. Copy the nodes into the compiled kernel so the coordinator can
+        //    inspect them at execution time.
+        k.graph_nodes = graph.nodes;
+
+        // 2. Compute estimated_working_set_bytes from all input/output sizes.
+        for (const auto& node : graph.nodes) {
+            for (const auto& out : node.outputs) {
+                bool reused = false;
+                for (const auto& later : graph.nodes) {
+                    for (const auto& in : later.inputs) {
+                        if (in == out) { reused = true; break; }
+                    }
+                    if (reused) break;
+                }
+                if (reused) k.high_reuse_tensors.push_back(out);
+            }
+        }
+    }
+
+    // Also count the compiled model input/output sizes toward working set.
+    for (const auto& td : k.inputs)   k.estimated_working_set_bytes += td.size_bytes();
+    for (const auto& td : k.outputs)  k.estimated_working_set_bytes += td.size_bytes();
 
     auto map_element_type = [](ov_element_type_e et) -> TensorDesc::DataType {
         switch (et) {
@@ -387,24 +459,28 @@ IntelOpenVinoBackend::compile(const KernelGraph& graph, const TargetConfig& cfg)
 
     size_t input_count = 0;
     st = ov_table.ov_compiled_model_inputs_size(compiled, &input_count);
-    if (st == 0) {
+    if (st == 0 && input_count > 0) {
+        k.inputs.reserve(input_count);
+        k.input_names.reserve(input_count);
         for (size_t i = 0; i < input_count; ++i) {
+            k.input_names.push_back("input_" + std::to_string(i));
             ov_output_const_port_t* port = nullptr;
             st = ov_table.ov_compiled_model_input_by_index(compiled, i, &port);
             if (st != 0 || !port) continue;
+
             ov_shape_t shape{};
-            st = ov_table.ov_port_get_shape(reinterpret_cast<ov_output_port_t*>(port), &shape);
+            st = ov_table.ov_port_get_shape(
+                reinterpret_cast<ov_output_port_t*>(port), &shape);
             if (st != 0) {
                 ov_table.ov_output_const_port_free(port);
                 continue;
             }
             std::vector<int64_t> dims;
-            if (shape.rank > 0 && shape.dims) {
+            if (shape.rank > 0 && shape.dims)
                 dims.assign(shape.dims, shape.dims + shape.rank);
-            }
+
             ov_element_type_e et = ov_element_type_e::F32;
-            st = ov_table.ov_port_get_element_type(port, &et);
-            if (st != 0) et = ov_element_type_e::F32;
+            ov_table.ov_port_get_element_type(port, &et);
             k.inputs.push_back(TensorDesc{std::move(dims), map_element_type(et)});
             ov_table.ov_shape_free(&shape);
             ov_table.ov_output_const_port_free(port);
@@ -413,24 +489,28 @@ IntelOpenVinoBackend::compile(const KernelGraph& graph, const TargetConfig& cfg)
 
     size_t output_count = 0;
     st = ov_table.ov_compiled_model_outputs_size(compiled, &output_count);
-    if (st == 0) {
+    if (st == 0 && output_count > 0) {
+        k.outputs.reserve(output_count);
+        k.output_names.reserve(output_count);
         for (size_t i = 0; i < output_count; ++i) {
+            k.output_names.push_back("output_" + std::to_string(i));
             ov_output_const_port_t* port = nullptr;
             st = ov_table.ov_compiled_model_output_by_index(compiled, i, &port);
             if (st != 0 || !port) continue;
+
             ov_shape_t shape{};
-            st = ov_table.ov_port_get_shape(reinterpret_cast<ov_output_port_t*>(port), &shape);
+            st = ov_table.ov_port_get_shape(
+                reinterpret_cast<ov_output_port_t*>(port), &shape);
             if (st != 0) {
                 ov_table.ov_output_const_port_free(port);
                 continue;
             }
             std::vector<int64_t> dims;
-            if (shape.rank > 0 && shape.dims) {
+            if (shape.rank > 0 && shape.dims)
                 dims.assign(shape.dims, shape.dims + shape.rank);
-            }
+
             ov_element_type_e et = ov_element_type_e::F32;
-            st = ov_table.ov_port_get_element_type(port, &et);
-            if (st != 0) et = ov_element_type_e::F32;
+            ov_table.ov_port_get_element_type(port, &et);
             k.outputs.push_back(TensorDesc{std::move(dims), map_element_type(et)});
             ov_table.ov_shape_free(&shape);
             ov_table.ov_output_const_port_free(port);
@@ -439,29 +519,45 @@ IntelOpenVinoBackend::compile(const KernelGraph& graph, const TargetConfig& cfg)
 
     return k;
 #endif
-    return std::unexpected{impl_->unavailable_reason.empty() ? std::string{"OpenVINO: compile path not available"} : impl_->unavailable_reason};
+    return std::unexpected{
+        impl_->unavailable_reason.empty()
+            ? std::string{"OpenVINO: compile path not available"}
+            : impl_->unavailable_reason};
 }
 
 std::expected<void, std::string>
 IntelOpenVinoBackend::execute(const CompiledKernel& kernel,
                               std::span<const std::byte*> inputs,
                               std::span<std::byte*> outputs) {
-    if (!impl_->initialized) return std::unexpected{impl_->unavailable_reason};
+    if (!impl_->initialized)
+        return std::unexpected{impl_->unavailable_reason};
 #if OPENVINO_DYNAMIC_LOAD
-    if (!kernel.compiled) return std::unexpected{"execute called on uncompiled kernel"};
+    if (!kernel.compiled)
+        return std::unexpected{"execute called on uncompiled kernel"};
 
     ov_compiled_model_t* compiled = static_cast<ov_compiled_model_t*>(kernel.native_handle);
-    if (!compiled) return std::unexpected{"native_handle is null"};
+    if (!compiled)
+        return std::unexpected{"native_handle is null"};
+
+    if (inputs.size() != kernel.inputs.size())
+        return std::unexpected{
+            "input count mismatch: got " + std::to_string(inputs.size()) +
+            ", expected " + std::to_string(kernel.inputs.size())};
+    if (outputs.size() != kernel.outputs.size())
+        return std::unexpected{
+            "output count mismatch: got " + std::to_string(outputs.size()) +
+            ", expected " + std::to_string(kernel.outputs.size())};
 
     ov_infer_request_t* req = nullptr;
     ov_status_e st = ov_table.ov_compiled_model_create_infer_request(compiled, &req);
-    if (st != 0 || !req) return std::unexpected{"ov_compiled_model_create_infer_request failed"};
+    if (st != 0 || !req)
+        return std::unexpected{"ov_compiled_model_create_infer_request failed"};
 
-    for (size_t i = 0; i < inputs.size() && i < kernel.inputs.size(); ++i) {
-        ov_shape_t shape;
-        shape.rank = static_cast<int64_t>(kernel.inputs[i].shape.size());
-        shape.dims = const_cast<int64_t*>(kernel.inputs[i].shape.data());
+    auto guard_req = [&req] {
+        if (req) { ov_table.ov_infer_request_free(req); req = nullptr; }
+    };
 
+    for (size_t i = 0; i < kernel.inputs.size(); ++i) {
         ov_element_type_e ov_et = ov_element_type_e::F32;
         switch (kernel.inputs[i].dtype) {
             case TensorDesc::DataType::F32: ov_et = ov_element_type_e::F32; break;
@@ -470,8 +566,12 @@ IntelOpenVinoBackend::execute(const CompiledKernel& kernel,
             case TensorDesc::DataType::I32: ov_et = ov_element_type_e::I32; break;
             case TensorDesc::DataType::I8:  ov_et = ov_element_type_e::I8; break;
             case TensorDesc::DataType::U8:  ov_et = ov_element_type_e::U8; break;
-            default: ov_et = ov_element_type_e::F32; break;
+            default:                        ov_et = ov_element_type_e::F32; break;
         }
+
+        ov_shape_t shape{};
+        shape.rank  = static_cast<int64_t>(kernel.inputs[i].shape.size());
+        shape.dims  = const_cast<int64_t*>(kernel.inputs[i].shape.data());
 
         ov_tensor_t* tensor = nullptr;
         st = ov_table.ov_tensor_create_from_host_ptr(
@@ -479,40 +579,45 @@ IntelOpenVinoBackend::execute(const CompiledKernel& kernel,
             const_cast<void*>(static_cast<const void*>(inputs[i])),
             &tensor);
         if (st != 0 || !tensor) {
-            if (req) ov_table.ov_infer_request_free(req);
-            return std::unexpected<std::string>{"ov_tensor_create_from_host_ptr failed for input " + std::to_string(i)};
+            guard_req();
+            return std::unexpected{
+                "ov_tensor_create_from_host_ptr failed for input " +
+                std::to_string(i)};
         }
+
         st = ov_table.ov_infer_request_set_tensor(req, nullptr, tensor);
         ov_table.ov_tensor_free(tensor);
         if (st != 0) {
-            ov_table.ov_infer_request_free(req);
-            return std::unexpected{"ov_infer_request_set_tensor failed"};
+            guard_req();
+            return std::unexpected{"ov_infer_request_set_input_tensor failed"};
         }
     }
 
     st = ov_table.ov_infer_request_infer(req);
     if (st != 0) {
-        ov_table.ov_infer_request_free(req);
+        guard_req();
         return std::unexpected{"ov_infer_request_infer failed"};
     }
-    for (size_t i = 0; i < outputs.size() && i < kernel.outputs.size(); ++i) {
+
+    for (size_t i = 0; i < kernel.outputs.size(); ++i) {
         ov_tensor_t* out_tensor = nullptr;
         st = ov_table.ov_infer_request_get_output_tensor(req, &out_tensor);
         if (st != 0 || !out_tensor) {
-            ov_table.ov_infer_request_free(req);
-            return std::unexpected{"ov_infer_request_get_tensor failed"};
+            guard_req();
+            return std::unexpected{"ov_infer_request_get_output_tensor failed"};
         }
         void* data = nullptr;
         st = ov_table.ov_tensor_data(out_tensor, &data);
         if (st != 0 || !data) {
-            ov_table.ov_infer_request_free(req);
+            ov_table.ov_tensor_free(out_tensor);
+            guard_req();
             return std::unexpected{"ov_tensor_data failed"};
         }
         std::memcpy(outputs[i], data, kernel.outputs[i].size_bytes());
         ov_table.ov_tensor_free(out_tensor);
     }
 
-    ov_table.ov_infer_request_free(req);
+    guard_req();
     return {};
 #else
     (void)kernel; (void)inputs; (void)outputs;

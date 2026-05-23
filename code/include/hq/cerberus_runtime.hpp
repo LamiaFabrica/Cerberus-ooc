@@ -1,0 +1,80 @@
+#pragma once
+/// @file cerberus_runtime.hpp
+/// @copyright Copyright (c) 2026 D Hargreaves. All rights reserved.
+///
+/// CerberusRuntime — production runtime entry point for the full engine stack.
+///
+/// This is the bridge between the C API and the Cerberus compiler+runtime.
+/// It owns the full execution path:
+///   KernelGraph → CerberusGraph → DecisionEngine → ExecutionCoordinator → Backend
+///
+/// @version 1.0.0
+
+#include "hq/npu_backend_unified.hpp"
+#include "hq/tiered_memory_manager.hpp"
+#include "hq/cerberus_execution_coordinator.hpp"
+#include "hq/cerberus_graph_engine.hpp"
+#include "hq/cerberus_decision_engine.hpp"
+
+#include <expected>
+#include <string>
+#include <vector>
+#include <span>
+
+namespace hq::cerberus {
+
+// ===========================================================================
+// CerberusRuntime — production runtime wrapper
+// ===========================================================================
+
+class CerberusRuntime {
+public:
+    struct Config {
+        std::string preferred_backend{"native"}; ///< "native", "openvino", "cuda", "cpu"
+        bool        enable_fusion{true};         ///< enable Mul+Add → FMA fusion
+        bool        enable_quantization{false};  ///< enable INT8 path where possible
+        std::size_t warm_capacity_bytes{128ULL << 30};
+        std::size_t cool_capacity_bytes{64ULL << 30};
+    };
+
+    explicit CerberusRuntime();
+    explicit CerberusRuntime(const Config& cfg);
+    ~CerberusRuntime();
+
+    // Non-copyable, movable
+    CerberusRuntime(const CerberusRuntime&) = delete;
+    CerberusRuntime& operator=(const CerberusRuntime&) = delete;
+    CerberusRuntime(CerberusRuntime&&) noexcept;
+    CerberusRuntime& operator=(CerberusRuntime&&) noexcept;
+
+    /// Compile and execute a KernelGraph through the full Cerberus stack.
+    /// @param graph  Input computational graph.
+    /// @param input_buffers  Pointers to input host buffers (size = graph.graph_inputs.size()).
+    /// @param output_buffers Pointers to output host buffers (size = graph.graph_outputs.size()).
+    /// @return CERBERUS_OK on success, or an error string.
+    [[nodiscard]] std::expected<void, std::string>
+    run_graph(const npu::KernelGraph& graph,
+              std::span<std::byte*>       output_buffers,
+              std::span<const std::byte*> input_buffers);
+
+    /// Return last execution plan (for diagnostics / profiling).
+    [[nodiscard]] const std::vector<ExecutionStep>& last_plan() const noexcept {
+        return last_plan_;
+    }
+
+    /// Return runtime name for C API compatibility.
+    [[nodiscard]] static const char* name() noexcept { return "CerberusRuntime-v1.0"; }
+
+private:
+    Config cfg_;
+    std::unique_ptr<TieredMemoryManager>    mem_mgr_;
+    std::unique_ptr<DecisionEngine>       decision_engine_;
+    std::unique_ptr<CerberusExecutionCoordinator> coordinator_;
+    std::unique_ptr<npu::INpuBackend>       backend_;
+
+    std::vector<ExecutionStep> last_plan_;
+
+    [[nodiscard]] std::expected<void, std::string> init_backend_();
+};
+
+} // namespace hq::cerberus

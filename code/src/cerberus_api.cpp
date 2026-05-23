@@ -14,6 +14,7 @@
 #include "hq/hailo_monitor.hpp"
 #include "hq/gpu_monitor.hpp"
 #include "hq/pipeline.hpp"
+#include "hq/cerberus_runtime.hpp"
 
 #include <algorithm>
 #include <atomic>
@@ -53,6 +54,7 @@ struct SessionState {
     cerberus_session_config_t config{};
     std::unique_ptr<hq::Pipeline> pipeline;
     std::unique_ptr<hq::npu::NpuDmaPipeline> npu_pipeline;
+    std::unique_ptr<hq::cerberus::CerberusRuntime> cerberus_rt;
     std::string model_path_owned;
     std::vector<float> output_buffer;
     bool active{false};
@@ -842,6 +844,163 @@ cerberus_status_t cerberus_free_pinned(void* ptr) {
 #endif
 
     return CERBERUS_OK;
+}
+
+// ===========================================================================
+// Cerberus-native graph API (production engine loop-in)
+// ===========================================================================
+
+namespace {
+
+struct CerberusGraphHolder {
+    hq::npu::KernelGraph graph;
+    std::vector<std::vector<float>> constant_buffers; ///< ownership for float_attrs
+};
+
+} // anonymous namespace
+
+cerberus_status_t cerberus_graph_create(cerberus_graph_handle_t* graph) {
+    if (!graph) {
+        set_error("cerberus_graph_create: null pointer");
+        return CERBERUS_INVALID_ARGUMENT;
+    }
+    try {
+        auto* gh = new CerberusGraphHolder{};
+        *graph = reinterpret_cast<cerberus_graph_handle_t>(gh);
+        return CERBERUS_OK;
+    } catch (const std::exception& e) {
+        set_error_fmt(std::string("cerberus_graph_create: ") + e.what());
+        return CERBERUS_ERROR;
+    }
+}
+
+cerberus_status_t cerberus_graph_destroy(cerberus_graph_handle_t graph) {
+    if (!graph) {
+        set_error("cerberus_graph_destroy: null pointer");
+        return CERBERUS_INVALID_ARGUMENT;
+    }
+    delete reinterpret_cast<CerberusGraphHolder*>(graph);
+    return CERBERUS_OK;
+}
+
+cerberus_status_t cerberus_graph_add_matmul(cerberus_graph_handle_t graph,
+                                              int a_idx, int b_idx, int out_idx,
+                                              int m, int n, int k) {
+    if (!graph) return CERBERUS_INVALID_ARGUMENT;
+    auto* gh = reinterpret_cast<CerberusGraphHolder*>(graph);
+    hq::npu::KernelNode node;
+    node.op = hq::npu::KernelNode::Op::MatMul;
+    node.inputs.push_back("tensor_" + std::to_string(a_idx));
+    node.inputs.push_back("tensor_" + std::to_string(b_idx));
+    node.outputs.push_back("tensor_" + std::to_string(out_idx));
+    node.int_attrs = {m, n, k};
+    gh->graph.nodes.push_back(std::move(node));
+    return CERBERUS_OK;
+}
+
+cerberus_status_t cerberus_graph_add_add(cerberus_graph_handle_t graph,
+                                           int a_idx, int b_idx, int out_idx,
+                                           int count) {
+    if (!graph) return CERBERUS_INVALID_ARGUMENT;
+    auto* gh = reinterpret_cast<CerberusGraphHolder*>(graph);
+    hq::npu::KernelNode node;
+    node.op = hq::npu::KernelNode::Op::Add;
+    node.inputs.push_back("tensor_" + std::to_string(a_idx));
+    node.inputs.push_back("tensor_" + std::to_string(b_idx));
+    node.outputs.push_back("tensor_" + std::to_string(out_idx));
+    node.int_attrs = {count};
+    gh->graph.nodes.push_back(std::move(node));
+    return CERBERUS_OK;
+}
+
+cerberus_status_t cerberus_graph_add_mul(cerberus_graph_handle_t graph,
+                                          int a_idx, int b_idx, int out_idx,
+                                          int count) {
+    if (!graph) return CERBERUS_INVALID_ARGUMENT;
+    auto* gh = reinterpret_cast<CerberusGraphHolder*>(graph);
+    hq::npu::KernelNode node;
+    node.op = hq::npu::KernelNode::Op::Mul;
+    node.inputs.push_back("tensor_" + std::to_string(a_idx));
+    node.inputs.push_back("tensor_" + std::to_string(b_idx));
+    node.outputs.push_back("tensor_" + std::to_string(out_idx));
+    node.int_attrs = {count};
+    gh->graph.nodes.push_back(std::move(node));
+    return CERBERUS_OK;
+}
+
+cerberus_status_t cerberus_graph_add_input(cerberus_graph_handle_t graph,
+                                           int tensor_idx,
+                                           int count) {
+    if (!graph) return CERBERUS_INVALID_ARGUMENT;
+    (void)tensor_idx;
+    auto* gh = reinterpret_cast<CerberusGraphHolder*>(graph);
+    hq::npu::TensorDesc desc;
+    desc.shape = {count};
+    desc.dtype = hq::npu::TensorDesc::DataType::F32;
+    gh->graph.graph_inputs.push_back(std::move(desc));
+    return CERBERUS_OK;
+}
+
+cerberus_status_t cerberus_graph_add_output(cerberus_graph_handle_t graph,
+                                            int tensor_idx,
+                                            int count) {
+    if (!graph) return CERBERUS_INVALID_ARGUMENT;
+    (void)tensor_idx;
+    auto* gh = reinterpret_cast<CerberusGraphHolder*>(graph);
+    hq::npu::TensorDesc desc;
+    desc.shape = {count};
+    desc.dtype = hq::npu::TensorDesc::DataType::F32;
+    gh->graph.graph_outputs.push_back(std::move(desc));
+    return CERBERUS_OK;
+}
+
+cerberus_status_t cerberus_run_graph(cerberus_graph_handle_t graph,
+                                     const float** inputs, const size_t* input_sizes,
+                                     float** outputs, size_t* output_sizes) {
+    (void)input_sizes; (void)output_sizes;
+    if (!graph) {
+        set_error("cerberus_run_graph: null graph");
+        return CERBERUS_INVALID_ARGUMENT;
+    }
+
+    auto* gh = reinterpret_cast<CerberusGraphHolder*>(graph);
+    auto& kg = gh->graph;
+
+    if (kg.nodes.empty()) {
+        set_error("cerberus_run_graph: graph has no nodes");
+        return CERBERUS_INVALID_ARGUMENT;
+    }
+
+    try {
+        hq::cerberus::CerberusRuntime rt;
+
+        std::vector<const std::byte*> in_ptrs;
+        std::vector<std::byte*> out_ptrs;
+
+        size_t num_inputs  = kg.graph_inputs.size();
+        size_t num_outputs = kg.graph_outputs.size();
+
+        if (inputs) {
+            for (size_t i = 0; i < num_inputs; ++i)
+                in_ptrs.push_back(reinterpret_cast<const std::byte*>(inputs[i]));
+        }
+        if (outputs) {
+            for (size_t i = 0; i < num_outputs; ++i)
+                out_ptrs.push_back(reinterpret_cast<std::byte*>(outputs[i]));
+        }
+
+        auto result = rt.run_graph(kg, out_ptrs, in_ptrs);
+        if (!result) {
+            set_error_fmt(std::string("cerberus_run_graph: ") + result.error());
+            return CERBERUS_INFERENCE_FAILED;
+        }
+
+        return CERBERUS_OK;
+
+    } catch (const std::exception& e) {
+        set_error_fmt(std::string("cerberus_run_graph: exception: ") + e.what());
+        return CERBERUS_ERROR;
+    }
 }
 
 } // extern "C"

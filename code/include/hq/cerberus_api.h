@@ -71,6 +71,8 @@ typedef struct {
     float       guidance_scale;  ///< CFG guidance scale
     int32_t     preferred_device;///< CERBERUS_DEVICE_GPU or CERBERUS_DEVICE_NPU
     int32_t     num_threads;     ///< ORT session thread count
+    int32_t     preferred_backend; /**< 0=auto, 1=native(Cerberus), 2=openvino,
+                                        3=cuda, 4=onnx-cpu (legacy pipeline) */
 } cerberus_session_config_t;
 /// Callers MUST zero-initialize: cerberus_session_config_t cfg = {0};
 /// then set required fields.
@@ -148,6 +150,64 @@ cerberus_status_t cerberus_run_async(cerberus_handle_t session,
                                      size_t input_size,
                                      cerberus_callback_t callback,
                                      void* user_data);
+
+// ===========================================================================
+// Cerberus-native graph execution (engine loop-in)
+// ===========================================================================
+
+/// @brief Opaque handle to a Cerberus-native computation graph.
+typedef void* cerberus_graph_handle_t;
+
+/// @brief Create an empty Cerberus graph.
+/// @param graph  Output handle (must be destroyed with cerberus_graph_destroy).
+cerberus_status_t cerberus_graph_create(cerberus_graph_handle_t* graph);
+
+/// @brief Destroy a Cerberus graph and free all associated resources.
+cerberus_status_t cerberus_graph_destroy(cerberus_graph_handle_t graph);
+
+/// @brief Add a MatMul node to the graph.
+/// @param graph   Graph handle.
+/// @param a_idx   Input tensor index A (or -1 for external input).
+/// @param b_idx   Input tensor index B (or -1 for external input).
+/// @param out_idx Output tensor index (must be unique).
+/// @param m,n,k   GEMM dimensions (C = A[m×k] × B[k×n]).
+cerberus_status_t cerberus_graph_add_matmul(cerberus_graph_handle_t graph,
+                                              int a_idx, int b_idx, int out_idx,
+                                              int m, int n, int k);
+
+/// @brief Add an element-wise Add node to the graph.
+cerberus_status_t cerberus_graph_add_add(cerberus_graph_handle_t graph,
+                                         int a_idx, int b_idx, int out_idx,
+                                         int count);
+
+/// @brief Add an element-wise Mul node to the graph.
+cerberus_status_t cerberus_graph_add_mul(cerberus_graph_handle_t graph,
+                                         int a_idx, int b_idx, int out_idx,
+                                         int count);
+
+/// @brief Declare an external input to the graph.
+cerberus_status_t cerberus_graph_add_input(cerberus_graph_handle_t graph,
+                                           int tensor_idx,
+                                           int count);
+
+/// @brief Declare an external output of the graph.
+cerberus_status_t cerberus_graph_add_output(cerberus_graph_handle_t graph,
+                                            int tensor_idx,
+                                            int count);
+
+/// @brief Compile and execute the Cerberus graph natively.
+///
+/// This is the production loop-in for the Cerberus compiler+runtime.
+/// It goes through: CerberusGraph → DecisionEngine → ExecutionCoordinator → Backend.
+///
+/// @param graph       Compiled graph handle.
+/// @param inputs      Array of input buffers (length = number of graph inputs).
+/// @param input_sizes Array of buffer sizes in floats.
+/// @param outputs     Array of output buffers (caller-allocated, length = number of graph outputs).
+/// @param output_sizes Array of buffer sizes in floats.
+cerberus_status_t cerberus_run_graph(cerberus_graph_handle_t graph,
+                                     const float** inputs, const size_t* input_sizes,
+                                     float** outputs, size_t* output_sizes);
 
 // ===========================================================================
 // Pinned memory allocation
