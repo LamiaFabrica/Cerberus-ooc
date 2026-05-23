@@ -24,6 +24,7 @@
 #include "hq/health_score.hpp"
 #include "hq/cxx26_features.hpp"
 #include "hq/npu_pipeline.hpp"
+#include "hq/npu_backend_unified.hpp"
 #include "hq/npu_encoder.hpp"
 #include "hq/npu_accelerator.hpp"
 #include "hq/logger.hpp"
@@ -37,6 +38,7 @@
 #include <filesystem>
 #include <fstream>
 #include <numeric>
+#include <iostream>
 #include <optional>
 #if UM790_HAS_STD_PRINT
 #  include <print>
@@ -948,95 +950,92 @@ void print_help(std::string_view program) {
 }
 
 // =============================================================================
-// CMD: probe-backends — Probe hardware and show available backends (NOT active pipeline state)
+// CMD: probe-backends — Probe hardware and show available backends (factory)
 // =============================================================================
 [[nodiscard]] int cmd_probe_backends(const CLIArgs& args) {
     (void)args;
-    std::print("=== Cerberus Backend Probe (Factory-Only, NOT Active Pipeline) ===\n");
-    std::print("WARNING: This command creates fresh backend instances via factories.\n");
-    std::print("It does NOT inspect the active Pipeline's selected backends.\n");
-    std::print("For runtime acceleration status, use 'cerberus profile' after generation.\n\n");
+    std::cout << "=== Cerberus Backend Probe (Compiler-Runtime Model) ===\n";fflush(stdout);std::cout << "WARNING: Probes compile()+execute() capable backends.\n\n";fflush(stdout);
 
-    // ---- Encoder ----
-    {
-        auto enc = hq::npu::NpuEncoderFactory::create_best_available(nullptr, nullptr, "");
-        if (enc) {
-            std::print("Encoder:           {}\n", enc->name());
-            std::print("  available:       {}\n", enc->is_available() ? "yes" : "no");
-            std::print("  synthetic_mode:  {}\n", enc->synthetic_mode() ? "true (CPU/stub)" : "false (real NPU/GPU)");
-            std::print("  utilization:     {:.1f}%\n", enc->utilization());
-            std::print("  temperature:     {:.1f} C\n", enc->temperature());
-            if (!enc->is_available()) {
-                std::print("  unavailable_reason: {}\n", enc->unavailable_reason());
-            }
-        } else {
-            std::print("Encoder:           NONE (no backend available)\n");
+    hq::npu::NpuBackendFactory::initialize();
+
+    auto* intel = hq::npu::NpuBackendFactory::by_name("Intel-OpenVINO-NPU");
+    auto* cuda  = hq::npu::NpuBackendFactory::by_name("NVIDIA-CUDA");
+    auto* cpu   = hq::npu::NpuBackendFactory::by_name("ONNX-CPU-Fallback");
+
+    auto print_backend = [](hq::npu::INpuBackend* b, const char* label) {
+        if (!b) {
+            std::cout << label << ":  NONE\n"; return;
         }
-    }
-
-    std::print("\n");
-
-    // ---- Post-Processor ----
-    {
-        auto pp = hq::npu::NpuPostProcessorFactory::create_best_available();
-        if (pp) {
-            std::print("Post-Processor:    {}\n", pp->name());
-            std::print("  available:       {}\n", pp->is_available() ? "yes" : "no");
-            std::print("  synthetic_mode:  {}\n", pp->synthetic_mode() ? "true (CPU/stub)" : "false (real NPU)");
-            std::print("  utilization:     {:.1f}%\n", pp->utilization());
-            if (!pp->is_available()) {
-                std::print("  unavailable_reason: {}\n", pp->unavailable_reason());
-            }
-        } else {
-            std::print("Post-Processor:    NONE (no backend available)\n");
+        std::cout << label << ":  " << b->name()
+                  << " (available=" << (b->is_available() ? "yes" : "no")
+                  << ", synthetic=" << (b->synthetic_mode() ? "yes" : "no") << ")\n";
+        if (!b->is_available()) {
+            std::cout << "  unavailable_reason: " << b->unavailable_reason() << "\n";
         }
-    }
+        std::cout << "  can_compile_for(intel_npu): " << (b->can_compile_for("intel_npu") ? "yes" : "no") << "\n";
+        std::cout << "  can_compile_for(cuda):      " << (b->can_compile_for("cuda") ? "yes" : "no") << "\n";
+        std::cout << "  can_compile_for(cpu):       " << (b->can_compile_for("cpu") ? "yes" : "no") << "\n";
+    };
 
-    std::print("\n");
+    print_backend(intel, "Intel NPU");
+    print_backend(cuda,  "CUDA     ");
+    print_backend(cpu,   "CPU      ");
+
+    std::cout << "\nBest for 'intel_npu': "
+              << (hq::npu::NpuBackendFactory::best_for("intel_npu") ? hq::npu::NpuBackendFactory::best_for("intel_npu")->name() : "NONE")
+              << "\n";
+    std::cout << "Best for 'cuda':      "
+              << (hq::npu::NpuBackendFactory::best_for("cuda") ? hq::npu::NpuBackendFactory::best_for("cuda")->name() : "NONE")
+              << "\n";
+    std::cout << "Best for 'cpu':       "
+              << (hq::npu::NpuBackendFactory::best_for("cpu") ? hq::npu::NpuBackendFactory::best_for("cpu")->name() : "NONE")
+              << "\n";
+
+    std::cout << "\n";
 
     // ---- GPU Monitor ----
     {
         hq::GPUMonitor gpu;
         bool init_ok = static_cast<bool>(gpu.initialize());
-        std::print("GPU Monitor:       {}\n", init_ok ? "initialized" : "not available");
+        std::cout << "GPU Monitor:       " << (init_ok ? "initialized" : "not available") << "\n";
         if (init_ok) {
             auto telem = gpu.query_all();
             if (telem) {
-                std::print("  telemetry_valid: {}\n", telem->telemetry_valid ? "yes" : "no");
-                std::print("  utilization:     {:.1f}%\n", telem->utilization_percent);
-                std::print("  temperature:     {:.1f} C\n", telem->temperature_celsius);
-                std::print("  memory_used:     {:.1f} MiB\n", telem->memory_used_mb);
-                std::print("  memory_total:    {:.1f} MiB\n", telem->memory_total_mb);
+                std::cout << "  telemetry_valid: " << (telem->telemetry_valid ? "yes" : "no") << "\n";
+                std::cout << "  utilization:     " << telem->utilization_percent << "\n";
+                std::cout << "  temperature:     " << telem->temperature_celsius << " C\n";
+                std::cout << "  memory_used:     " << telem->memory_used_mb << " MiB\n";
+                std::cout << "  memory_total:    " << telem->memory_total_mb << " MiB\n";
             } else {
-                std::print("  query_all: FAILED\n");
+                std::cout << "  query_all: FAILED\n";
             }
         }
     }
 
-    std::print("\n");
+    std::cout << "\n";
 
     // ---- Hailo Monitor ----
     {
         hq::HailoMonitor mon;
         bool open_ok = static_cast<bool>(mon.open(""));
-        std::print("Hailo Monitor:     {}\n", open_ok ? "open (real sensors)" : "not available");
+        std::cout << "Hailo Monitor:     " << (open_ok ? "open (real sensors)" : "not available") << "\n";
         if (open_ok) {
             auto stats = mon.sample();
             if (stats) {
-                std::print("  temperature:     {:.1f} C\n", stats->temperature_celsius);
-                std::print("  power:           {:.1f} W\n", stats->power_watts);
-                std::print("  nn_core_util:    {:.1f}%\n", stats->nn_core_utilization);
+                std::cout << "  temperature:     " << stats->temperature_celsius << " C\n";
+                std::cout << "  power:           " << stats->power_watts << " W\n";
+                std::cout << "  nn_core_util:    " << stats->nn_core_utilization << "\n";
             } else {
-                std::print("  sample: FAILED\n");
+                std::cout << "  sample: FAILED\n";
             }
             mon.close();
         }
     }
 
-    std::print("\n=== Honesty Summary ===\n");
-    std::print("All hardware claims in this report are explicit and verifiable.\n");
-    std::print("No fabricated telemetry. No misleading capability assertions.\n");
-    std::print("========================\n");
+    std::cout << "\n=== Honesty Summary ===\n";
+    std::cout << "All hardware claims in this report are explicit and verifiable.\n";
+    std::cout << "No fabricated telemetry. No misleading capability assertions.\n";
+    std::cout << "========================\n";
 
     return EXIT_SUCCESS;
 }

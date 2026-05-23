@@ -154,6 +154,29 @@ else()
     message(STATUS "ORT CUDA provider: not found — CUDA EP will use CPU fallback")
 endif()
 
+# --- Intel OpenVINO (NPU backend) ---
+# NOTE: OpenVINO Windows binaries are MSVC-built. Because we compile with MinGW,
+# we CANNOT link the C++ API (ABI mismatch). We use the C API and dynamically
+# load openvino.dll at runtime. CMake only needs the header path.
+set(OPENVINO_ROOT "$ENV{OPENVINO_ROOT}" CACHE PATH "OpenVINO runtime root directory")
+if(NOT OPENVINO_ROOT)
+    set(OPENVINO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../openvino" CACHE PATH "OpenVINO runtime root directory")
+endif()
+
+find_path(OPENVINO_INCLUDE NAMES openvino/c/ov_c_api.h
+    HINTS
+        ${OPENVINO_ROOT}/runtime/include
+    DOC "OpenVINO C API headers"
+)
+
+if(OPENVINO_INCLUDE)
+    message(STATUS "OpenVINO C API: found (include=${OPENVINO_INCLUDE})")
+    target_include_directories(um790_includes SYSTEM INTERFACE ${OPENVINO_INCLUDE})
+else()
+    message(STATUS "OpenVINO: NOT found — Intel NPU backend disabled")
+    message(STATUS "  Set OPENVINO_ROOT to the extracted ZIP directory")
+endif()
+
 # --- GoogleTest (FetchContent preferred for hermetic builds) ---
 include(FetchContent)
 FetchContent_Declare(
@@ -265,6 +288,7 @@ target_include_directories(um790_includes INTERFACE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/generated>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/openvino/include>
     $<INSTALL_INTERFACE:include>
 )
 # ORT headers are treated as SYSTEM includes to suppress their warnings
@@ -292,6 +316,7 @@ set(UM790_PIPELINE_SOURCES
     src/npu_pipeline.cpp
     src/npu_encoder.cpp
     src/npu_accelerator.cpp
+    src/npu_backend_unified.cpp
     src/async_pipeline.cpp
     src/tiered_memory_manager.cpp
     src/cluster_transport.cpp
@@ -318,7 +343,7 @@ set(UM790_PIPELINE_HEADERS
     include/hq/tiered_memory_manager.hpp
     include/hq/cluster_transport.hpp
     include/hq/benchmark_logger.hpp
-    include/hq/npu_backend.hpp
+    include/hq/npu_backend_unified.hpp
 )
 
 # ---------------------------------------------------------------------------
@@ -354,6 +379,9 @@ target_compile_definitions(um790_pipeline PUBLIC
     $<$<BOOL:${HIP_FOUND}>:UM790_HAS_HIP>
     $<$<BOOL:${CUDAToolkit_FOUND}>:UM790_HAS_CUDA>
     $<$<BOOL:${UM790_HAS_DIRECTML}>:UM790_HAS_DIRECTML>
+    $<$<BOOL:${OPENVINO_INCLUDE}>:CERBERUS_HAS_OPENVINO=1>
+    $<$<BOOL:${CERBERUS_OPENVINO_FOUND}>:CERBERUS_HAS_OPENVINO=1>
+    $<$<BOOL:${CERBERUS_OPENVINO_NOTFOUND}>:CERBERUS_HAS_OPENVINO=0>
 )
 
 set_target_properties(um790_pipeline PROPERTIES
@@ -390,6 +418,15 @@ enable_testing()
 include(GoogleTest)
 gtest_discover_tests(um790_test DISCOVERY_MODE PRE_TEST)
 
+add_executable(test_empty_main src/test_empty_main.cpp)
+target_link_libraries(test_empty_main PRIVATE um790_pipeline um790_compile_options um790_includes um790_link_options Threads::Threads)
+
+# ---------------------------------------------------------------------------
+# Target: test_smoke_ov
+# ---------------------------------------------------------------------------
+add_executable(test_cout src/test_cout.cpp)
+target_link_libraries(test_cout PRIVATE um790_compile_options um790_includes um790_link_options)
+
 # ---------------------------------------------------------------------------
 # Target: cerberus_npu (shared library)
 # ---------------------------------------------------------------------------
@@ -424,6 +461,13 @@ target_link_libraries(cerberus_server PRIVATE
     um790_compile_options
     $<$<PLATFORM_ID:Windows>:ws2_32>
 )
+
+add_executable(test_smoke_ov src/test_smoke_ov.cpp)
+target_link_libraries(test_smoke_ov PRIVATE um790_pipeline um790_compile_options um790_includes um790_link_options Threads::Threads)
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND WIN32)
+    # Statically link libstdc++ so test binary runs without GCC runtime DLL in PATH.
+    target_link_options(test_smoke_ov PRIVATE -static-libgcc -static-libstdc++)
+endif()
 
 # ---------------------------------------------------------------------------
 # Installation
@@ -476,10 +520,11 @@ message(STATUS "  Compiler:   ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERS
 message(STATUS "  HIP:        ${HIP_FOUND} (${HIP_VERSION})")
 message(STATUS "  CUDA:       ${CUDAToolkit_FOUND} (${CUDAToolkit_VERSION})")
 message(STATUS "  NVML:       ${NVML_LIB}")
-message(STATUS "  DirectML:  ${UM790_HAS_DIRECTML}")
-message(STATUS "  HailoRT:    ${HAILORT_FOUND} (${HAILORT_VERSION})")
-message(STATUS "  ONNX RT:    ${ONNXRUNTIME_LIB}")
-message(STATUS "  Install:    ${CMAKE_INSTALL_PREFIX}")
-message(STATUS "===================================")
-message(STATUS "")
+    message(STATUS "  DirectML:  ${UM790_HAS_DIRECTML}")
+    message(STATUS "  HailoRT:    ${HAILORT_FOUND} (${HAILORT_VERSION})")
+    message(STATUS "  ONNX RT:    ${ONNXRUNTIME_LIB}")
+    message(STATUS "  OpenVINO:   ${OPENVINO_INCLUDE}")
+    message(STATUS "  Install:    ${CMAKE_INSTALL_PREFIX}")
+    message(STATUS "===================================")
+    message(STATUS "")
 message(STATUS "")
