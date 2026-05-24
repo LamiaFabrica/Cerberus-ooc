@@ -77,6 +77,21 @@ CerberusExecutionCoordinator::run(npu::INpuBackend& backend,
     std::vector<const std::byte*> tiered_input_ptrs;
     tiered_input_ptrs.reserve(kernel.inputs.size());
 
+    // --- validate input buffer pointers ---
+    for (std::size_t i = 0; i < user_inputs.size(); ++i) {
+        if (user_inputs[i] == nullptr) {
+            return std::unexpected{
+                "input buffer[" + std::to_string(i) + "] is null"};
+        }
+    }
+    for (std::size_t i = 0; i < user_outputs.size(); ++i) {
+        if (user_outputs[i] == nullptr) {
+            return std::unexpected{
+                "output buffer[" + std::to_string(i) + "] is null"};
+        }
+    }
+
+    // --- allocate tiered INPUT buffers and copy from user ---------------------
     for (std::size_t i = 0; i < kernel.inputs.size(); ++i) {
         MemoryTier tier = pick_input_tier(kernel, i);
         std::size_t sz = kernel.inputs[i].size_bytes();

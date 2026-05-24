@@ -329,6 +329,15 @@ set(UM790_PIPELINE_SOURCES
     src/cerberus_graph_engine.cpp
     src/cerberus_decision_engine.cpp
     src/cerberus_runtime.cpp
+    src/cerberus_predictor.cpp
+    src/cerberus_shadow_state.cpp
+    src/cerberus_command_parser.cpp
+    src/cerberus_command_executor.cpp
+    src/cerberus_api_gateway.cpp
+    src/cerberus_slipstream.cpp
+    src/cerberus_metro.cpp
+    src/cerberus_glow_engine.cpp
+    src/cerberus_gguf_parser.cpp
 )
 
 list(APPEND UM790_PIPELINE_SOURCES src/hip_graph_denoiser.cpp)

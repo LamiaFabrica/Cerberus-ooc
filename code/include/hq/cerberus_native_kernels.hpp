@@ -65,6 +65,17 @@ execute(OpType op,
     const float* A, const float* B, float* C,
     std::size_t M, std::size_t N, std::size_t K);
 
+[[nodiscard]] std::expected<void, std::string> kernel_matmul_blocked(
+    const float* A, const float* B, float* C,
+    std::size_t M, std::size_t N, std::size_t K);
+
+#if defined(__x86_64__) || defined(_M_X64) || defined(__amd64__) || defined(__AVX2__)
+/// @brief AVX2 blocked MatMul (requires __AVX2__).
+[[nodiscard]] std::expected<void, std::string> kernel_matmul_blocked_avx2(
+    const float* A, const float* B, float* C,
+    std::size_t M, std::size_t N, std::size_t K);
+#endif
+
 [[nodiscard]] std::expected<void, std::string> kernel_add(
     const float* a, const float* b, float* out,
     std::size_t elems);
@@ -72,5 +83,41 @@ execute(OpType op,
 [[nodiscard]] std::expected<void, std::string> kernel_mul(
     const float* a, const float* b, float* out,
     std::size_t elems);
+
+// ===========================================================================
+// Activation + normalization kernels
+// ===========================================================================
+
+[[nodiscard]] std::expected<void, std::string> kernel_relu(
+    const float* in, float* out, std::size_t elems);
+
+[[nodiscard]] std::expected<void, std::string> kernel_sigmoid(
+    const float* in, float* out, std::size_t elems);
+
+[[nodiscard]] std::expected<void, std::string> kernel_softmax(
+    const float* in, float* out,
+    std::size_t rows, std::size_t cols);
+
+[[nodiscard]] std::expected<void, std::string> kernel_gelu(
+    const float* in, float* out, std::size_t elems);
+
+[[nodiscard]] std::expected<void, std::string> kernel_layernorm(
+    const float* in, float* out,
+    std::size_t rows, std::size_t cols,
+    float eps = 1e-6f);
+
+// ===========================================================================
+// Conv2D (reference)
+// ===========================================================================
+
+/// @brief 2D convolution — no padding, stride=1.
+[[nodiscard]] std::expected<void, std::string> kernel_conv2d(
+    const float* input,   /// [H * W * C]
+    const float* weight,  /// [KH * KW * C * OC]
+    const float* bias,    /// [OC] (may be nullptr)
+    float* output,        /// [OH * OW * OC]
+    std::size_t H, std::size_t W, std::size_t C,
+    std::size_t KH, std::size_t KW,
+    std::size_t OC);
 
 } // namespace hq::cerberus::native

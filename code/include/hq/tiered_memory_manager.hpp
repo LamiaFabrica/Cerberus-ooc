@@ -175,8 +175,24 @@ struct TierStats {
 /// @param from_tier Source tier.
 /// @param to_tier   Destination tier.
 using MigrationHook = std::function<void(TierHandle handle,
-                                          MemoryTier from_tier,
-                                          MemoryTier to_tier)>;
+                                           MemoryTier from_tier,
+                                           MemoryTier to_tier)>;
+
+// ===========================================================================
+// MigrationComputeHook — in-flight compute during tier movement
+//
+// Called after source data is staged but before destination writeback.
+// Examples: partial dequantization, layout reshape, compression.
+// If the hook throws, migration is aborted and source data untouched.
+// ===========================================================================
+
+using MigrationComputeHook = std::function<void(
+    void* src_ptr,         ///< source tensor data (const-ish, don't free)
+    void* dst_ptr,         ///< destination buffer (write here)
+    std::size_t bytes,     ///< total bytes in the tensor
+    MemoryTier from_tier,  ///< where it lived
+    MemoryTier to_tier)    ///< where it's going
+>;
 
 // ---------------------------------------------------------------------------
 // TieredMemoryManager
@@ -215,6 +231,14 @@ public:
     // ------------------------------------------------------------------
     // Migration API (callable by watchdog on memory-pressure events)
     // ------------------------------------------------------------------
+
+    /// Register an in-flight compute hook called during promote/demote.
+    [[nodiscard]] std::expected<void, std::string>
+    register_compute_hook(MigrationComputeHook hook);
+
+    /// Predict whether preferred_tier allocation will succeed soon.
+    /// Returns estimated free bytes in that tier.
+    [[nodiscard]] std::size_t predict_pressure(MemoryTier tier) const noexcept;
 
     /// Promote a block to a hotter tier (Cool→Warm→Hot).
     [[nodiscard]] std::expected<TierAllocation, TierError>

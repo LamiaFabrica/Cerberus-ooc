@@ -211,6 +211,18 @@ DecisionEngine::analyse(CerberusGraph& graph, std::string_view target_name) {
     // Fusion pass rewrites the plan
     fuse_elementwise_chain(graph, plan);
 
+    // Power-budget routing: if budget is low, downgrade high-power backends and prefer Cool
+    if (cfg_.power_budget_watts < 5.0f) {
+        for (auto& step : plan) {
+            if (step.backend == ExecutionStep::Backend::CUDA ||
+                step.backend == ExecutionStep::Backend::OpenVINO) {
+                step.backend = ExecutionStep::Backend::Native;
+                step.debug_label += " (power-override)";
+                step.preferred_tier = MemoryTier::Cool;
+            }
+        }
+    }
+
     return plan;
 }
 

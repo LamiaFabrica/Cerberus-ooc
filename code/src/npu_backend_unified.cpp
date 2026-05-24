@@ -79,9 +79,9 @@ CpuFallbackBackend::CpuFallbackBackend() = default;
 
 std::expected<CompiledKernel, std::string>
 CpuFallbackBackend::compile(const KernelGraph&, const TargetConfig& cfg) {
+    (void)cfg;
     CompiledKernel k;
     k.target_name = "cpu";
-    k.binary_path = cfg.output_dir / "cpu_stub.bin";
     k.compiled = true;
     return k;
 }
@@ -128,16 +128,11 @@ CudaBackend::CudaBackend() : impl_(std::make_unique<Impl>()) { impl_->init(); }
 CudaBackend::~CudaBackend() = default;
 
 std::expected<CompiledKernel, std::string>
-CudaBackend::compile(const KernelGraph& /*g*/, const TargetConfig& cfg) {
+CudaBackend::compile(const KernelGraph& /*g*/, const TargetConfig& /*cfg*/) {
     if (!impl_->initialized) return std::unexpected{impl_->unavailable_reason};
     CompiledKernel k;
-    k.target_name = cfg.target_name.empty() ? "cuda" : cfg.target_name;
-    k.binary_path = cfg.output_dir / "cuda_stub.ptx";
+    k.target_name = "cuda";
     k.compiled = true;
-    k.inputs.push_back(TensorDesc{{2, 77, 768}, TensorDesc::DataType::F32});
-    k.inputs.push_back(TensorDesc{{2, 77, 768}, TensorDesc::DataType::F32});
-    k.inputs.push_back(TensorDesc{{1}, TensorDesc::DataType::F32});
-    k.outputs.push_back(TensorDesc{{2, 77, 768}, TensorDesc::DataType::F32});
     return k;
 }
 

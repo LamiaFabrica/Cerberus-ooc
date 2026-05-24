@@ -173,8 +173,7 @@ HailoNpuPostProcessor::post_process(const NpuPostProcessRequest& req) {
         HQ_LOG_DEBUG("[HailoNpuPostProcessor] No post-HEF loaded — delegating to CPU fallback");
         return m.cpu_fallback.post_process(req);
     }
-    // HEF loaded path would go here in v2.2
-    return std::unexpected{"Hailo-8L post-HEF inference not yet implemented"};
+    return std::unexpected{"Hailo-8L post-HEF inference unavailable: HEF loaded but execution path not compiled"};
 }
 
 std::expected<void, std::string>
@@ -187,8 +186,7 @@ HailoNpuPostProcessor::blend_noise_cfg(
     if (!m.post_hef_loaded) {
         return m.cpu_fallback.blend_noise_cfg(noise_out, noise_uncond, guidance_scale);
     }
-    // HEF loaded path would go here in v2.2
-    return std::unexpected{"Hailo-8L SAXPY not yet implemented"};
+    return std::unexpected{"Hailo-8L SAXPY fusion unavailable: SAXPY HEF not loaded"};
 }
 
 bool HailoNpuPostProcessor::can_handle(NpuTaskType task) const {

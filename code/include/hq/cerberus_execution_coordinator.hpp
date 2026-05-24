@@ -77,4 +77,18 @@ private:
                                               std::size_t output_idx) const noexcept;
 };
 
+// ===========================================================================
+// TensorHash — lightweight FNV-1a over contiguous byte buffers
+// ===========================================================================
+
+[[nodiscard]] inline std::uint64_t fnv1a_bytes(const void* data, std::size_t n) noexcept {
+    std::uint64_t hash = 0xcbf29ce484222325ull;
+    const auto* ptr = static_cast<const std::uint8_t*>(data);
+    for (std::size_t i = 0; i < n; ++i) {
+        hash ^= ptr[i];
+        hash *= 0x100000001b3ull;
+    }
+    return hash;
+}
+
 } // namespace hq

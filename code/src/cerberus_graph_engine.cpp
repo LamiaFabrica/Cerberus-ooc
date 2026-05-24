@@ -73,7 +73,13 @@ bool CerberusGraph::topo_sort() {
         if (n.outputs.empty()) continue;
         const std::string& out = n.outputs[0];
         for (const auto& later : nodes) {
-            if (later.id == n.id) continue;
+            if (later.id == n.id) {
+                // Self-loop check: node consumes its own output
+                for (const auto& in : later.inputs) {
+                    if (in == out) { in_degree[later.id]++; break; }
+                }
+                continue;
+            }
             for (const auto& in : later.inputs) {
                 if (in == out) { in_degree[later.id]++; break; }
             }
@@ -161,6 +167,57 @@ CerberusGraph CerberusGraph::from_kernel_graph(const npu::KernelGraph& kg) {
 
     (void)g.topo_sort();
     return g;
+}
+
+std::size_t apply_rewrites(CerberusGraph& g, std::span<const GraphRewriteRule> rules) {
+    std::size_t rewrites = 0;
+    for (auto& rule : rules) {
+        for (std::size_t i = 0; i < g.nodes.size(); ++i) {
+            if (rule.match(g, i)) {
+                rule.replace(g, i);
+                ++rewrites;
+            }
+        }
+    }
+    return rewrites;
+}
+
+GraphRewriteRule make_fuse_matmul_bias_relu_rule() {
+    GraphRewriteRule rule;
+    rule.name = "fuse_matmul_bias_relu";
+    rule.match = [](const CerberusGraph& g, std::size_t idx) -> bool {
+        if (idx + 2 >= g.nodes.size()) return false;
+        const auto& n0 = g.nodes[idx];
+        const auto& n1 = g.nodes[idx + 1];
+        const auto& n2 = g.nodes[idx + 2];
+        // Pattern: MatMul -> Add -> ReLU on the same single-value chain
+        if (n0.op != npu::KernelNode::Op::MatMul) return false;
+        if (n1.op != npu::KernelNode::Op::Add) return false;
+        if (n2.op != npu::KernelNode::Op::Relu) return false;
+        // n0 single output must be n1's single input
+        if (n0.outputs.empty() || n1.inputs.empty()) return false;
+        if (n0.outputs[0] != n1.inputs[0]) return false;
+        // n1 single output must be n2's single input
+        if (n1.outputs.empty() || n2.inputs.empty()) return false;
+        if (n1.outputs[0] != n2.inputs[0]) return false;
+        return true;
+    };
+    rule.replace = [](CerberusGraph& g, std::size_t idx) {
+        auto& n0 = g.nodes[idx];
+        auto& n1 = g.nodes[idx + 1];
+        auto& n2 = g.nodes[idx + 2];
+        // Replace n0 with fused node, absorb bias from n1, absorb ReLU from n2
+        n0.name = n0.name + "_fused_bias_relu";
+        n0.op = npu::KernelNode::Op::FusedMatMulBiasRelu;
+        n0.outputs = n2.outputs; // final fused output
+        // Absorb bias tensor from n1 (second input of Add node)
+        if (n1.inputs.size() > 1) {
+            n0.inputs.push_back(n1.inputs[1]);
+        }
+        // Remove n1 and n2
+        g.nodes.erase(g.nodes.begin() + idx + 1, g.nodes.begin() + idx + 3);
+    };
+    return rule;
 }
 
 } // namespace hq::cerberus

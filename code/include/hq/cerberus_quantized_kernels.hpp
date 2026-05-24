@@ -60,9 +60,14 @@ struct QuantParams {
     const QuantParams& q);
 
 // ===========================================================================
-// Per-channel quantization (weights) — dequantize then multiply
+// Quantization helpers (exposed for tests)
 // ===========================================================================
 
+std::pair<float, float> compute_minmax(const float* src, std::size_t n);
+float compute_scale(float min_val, float max_val);
+std::int32_t compute_zero_point(float min_val, float scale);
+
+// --- per-channel ---
 void quantize_per_channel(const float* weight, std::uint8_t* out,
                           int out_channels, int in_channels,
                           float* scales, std::int32_t* zero_points);
@@ -70,5 +75,13 @@ void quantize_per_channel(const float* weight, std::uint8_t* out,
 void dequantize_per_channel(const float* src, float* dst,
                             int out_channels, int in_channels,
                             const float* scales, const std::int32_t* zps);
+
+// ===========================================================================
+// Dequantization kernel — turns uint8_t storage back to float during migration
+// ===========================================================================
+
+[[nodiscard]] std::expected<void, std::string>
+dequantize_u8_to_f32(const std::uint8_t* src, float* dst, std::size_t n,
+                     float scale, std::int32_t zero_point);
 
 } // namespace hq::cerberus::native

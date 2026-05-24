@@ -15,11 +15,17 @@
 #include "hq/cerberus_execution_coordinator.hpp"
 #include "hq/cerberus_graph_engine.hpp"
 #include "hq/cerberus_decision_engine.hpp"
+#include "hq/cerberus_glow_engine.hpp"
 
 #include <expected>
 #include <string>
+#include <memory>
 #include <vector>
 #include <span>
+
+namespace hq::cerberus::cli {
+class CerberusCommandExecutor;
+}
 
 namespace hq::cerberus {
 
@@ -65,14 +71,26 @@ public:
     /// Return runtime name for C API compatibility.
     [[nodiscard]] static const char* name() noexcept { return "CerberusRuntime-v1.0"; }
 
+    /// Execute a Cerberus command string through the command layer.
+    /// @param raw_command  A command in protocol form (cerberus:// or cbr://) or ergonomic shorthand.
+    /// @return JSON-like output string, or an error message.
+    [[nodiscard]] std::string execute_command(const std::string& raw_command);
+
+    /// Access the GlowEngine for hot-path learning and query.
+    [[nodiscard]] GlowEngine* glow_engine() noexcept { return glow_engine_.get(); }
+    [[nodiscard]] const GlowEngine* glow_engine() const noexcept { return glow_engine_.get(); }
+
 private:
     Config cfg_;
     std::unique_ptr<TieredMemoryManager>    mem_mgr_;
     std::unique_ptr<DecisionEngine>       decision_engine_;
     std::unique_ptr<CerberusExecutionCoordinator> coordinator_;
     std::unique_ptr<npu::INpuBackend>       backend_;
+    npu::INpuBackend*                       delegating_backend_{nullptr};
+    std::unique_ptr<GlowEngine>             glow_engine_;
 
     std::vector<ExecutionStep> last_plan_;
+    std::unique_ptr<cli::CerberusCommandExecutor> executor_;
 
     [[nodiscard]] std::expected<void, std::string> init_backend_();
 };

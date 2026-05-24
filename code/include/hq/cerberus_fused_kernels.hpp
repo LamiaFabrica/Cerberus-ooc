@@ -31,10 +31,4 @@ namespace hq::cerberus::native {
     const float* A, const float* B, float* C,
     std::size_t M, std::size_t N, std::size_t K);
 
-/// @brief Fused Conv+ReLU stub (for future expansion).
-[[nodiscard]] std::expected<void, std::string> kernel_conv_relu_stub(
-    const float* in, const float* weights, const float* bias, float* out,
-    std::size_t batch, std::size_t in_c, std::size_t out_c,
-    std::size_t h, std::size_t w, std::size_t kh, std::size_t kw);
-
 } // namespace hq::cerberus::native

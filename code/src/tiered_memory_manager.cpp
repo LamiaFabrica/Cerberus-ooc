@@ -165,6 +165,7 @@ private:
 struct TieredMemoryManager::Impl {
     TieredMemoryConfig cfg;
     MigrationHook      on_migrate;
+    MigrationComputeHook compute_hook;
 
     // PMR resources
     std::unique_ptr<CoolPmrResource> cool_res;
@@ -531,10 +532,14 @@ TieredMemoryManager::promote(TierHandle handle) {
     auto new_alloc = allocate(src.size_bytes, target, src.alignment);
     if (!new_alloc) return std::unexpected{TierError::MigrationFailed};
 
-    // Copy data
+    // Copy data with optional in-flight compute
     if (src.tier == MemoryTier::Warm || src.tier == MemoryTier::Cool) {
         if (src.ptr && new_alloc->ptr) {
-            std::memcpy(new_alloc->ptr, src.ptr, src.size_bytes);
+            if (m.compute_hook) {
+                m.compute_hook(src.ptr, new_alloc->ptr, src.size_bytes, src.tier, new_alloc->tier);
+            } else {
+                std::memcpy(new_alloc->ptr, src.ptr, src.size_bytes);
+            }
         }
 #ifdef UM790_HAS_HIP
         else if (new_alloc->device_ptr && src.ptr) {
@@ -635,7 +640,11 @@ TieredMemoryManager::demote(TierHandle handle) {
         } else
 #endif
         if (src.ptr && new_alloc->ptr) {
-            std::memcpy(new_alloc->ptr, src.ptr, src.size_bytes);
+            if (m.compute_hook) {
+                m.compute_hook(src.ptr, new_alloc->ptr, src.size_bytes, src.tier, new_alloc->tier);
+            } else {
+                std::memcpy(new_alloc->ptr, src.ptr, src.size_bytes);
+            }
         }
     } else if (target == MemoryTier::Cold && new_alloc->ptr == nullptr) {
         // Written to spill file — read from source and write
@@ -780,6 +789,26 @@ std::pmr::memory_resource* TieredMemoryManager::cool_resource() noexcept {
 
 std::pmr::memory_resource* TieredMemoryManager::warm_resource() noexcept {
     return impl_->warm_res.get();
+}
+
+// ===========================================================================
+// Migration compute hook + pressure prediction
+// ===========================================================================
+
+std::expected<void, std::string>
+TieredMemoryManager::register_compute_hook(MigrationComputeHook hook) {
+    if (!hook) return std::unexpected{"null hook"};
+    impl_->compute_hook = std::move(hook);
+    return {};
+}
+
+std::size_t TieredMemoryManager::predict_pressure(MemoryTier tier) const noexcept {
+    auto& m = *impl_;
+    const int ti = static_cast<int>(tier);
+    if (ti < 0 || ti >= 4) return 0;
+    std::size_t cap = m.acct[ti].capacity;
+    std::size_t used = m.acct[ti].allocated.load(std::memory_order_relaxed);
+    return used >= cap ? 0 : cap - used;
 }
 
 } // namespace hq

@@ -36,6 +36,31 @@ struct TensorDesc {
 };
 
 // ===========================================================================
+// Quantization metadata
+// ===========================================================================
+
+enum class QuantMethod : std::uint8_t {
+    None,   ///< No quantization (FP32)
+    PTQ,    ///< Post-training quantization
+    QAT,    ///< Quantization-aware training
+    LSQ,    ///< Learned Step Size
+};
+
+enum class QuantGranularity : std::uint8_t {
+    PerTensor,   ///< Single scale for entire tensor
+    PerChannel,  ///< Per-output-channel (weights)
+    PerToken,    ///< Per-row (activations in LLMs)
+};
+
+struct QuantProfile {
+    QuantMethod      method{QuantMethod::None};
+    std::uint8_t     activation_bits{8};    ///< e.g. 8 for INT8, 4 for INT4
+    std::uint8_t     weight_bits{8};
+    QuantGranularity act_granularity{QuantGranularity::PerTensor};
+    QuantGranularity weight_granularity{QuantGranularity::PerChannel};
+};
+
+// ===========================================================================
 // KernelNode — a single operation in the Cerberus-owned graph
 //
 // This is the first step toward Cerberus owning the IR.  Each node is a
@@ -60,6 +85,7 @@ struct KernelNode {
         LayerNorm,
         Gelu,
         Constant,
+        FusedMatMulBiasRelu,
         // --- extensible ---
     };
     Op op{Op::Unknown};
@@ -70,31 +96,9 @@ struct KernelNode {
     std::vector<float>             float_attrs;
     std::vector<std::int64_t>      int_attrs;
     std::vector<std::vector<std::int64_t>> shape_attrs;
-};
 
-// ===========================================================================
-// Quantization metadata (moved here so KernelNode + GraphNode can both carry it)
-// ===========================================================================
-
-enum class QuantMethod : std::uint8_t {
-    None,   ///< No quantization (FP32)
-    PTQ,    ///< Post-training quantization
-    QAT,    ///< Quantization-aware training
-    LSQ,    ///< Learned Step Size
-};
-
-enum class QuantGranularity : std::uint8_t {
-    PerTensor,   ///< Single scale for entire tensor
-    PerChannel,  ///< Per-output-channel (weights)
-    PerToken,    ///< Per-row (activations in LLMs)
-};
-
-struct QuantProfile {
-    QuantMethod      method{QuantMethod::None};
-    std::uint8_t     activation_bits{8};    ///< e.g. 8 for INT8, 4 for INT4
-    std::uint8_t     weight_bits{8};
-    QuantGranularity act_granularity{QuantGranularity::PerTensor};
-    QuantGranularity weight_granularity{QuantGranularity::PerChannel};
+    // --- per-node quantization profile (drives decision engine routing) ---
+    QuantProfile quant_profile{};
 };
 
 // ===========================================================================

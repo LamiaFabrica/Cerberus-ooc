@@ -31,10 +31,14 @@ namespace hq::cerberus {
 // ===========================================================================
 
 struct DecisionConfig {
-    std::size_t native_elem_threshold{1024};       ///< <= this many floats => native
-    std::size_t matmul_native_max_mnk{64};         ///< MatMul native only if all dims <= this
-    float       warm_tier_pressure_limit{0.75f};     ///< above this, avoid Warm
-    bool        fuse_elementwise{true};             ///< fuse chains of Add/Mul
+    std::size_t native_elem_threshold{1024};
+    std::size_t matmul_native_max_mnk{64};
+    float       warm_tier_pressure_limit{0.75f};
+    bool        fuse_elementwise{true};
+
+    // Power budget routing
+    float       power_budget_watts{10.0f};     ///< per-step budget cap
+    std::uint8_t min_precision_bits{4};         ///< floor (INT4 minimum)
 };
 
 // ===========================================================================

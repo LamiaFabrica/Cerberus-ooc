@@ -96,4 +96,116 @@ std::expected<void, std::string> execute(
     }
 }
 
+// ===========================================================================
+// Activations
+// ===========================================================================
+
+std::expected<void, std::string> kernel_relu(
+    const float* in, float* out, std::size_t elems) {
+    if (!in || !out) return std::unexpected{"null pointer"};
+    for (std::size_t i = 0; i < elems; ++i)
+        out[i] = in[i] > 0.0f ? in[i] : 0.0f;
+    return {};
+}
+
+std::expected<void, std::string> kernel_sigmoid(
+    const float* in, float* out, std::size_t elems) {
+    if (!in || !out) return std::unexpected{"null pointer"};
+    for (std::size_t i = 0; i < elems; ++i)
+        out[i] = 1.0f / (1.0f + std::exp(-in[i]));
+    return {};
+}
+
+std::expected<void, std::string> kernel_softmax(
+    const float* in, float* out,
+    std::size_t rows, std::size_t cols) {
+    if (!in || !out) return std::unexpected{"null pointer"};
+    for (std::size_t r = 0; r < rows; ++r) {
+        float mx = in[r * cols];
+        for (std::size_t c = 1; c < cols; ++c)
+            if (in[r*cols+c] > mx) mx = in[r*cols+c];
+        float sum = 0;
+        for (std::size_t c = 0; c < cols; ++c) {
+            out[r*cols+c] = std::exp(in[r*cols+c] - mx);
+            sum += out[r*cols+c];
+        }
+        for (std::size_t c = 0; c < cols; ++c)
+            out[r*cols+c] /= sum;
+    }
+    return {};
+}
+
+// Approximate GELU with tanh approximation
+std::expected<void, std::string> kernel_gelu(
+    const float* in, float* out, std::size_t elems) {
+    if (!in || !out) return std::unexpected{"null pointer"};
+    constexpr float sqrt_2_over_pi = 0.7978845608f;
+    constexpr float coef = 0.044715f;
+    for (std::size_t i = 0; i < elems; ++i) {
+        float x = in[i];
+        float x3 = x * x * x;
+        float t = sqrt_2_over_pi * (x + coef * x3);
+        out[i] = 0.5f * x * (1.0f + std::tanh(t));
+    }
+    return {};
+}
+
+std::expected<void, std::string> kernel_layernorm(
+    const float* in, float* out,
+    std::size_t rows, std::size_t cols, float eps) {
+    if (!in || !out) return std::unexpected{"null pointer"};
+    for (std::size_t r = 0; r < rows; ++r) {
+        float mean = 0;
+        for (std::size_t c = 0; c < cols; ++c) mean += in[r*cols+c];
+        mean /= static_cast<float>(cols);
+        float var = 0;
+        for (std::size_t c = 0; c < cols; ++c) {
+            float d = in[r*cols+c] - mean;
+            var += d * d;
+        }
+        var /= static_cast<float>(cols);
+        float inv_std = 1.0f / std::sqrt(var + eps);
+        for (std::size_t c = 0; c < cols; ++c)
+            out[r*cols+c] = (in[r*cols+c] - mean) * inv_std;
+    }
+    return {};
+}
+
+// ===========================================================================
+// Conv2D reference (no padding, stride=1)
+// ===========================================================================
+
+std::expected<void, std::string> kernel_conv2d(
+    const float* input, const float* weight,
+    const float* bias, float* output,
+    std::size_t H, std::size_t W, std::size_t C,
+    std::size_t KH, std::size_t KW,
+    std::size_t OC) {
+    if (!input || !weight || !output) return std::unexpected{"null pointer"};
+    if (H < KH || W < KW) return std::unexpected{"input smaller than kernel"};
+
+    std::size_t OH = H - KH + 1;
+    std::size_t OW = W - KW + 1;
+
+    for (std::size_t oc = 0; oc < OC; ++oc) {
+        for (std::size_t oh = 0; oh < OH; ++oh) {
+            for (std::size_t ow = 0; ow < OW; ++ow) {
+                float acc = 0;
+                for (std::size_t kh = 0; kh < KH; ++kh) {
+                    for (std::size_t kw = 0; kw < KW; ++kw) {
+                        for (std::size_t c = 0; c < C; ++c) {
+                            float iv = input[(oh + kh) * W * C + (ow + kw) * C + c];
+                            float wv = weight[kh * KW * C * OC + kw * C * OC + c * OC + oc];
+                            acc += iv * wv;
+                        }
+                    }
+                }
+                if (bias) acc += bias[oc];
+                output[oh * OW * OC + ow * OC + oc] = acc;
+            }
+        }
+    }
+    return {};
+}
+
 } // namespace hq::cerberus::native

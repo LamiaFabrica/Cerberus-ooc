@@ -255,7 +255,7 @@ Hailo8lEncoder::encode(const NpuEncodeRequest& req) {
         return std::unexpected{"Hailo async infer runner not initialized"};
     }
 
-    // --- Tokenize prompt with CLIPTokenizer ---
+    auto encode_t0 = std::chrono::high_resolution_clock::now();
     const std::size_t seq_len = req.max_seq_len > 0 ? req.max_seq_len : 77;
     CLIPTokenizer tokenizer;
     std::vector<std::int64_t> token_ids = tokenizer.encode(req.prompt, seq_len);
@@ -347,8 +347,13 @@ Hailo8lEncoder::encode(const NpuEncodeRequest& req) {
 
     result.npu_utilization = m.last_utilization;
     result.npu_temperature = m.last_temperature;
-    result.encode_time_us = 0.0f;  // TODO: measure with high-res clock
+    result.encode_time_us = 0.0f;
     result.slot_index = 0;
+
+    // --- Measure total encode time ---
+    auto encode_t1 = std::chrono::high_resolution_clock::now();
+    result.encode_time_us = static_cast<float>(
+        std::chrono::duration<double, std::micro>(encode_t1 - encode_t0).count());
 
     HQ_LOG_INFO("[Hailo8lEncoder] Hailo async inference complete: {}, seq={}, hidden={}, elems={}",
                 req.prompt, seq_len, hidden_dim, output_elems);

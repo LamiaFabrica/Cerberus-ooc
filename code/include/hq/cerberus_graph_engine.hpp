@@ -54,6 +54,9 @@ struct GraphNode {
 
     // --- optional inline tensor data for constants ---
     std::vector<float>       constant_data;
+
+    // --- quantization profile (mirrors KernelNode::quant_profile) ---
+    hq::npu::QuantProfile    quant_profile{};
 };
 
 // ===========================================================================
@@ -85,5 +88,27 @@ public:
     /// Convert a KernelGraph into a CerberusGraph (today: minimal, from nodes).
     [[nodiscard]] static CerberusGraph from_kernel_graph(const npu::KernelGraph& kg);
 };
+
+// ===========================================================================
+// GraphRewriteRule — declarative pattern-matching rewrite for graph healing
+// ===========================================================================
+
+struct GraphRewriteRule {
+    std::string name;
+    /// Return true if the rewrite should fire at node_idx.
+    std::function<bool(const CerberusGraph&, std::size_t node_idx)> match;
+    /// Mutate graph when match succeeds.
+    std::function<void(CerberusGraph&, std::size_t node_idx)> replace;
+};
+
+/// Apply all rules in order.  Returns number of rewrites performed.
+[[nodiscard]] std::size_t apply_rewrites(CerberusGraph& g, std::span<const GraphRewriteRule> rules);
+
+// ===========================================================================
+// Built-in rules (healing / fusion)
+// ===========================================================================
+
+/// Fuse MatMul → Add → ReLU into a single fused node.
+[[nodiscard]] GraphRewriteRule make_fuse_matmul_bias_relu_rule();
 
 } // namespace hq::cerberus
