@@ -2,16 +2,20 @@
 /// @file cerberus_decision_engine.hpp
 /// @copyright Copyright (c) 2026 D Hargreaves. All rights reserved.
 ///
-/// Cerberus Decision Engine — routes graph nodes to backends and memory tiers.
+/// Cerberus Decision Engine — thin local router for Cerberus-native graphs.
 ///
-/// This is the "interlaced decision engine". It inspects the Cerberus-owned
-/// graph and decides, per node or per fused subgraph:
-///   * Which execution backend (native CPU, OpenVINO, CUDA, etc.)
+/// This is a lightweight integrator-level router, NOT PsiForceDB's proprietary
+/// optimizer. It inspects the local Cerberus graph and decides:
+///   * Which local execution backend (native CPU, OpenVINO stub, CUDA stub)
 ///   * Which memory tier (Hot/Warm/Cool/Cold) for outputs
-///   * Whether to fuse adjacent simple ops into a single native kernel
+///   * Whether to fuse adjacent simple ops into a single local native kernel
 ///
 /// The engine is pressure-aware: it reads TieredMemoryManager stats and will
 /// demote allocations to cooler tiers when memory pressure is high.
+///
+/// BOUNDARY: All deep intelligence (graph rewriting, advanced quantization
+/// planning, PQC-secured model splitting) lives in PsiForceDB. This class only
+/// routes what is already compiled.
 ///
 /// @version 1.0.0
 

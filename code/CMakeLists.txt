@@ -6,6 +6,10 @@
 # =============================================================================
 cmake_minimum_required(VERSION 3.28)
 
+# Force the known-good GCC 15.2.0 toolchain (WinLibs MCF UCRT)
+set(CMAKE_C_COMPILER   "C:/gcc-15.2.0/mingw64/bin/gcc.exe"  CACHE FILEPATH "C compiler" FORCE)
+set(CMAKE_CXX_COMPILER "C:/gcc-15.2.0/mingw64/bin/g++.exe" CACHE FILEPATH "C++ compiler" FORCE)
+
 project(um790_pipeline
     VERSION 1.0.0
     DESCRIPTION "AI Image Generation Pipeline for UM790 Pro"
@@ -230,6 +234,36 @@ else()
     message(STATUS "  mdspan: native <mdspan> available (UM790_HAS_STD_MDSPAN=1)")
 endif()
 
+# --- PsiForceDB ecosystem headers (optional, for extension integration) ---
+# Navigate from .../Cerberus - Copy/code up to Projects/, then into PsiForceDB
+get_filename_component(PSIFORCEDB_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../PsiForceDB" ABSOLUTE)
+set(PSIFORCEDB_INCLUDE_DIRS
+    "${PSIFORCEDB_ROOT}/Src/Inc/Intake/include"
+    "${PSIFORCEDB_ROOT}/Src/Database/Intake/include"
+    "${PSIFORCEDB_ROOT}/Src/Unclassified/Intake/include"
+    "${PSIFORCEDB_ROOT}/Src/Inc/Concurrency/include"
+)
+# NOTE: actual target_include_directories() calls are deferred until um790_includes
+# is defined (see below after add_library(um790_includes INTERFACE)).
+
+# Detect whether the real PsiForceDB extension_interface.hpp is present
+set(PSIFORCEDB_HEADERS_FOUND FALSE)
+foreach(dir IN LISTS PSIFORCEDB_INCLUDE_DIRS)
+    if(IS_DIRECTORY "${dir}")
+        list(APPEND PSIFORCEDB_VALID_INCLUDE_DIRS "${dir}")
+        if(EXISTS "${dir}/multimodel/extension_interface.hpp")
+            set(PSIFORCEDB_HEADERS_FOUND TRUE)
+            message(STATUS "PsiForceDB extension_interface.hpp FOUND: ${dir}/multimodel/extension_interface.hpp")
+        endif()
+    endif()
+endforeach()
+
+if(PSIFORCEDB_HEADERS_FOUND)
+    message(STATUS "PsiForceDB real headers available — CERBERUS_USE_REAL_PSIFORCEDB_HEADERS will be defined")
+else()
+    message(STATUS "PsiForceDB real headers NOT available — using standalone replica")
+endif()
+
 # ---------------------------------------------------------------------------
 # Compiler Flags (target-based, no globals)
 # ---------------------------------------------------------------------------
@@ -298,6 +332,29 @@ target_include_directories(um790_includes SYSTEM INTERFACE
     $<$<BOOL:${NVML_INCLUDE_DIR}>:${NVML_INCLUDE_DIR}>
 )
 
+# --- PsiForceDB ecosystem includes (deferred until um790_includes exists) ---
+foreach(dir IN LISTS PSIFORCEDB_INCLUDE_DIRS)
+    if(IS_DIRECTORY "${dir}")
+        target_include_directories(um790_includes SYSTEM INTERFACE "${dir}")
+        message(STATUS "PsiForceDB include: ${dir}")
+    else()
+        message(WARNING "PsiForceDB include NOT FOUND: ${dir}")
+    endif()
+endforeach()
+
+# --- LFSSL ecosystem includes (sibling project, added AFTER PsiForceDB so that
+#     PsiForceDB's monolithic LFSSL_Native_Crypto.hpp takes precedence for the
+#     inline SHA256/HMAC/PBKDF2 subset Cerberus already consumes) ---
+get_filename_component(LFSSL_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../LFSSL - Lamia Fabrica SSL" ABSOLUTE)
+if(IS_DIRECTORY "${LFSSL_ROOT}/include")
+    target_include_directories(um790_includes SYSTEM INTERFACE "${LFSSL_ROOT}/include")
+    message(STATUS "LFSSL include: ${LFSSL_ROOT}/include")
+    set(LFSSL_HEADERS_FOUND TRUE)
+else()
+    message(STATUS "LFSSL include NOT FOUND")
+    set(LFSSL_HEADERS_FOUND FALSE)
+endif()
+
 # ---------------------------------------------------------------------------
 # Sources
 # ---------------------------------------------------------------------------
@@ -338,6 +395,15 @@ set(UM790_PIPELINE_SOURCES
     src/cerberus_metro.cpp
     src/cerberus_glow_engine.cpp
     src/cerberus_gguf_parser.cpp
+    src/cerberus_psiforcedb_extension.cpp
+    src/cerberus_psiforcedb_graph_bridge.cpp
+    src/cerberus_psiforcedb_security.cpp
+    src/cerberus_psiforcedb_real_integration.cpp
+    src/cerberus_smdi.cpp
+    src/cerberus_local_maintenance_db.cpp
+    src/cerberus_user_security.cpp
+    src/cerberus_jwt_session.cpp
+    src/cerberus_first_run.cpp
 )
 
 list(APPEND UM790_PIPELINE_SOURCES src/hip_graph_denoiser.cpp)
@@ -362,6 +428,7 @@ set(UM790_PIPELINE_HEADERS
     include/hq/cluster_transport.hpp
     include/hq/benchmark_logger.hpp
     include/hq/npu_backend_unified.hpp
+    include/hq/cerberus_psiforcedb_security.hpp
 )
 
 # ---------------------------------------------------------------------------
@@ -400,6 +467,8 @@ target_compile_definitions(um790_pipeline PUBLIC
     $<$<BOOL:${OPENVINO_INCLUDE}>:CERBERUS_HAS_OPENVINO=1>
     $<$<BOOL:${CERBERUS_OPENVINO_FOUND}>:CERBERUS_HAS_OPENVINO=1>
     $<$<BOOL:${CERBERUS_OPENVINO_NOTFOUND}>:CERBERUS_HAS_OPENVINO=0>
+    # Enable real PsiForceDB header compilation when headers are present
+    $<$<BOOL:${PSIFORCEDB_HEADERS_FOUND}>:CERBERUS_USE_REAL_PSIFORCEDB_HEADERS=1>
 )
 
 set_target_properties(um790_pipeline PROPERTIES

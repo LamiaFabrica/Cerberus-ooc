@@ -65,6 +65,10 @@ struct GgufTensorInfo {
 // ==========================================================================
 
 enum class GgufMetadataType : uint32_t {
+    UINT8   = 0,
+    INT8    = 1,
+    UINT16  = 2,
+    INT16   = 3,
     UINT32  = 4,
     INT32   = 5,
     FLOAT32 = 6,

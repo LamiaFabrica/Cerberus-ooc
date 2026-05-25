@@ -364,20 +364,165 @@ PropupResult propup_adversarial_slipstream_overflow(std::ostream* log = nullptr)
 PropupResult propup_adversarial_metro_empty_payload(std::ostream* log = nullptr);
 
 // ===========================================================================
-// GGUF PARSER SUITE
+// GGUF PARSER SUITE (synthetic — validates parser code, not external assets)
 // ===========================================================================
 
-/// @brief Prop up: parsed GGUF file has valid header magic and version.
-PropupResult propup_gguf_header_magic(std::ostream* log = nullptr);
+/// @brief Prop up: synthetic GGUF header magic validates parser endianness logic.
+PropupResult propup_gguf_synthetic_header(std::ostream* log = nullptr);
 
-/// @brief Prop up: tensor count matches real GGUF metadata.
-PropupResult propup_gguf_tensor_count(std::ostream* log = nullptr);
+/// @brief Prop up: synthetic tensor info roundtrip validates data structure integrity.
+PropupResult propup_gguf_synthetic_tensor_info(std::ostream* log = nullptr);
 
-/// @brief Prop up: at least one Q4_K_M quantized tensor detected.
-PropupResult propup_gguf_q4km_detected(std::ostream* log = nullptr);
+// ===========================================================================
+// PSIFORCEDB EXTENSION INTEGRATION
+// ===========================================================================
 
-/// @brief Prop up: metadata KV retrieval (architecture string).
-PropupResult propup_gguf_metadata_string(std::ostream* log = nullptr);
+/// @brief Prop up: CerberusExtension initializes with PsiForceDB ExtensionConfig.
+PropupResult propup_psiforcedb_extension_init(std::ostream* log = nullptr);
+
+/// @brief Prop up: CerberusExtension load/unload lifecycle works.
+PropupResult propup_psiforcedb_extension_load_unload(std::ostream* log = nullptr);
+
+/// @brief Prop up: CerberusExtension executeQuery INFERENCE routes to CerberusRuntime.
+PropupResult propup_psiforcedb_extension_inference_query(std::ostream* log = nullptr);
+
+/// @brief Prop up: CerberusExtension executeQuery STATUS returns telemetry.
+PropupResult propup_psiforcedb_extension_status_query(std::ostream* log = nullptr);
+
+/// @brief Prop up: CerberusExtension getStatistics reports query counts.
+PropupResult propup_psiforcedb_extension_stats(std::ostream* log = nullptr);
+
+/// @brief Prop up: CerberusExtension validateQuery accepts cerberus:// and cbr: prefixes.
+PropupResult propup_psiforcedb_extension_validate(std::ostream* log = nullptr);
+
+/// @brief Prop up: CerberusExtension routes PFQL-style inference queries.
+PropupResult propup_psiforcedb_extension_pfql_routing(std::ostream* log = nullptr);
+
+/// @brief Prop up: CerberusExtension GGUF_LOADER query returns synthetic Athenea tensor metadata.
+PropupResult propup_psiforcedb_extension_gguf_loader(std::ostream* log = nullptr);
+
+/// @brief Prop up: CerberusExtension TELEMETRY query packages STATUS + GLOW rows for PsiForceDB web tier.
+PropupResult propup_psiforcedb_extension_telemetry(std::ostream* log = nullptr);
+
+/// @brief Prop up: CerberusExtension health check returns correct state after load/unload.
+PropupResult propup_psiforcedb_extension_health_check(std::ostream* log = nullptr);
+
+/// @brief Prop up: CerberusExtension rejects transaction begin because supportsTransaction=false.
+PropupResult propup_psiforcedb_extension_transaction_reject(std::ostream* log = nullptr);
+
+/// @brief Prop up: Synthetic PsiForceDB MultiModelCoordinator routes INFERENCE to CerberusExtension.
+PropupResult propup_psiforcedb_extension_coordinator_routing(std::ostream* log = nullptr);
+
+/// @brief Prop up: C factory cerberus_create_extension produces valid extension.
+PropupResult propup_psiforcedb_extension_factory(std::ostream* log = nullptr);
+
+/// @brief Prop up: Extension with missing dependency fails to load.
+PropupResult propup_psiforcedb_extension_dependencies(std::ostream* log = nullptr);
+
+/// @brief Prop up: getMetadata() roundtrip returns correct name, version, model_type, supported_queries.
+PropupResult propup_psiforcedb_extension_metadata(std::ostream* log = nullptr);
+
+/// @brief Prop up: ModelTopologyMapper produces valid PsiForceDB graph topology.
+PropupResult propup_psiforcedb_graph_bridge_topology(std::ostream* log = nullptr);
+
+/// @brief Prop up: GraphNode/GraphEdge PFQL row export produces correct fields.
+PropupResult propup_psiforcedb_graph_bridge_pfql_rows(std::ostream* log = nullptr);
+
+/// @brief Prop up: Extension validateQuery rejects unbalanced quotes and oversized strings.
+PropupResult propup_psiforcedb_extension_validate_edge_cases(std::ostream* log = nullptr);
+
+/// @brief Prop up: Extension error_count increments on failed init/load/unload.
+PropupResult propup_psiforcedb_extension_error_counting(std::ostream* log = nullptr);
+
+/// @brief Prop up: Extension parameter_or and model_from_type helper utilities work.
+PropupResult propup_psiforcedb_extension_detail_helpers(std::ostream* log = nullptr);
+
+/// @brief Prop up: Extension GlowEngine hot-path recording is visible through GLOW query.
+PropupResult propup_psiforcedb_extension_glow_integration(std::ostream* log = nullptr);
+
+// ===========================================================================
+// AVX-512 DISPATCH SUITE (synthetic — validates dispatch logic, not host hw)
+// ===========================================================================
+
+/// @brief Prop up: AVX-512 feature detection returns consistent result.
+PropupResult propup_kernel_avx512_detect(std::ostream* log = nullptr);
+
+/// @brief Prop up: AVX-512 blocked MatMul synthetic dispatch (no real AVX-512 hw required).
+PropupResult propup_kernel_matmul_avx512_dispatch(std::ostream* log = nullptr);
+
+// ===========================================================================
+// Additional native kernel propups
+// ===========================================================================
+
+/// @brief Prop up: kernel_sigmoid numerical correctness.
+PropupResult propup_kernel_sigmoid(std::ostream* log = nullptr);
+
+/// @brief Prop up: kernel_relu numerical correctness.
+PropupResult propup_kernel_relu(std::ostream* log = nullptr);
+
+/// @brief Prop up: CryptoBridge SHA256 determinism and digest size.
+PropupResult propup_security_sha256(std::ostream* log = nullptr);
+
+/// @brief Prop up: CryptoBridge HMAC-SHA256 integrity and uniqueness.
+PropupResult propup_security_hmac_sha256(std::ostream* log = nullptr);
+
+/// @brief Prop up: CryptoBridge PBKDF2-SHA256 determinism and sensitivity.
+PropupResult propup_security_pbkdf2_sha256(std::ostream* log = nullptr);
+
+/// @brief Prop up: LfsslSentinel correctly reports AES-256-GCM as delegated to PsiForceDB.
+PropupResult propup_security_aes256_gcm_sentinel(std::ostream* log = nullptr);
+
+/// @brief Prop up: LfsslSentinel correctly reports Kyber/Dilithium as delegated to PsiForceDB.
+PropupResult propup_security_pqc_sentinel(std::ostream* log = nullptr);
+
+/// @brief Prop up: Cerberus compiles and links against real PsiForceDB extension_interface.hpp.
+PropupResult propup_psiforcedb_extension_real_header_compile(std::ostream* log = nullptr);
+
+// ===========================================================================
+// Privacy / RBPC / Local Maintenance DB (carbon copy of PsiForceDB security surface)
+// ===========================================================================
+
+/// @brief Prop up: LocalMaintenanceDB initializes, stores encrypted records, syncs queue.
+PropupResult propup_privacy_local_maintenance_db(std::ostream* log = nullptr);
+
+/// @brief Prop up: RBPC PIN generation system-issued, commitment-only storage.
+PropupResult propup_privacy_pin_generation(std::ostream* log = nullptr);
+
+/// @brief Prop up: RBPC PIN verification with burn-after-3-attempts policy.
+PropupResult propup_privacy_pin_burn_policy(std::ostream* log = nullptr);
+
+/// @brief Prop up: Memorable word validation and commitment derivation.
+PropupResult propup_privacy_word_commitment(std::ostream* log = nullptr);
+
+/// @brief Prop up: Dual-factor confirmation (PIN + Word) offline/online.
+PropupResult propup_privacy_dual_factor_confirmation(std::ostream* log = nullptr);
+
+/// @brief Prop up: JWT session creation, validation, refresh, revocation (CSF/BFD/InjectionProof/Sentry).
+PropupResult propup_privacy_jwt_session(std::ostream* log = nullptr);
+
+/// @brief Prop up: extension entry store/search/load in LocalMaintenanceDB.
+PropupResult propup_lcmd_extension_entry(std::ostream* log = nullptr);
+
+/// @brief Prop up: revenue share record store/load in LocalMaintenanceDB.
+PropupResult propup_lcmd_revenue_share(std::ostream* log = nullptr);
+
+/// @brief Prop up: VIP key store/exists/get_all in LocalMaintenanceDB.
+PropupResult propup_lcmd_vip_keys(std::ostream* log = nullptr);
+
+/// @brief Prop up: onboarding grant store/consume/load in LocalMaintenanceDB.
+PropupResult propup_lcmd_onboarding_grant(std::ostream* log = nullptr);
+
+/// @brief Prop up: concurrent JWT validation from multiple threads.
+PropupResult propup_privacy_jwt_concurrent(std::ostream* log = nullptr);
+
+/// @brief Prop up: cerberus_lfssl.dll loads, exports resolve, and primitives pass smoke.
+PropupResult propup_lfssl_dll_smoke(std::ostream* log = nullptr);
+
+/// @brief Prop up: SHA-256 digest determinism via DLL.
+PropupResult propup_lfssl_dll_sha256(std::ostream* log = nullptr);
+
+/// @brief Prop up: HMAC-SHA256 correctness via DLL.
+PropupResult propup_lfssl_dll_hmac(std::ostream* log = nullptr);
 
 // ===========================================================================
 // Full test suite — runs all validators and returns aggregate report

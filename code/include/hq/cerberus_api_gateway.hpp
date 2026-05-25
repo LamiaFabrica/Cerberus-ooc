@@ -117,6 +117,11 @@ struct HandshakeCompleteResponse {
 // Command Opcodes (Cerberus-specific)
 // ===========================================================================
 
+// MinGW headers define ERROR_NOT_FOUND via winerror.h macros; guard enum body.
+#ifdef ERROR_NOT_FOUND
+#undef ERROR_NOT_FOUND
+#endif
+
 enum class CerberusOpcode : uint16_t {
     RUN_GRAPH       = 0x1000,
     COMPILE_GRAPH   = 0x1001,

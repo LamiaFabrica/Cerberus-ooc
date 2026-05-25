@@ -105,6 +105,22 @@ std::string GgufParser::read_string(std::istream& in) const {
 
 static bool skip_metadata_value(std::istream& in, GgufMetadataType type) {
     switch (type) {
+        case GgufMetadataType::UINT8: {
+            uint8_t _; in.read(reinterpret_cast<char*>(&_), sizeof(_));
+            break;
+        }
+        case GgufMetadataType::INT8: {
+            int8_t _; in.read(reinterpret_cast<char*>(&_), sizeof(_));
+            break;
+        }
+        case GgufMetadataType::UINT16: {
+            uint16_t _; in.read(reinterpret_cast<char*>(&_), sizeof(_));
+            break;
+        }
+        case GgufMetadataType::INT16: {
+            int16_t _; in.read(reinterpret_cast<char*>(&_), sizeof(_));
+            break;
+        }
         case GgufMetadataType::UINT32: {
             uint32_t _; in.read(reinterpret_cast<char*>(&_), sizeof(_));
             break;
@@ -150,8 +166,7 @@ static bool skip_metadata_value(std::istream& in, GgufMetadataType type) {
             }
             break;
         }
-        default:
-            return false;
+        // No default — every GGUF type 0..12 is explicitly handled.
     }
     return in.good();
 }
@@ -167,7 +182,28 @@ bool GgufParser::parse_metadata_kv(std::istream& in) {
     mv.key = std::move(key);
     mv.type = type;
 
+    // Handle all GGUF metadata types (0-12)
     switch (type) {
+        case GgufMetadataType::UINT8: {
+            uint8_t v = 0; in.read(reinterpret_cast<char*>(&v), sizeof(v));
+            mv.value = static_cast<uint64_t>(v);
+            break;
+        }
+        case GgufMetadataType::INT8: {
+            int8_t v = 0; in.read(reinterpret_cast<char*>(&v), sizeof(v));
+            mv.value = static_cast<int64_t>(v);
+            break;
+        }
+        case GgufMetadataType::UINT16: {
+            uint16_t v = 0; in.read(reinterpret_cast<char*>(&v), sizeof(v));
+            mv.value = static_cast<uint64_t>(v);
+            break;
+        }
+        case GgufMetadataType::INT16: {
+            int16_t v = 0; in.read(reinterpret_cast<char*>(&v), sizeof(v));
+            mv.value = static_cast<int64_t>(v);
+            break;
+        }
         case GgufMetadataType::UINT32: {
             uint32_t v = 0; in.read(reinterpret_cast<char*>(&v), sizeof(v));
             mv.value = static_cast<uint64_t>(v);
@@ -219,8 +255,6 @@ bool GgufParser::parse_metadata_kv(std::istream& in) {
             mv.value = std::string("[array]");
             break;
         }
-        default:
-            return false;
     }
 
     if (!in.good()) return false;

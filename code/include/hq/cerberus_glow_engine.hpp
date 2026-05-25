@@ -2,14 +2,21 @@
 /// @file cerberus_glow_engine.hpp
 /// @copyright Copyright (c) 2026 D Hargreaves. All rights reserved.
 ///
-/// Cerberus GlowEngine — ported from PsiForceDB Nemadic v3 Glowing Strings.
+/// Cerberus GlowEngine — local execution-path recorder (integrator layer).
 ///
-/// Learns hot execution paths through a KernelGraph/CerberusGraph by tracking
-/// edge usage as "bonds" with usage-based strengths.  Supports:
-///   - reinforcement on successful traversal
+/// Records hot execution paths through local Cerberus graphs by tracking edge
+/// traversal frequency as lightweight "bonds". This is a thin integrator
+/// telemetry layer — NOT PsiForceDB's proprietary knowledge-graph engine.
+///
+/// Responsibilities:
+///   - reinforcement on successful local traversal
 ///   - periodic decay of unused bonds
-///   - catchphrase resolution (human name -> node id)
-///   - hot-path query for predictor caching / tier promotion
+///   - catchphrase resolution (human name -> node id) for local debugging
+///   - hot-path query for local tier promotion hints
+///
+/// BOUNDARY: PsiForceDB owns the deep knowledge graph, persistent Glow state,
+/// and cross-session learning. Cerberus only records local traces and reports
+/// them to PsiForceDB via the extension query interface.
 ///
 /// Every field is consumed — no empty feature-incomplete variables.
 ///

@@ -76,6 +76,17 @@ execute(OpType op,
     std::size_t M, std::size_t N, std::size_t K);
 #endif
 
+#if defined(__AVX512F__)
+/// @brief AVX-512 blocked MatMul (requires __AVX512F__).
+[[nodiscard]] std::expected<void, std::string> kernel_matmul_blocked_avx512(
+    const float* A, const float* B, float* C,
+    std::size_t M, std::size_t N, std::size_t K);
+#endif
+
+/// @brief Runtime CPU feature detection.
+[[nodiscard]] bool cpu_has_avx512f() noexcept;
+[[nodiscard]] bool cpu_has_avx2() noexcept;
+
 [[nodiscard]] std::expected<void, std::string> kernel_add(
     const float* a, const float* b, float* out,
     std::size_t elems);
