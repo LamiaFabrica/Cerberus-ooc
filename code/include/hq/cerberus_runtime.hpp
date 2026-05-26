@@ -39,8 +39,8 @@ public:
         std::string preferred_backend{"native"}; ///< "native", "openvino", "cuda", "cpu"
         bool        enable_fusion{true};         ///< enable Mul+Add → FMA fusion
         bool        enable_quantization{false};  ///< enable INT8 path where possible
-        std::size_t warm_capacity_bytes{128ULL << 30};
-        std::size_t cool_capacity_bytes{64ULL << 30};
+        std::size_t warm_capacity_bytes{1ULL << 30}; ///< 1 GiB
+        std::size_t cool_capacity_bytes{512ULL << 20}; ///< 512 MiB
     };
 
     explicit CerberusRuntime();

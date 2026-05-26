@@ -12,6 +12,7 @@
 #include <cmath>
 #include <fstream>
 #include <cstdio>
+#include <mutex>
 
 // ===========================================================================
 // CUDA includes
@@ -634,11 +635,14 @@ float IntelOpenVinoBackend::temperature() const { return -1.0f; }
 static struct { std::unique_ptr<INpuBackend> cpu, cuda, intel; } g_backends;
 
 void NpuBackendFactory::initialize() {
-    g_backends.cpu   = std::make_unique<CpuFallbackBackend>();
-    g_backends.cuda  = std::make_unique<CudaBackend>();
-    g_backends.intel = std::make_unique<IntelOpenVinoBackend>();
-    HQ_LOG_INFO("[NpuBackendFactory] Probed {} backends:", 3);
-    print_status();
+    static std::once_flag once;
+    std::call_once(once, []() {
+        g_backends.cpu   = std::make_unique<CpuFallbackBackend>();
+        g_backends.cuda  = std::make_unique<CudaBackend>();
+        g_backends.intel = std::make_unique<IntelOpenVinoBackend>();
+        HQ_LOG_INFO("[NpuBackendFactory] Probed {} backends:", 3);
+        print_status();
+    });
 }
 
 INpuBackend* NpuBackendFactory::best_for(std::string_view target_name) {

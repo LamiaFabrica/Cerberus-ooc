@@ -512,6 +512,30 @@ PropupResult propup_lcmd_vip_keys(std::ostream* log = nullptr);
 /// @brief Prop up: onboarding grant store/consume/load in LocalMaintenanceDB.
 PropupResult propup_lcmd_onboarding_grant(std::ostream* log = nullptr);
 
+/// @brief Prop up: LCMD offline accumulation + sync-queue readiness.
+PropupResult propup_lcmd_offline_sync_ready(std::ostream* log = nullptr);
+
+/// @brief Prop up: license store + load + revocation in LocalMaintenanceDB.
+PropupResult propup_lcmd_license_store_revoke(std::ostream* log = nullptr);
+
+/// @brief Prop up: review store + load by extension_id in LocalMaintenanceDB.
+PropupResult propup_lcmd_review_store_load(std::ostream* log = nullptr);
+
+/// @brief Prop up: trust policy store + roundtrip load in LocalMaintenanceDB.
+PropupResult propup_lcmd_trust_policy_roundtrip(std::ostream* log = nullptr);
+
+/// @brief Prop up: credential record store + load in LocalMaintenanceDB.
+PropupResult propup_lcmd_credential_record(std::ostream* log = nullptr);
+
+/// @brief Prop up: RBPC state save/load roundtrip in LocalMaintenanceDB.
+PropupResult propup_lcmd_rbpc_state_roundtrip(std::ostream* log = nullptr);
+
+/// @brief Prop up: extension stats update + get in LocalMaintenanceDB.
+PropupResult propup_lcmd_extension_stats(std::ostream* log = nullptr);
+
+/// @brief Prop up: preference store + load in LocalMaintenanceDB.
+PropupResult propup_lcmd_preference_roundtrip(std::ostream* log = nullptr);
+
 /// @brief Prop up: concurrent JWT validation from multiple threads.
 PropupResult propup_privacy_jwt_concurrent(std::ostream* log = nullptr);
 
@@ -523,6 +547,156 @@ PropupResult propup_lfssl_dll_sha256(std::ostream* log = nullptr);
 
 /// @brief Prop up: HMAC-SHA256 correctness via DLL.
 PropupResult propup_lfssl_dll_hmac(std::ostream* log = nullptr);
+
+/// @brief Prop up: AES-256-GCM encrypt/decrypt round-trip with AAD via DLL.
+PropupResult propup_lfssl_dll_aes256gcm(std::ostream* log = nullptr);
+
+/// @brief Prop up: Kyber KEM keypair/encaps/decaps round-trip via DLL.
+PropupResult propup_lfssl_dll_kyber(std::ostream* log = nullptr);
+
+/// @brief Prop up: Dilithium sign/verify via DLL.
+PropupResult propup_lfssl_dll_dilithium(std::ostream* log = nullptr);
+
+/// @brief Prop up: Argon2id memory-hard password hashing via DLL.
+PropupResult propup_lfssl_dll_argon2id(std::ostream* log = nullptr);
+
+/// @brief Prop up: Argon2id hash-then-verify round-trip with wrong-password rejection via DLL.
+PropupResult propup_lfssl_dll_argon2id_verify(std::ostream* log = nullptr);
+
+/// @brief Prop up: LfsslSentinel AES-256-GCM unavailable_reason consistency.
+PropupResult propup_lfssl_sentinel_aes256gcm_unavailable(std::ostream* log = nullptr);
+
+/// @brief Prop up: LfsslSentinel Kyber unavailable_reason consistency.
+PropupResult propup_lfssl_sentinel_kyber_unavailable(std::ostream* log = nullptr);
+
+/// @brief Prop up: LfsslSentinel Dilithium unavailable_reason consistency.
+PropupResult propup_lfssl_sentinel_dilithium_unavailable(std::ostream* log = nullptr);
+
+// ===========================================================================
+// LCMD EDGE BEHAVIOR (fill remaining surface)
+// ===========================================================================
+
+/// @brief Prop up: RBPC burn threshold — 3 failed attempts = locked state.
+PropupResult propup_lcmd_rbpc_burn_threshold(std::ostream* log = nullptr);
+
+/// @brief Prop up: preference overwrites previous value in LocalMaintenanceDB.
+PropupResult propup_lcmd_preference_overwrite(std::ostream* log = nullptr);
+
+/// @brief Prop up: extension search with filters returns correct subset.
+PropupResult propup_lcmd_search_with_filters(std::ostream* log = nullptr);
+
+/// @brief Prop up: review load respects limit parameter.
+PropupResult propup_lcmd_review_limit(std::ostream* log = nullptr);
+
+/// @brief Prop up: VIP key status update roundtrip.
+PropupResult propup_lcmd_vip_key_status_update(std::ostream* log = nullptr);
+
+/// @brief Prop up: extension stats overwrite previous values.
+PropupResult propup_lcmd_extension_stats_overwrite(std::ostream* log = nullptr);
+
+/// @brief Prop up: trust policy keeps_local_authority positive/negative.
+PropupResult propup_lcmd_trust_policy_keeps_authority(std::ostream* log = nullptr);
+
+/// @brief Prop up: RBPC state burn after repeated increment.
+PropupResult propup_lcmd_rbpc_increment_to_burn(std::ostream* log = nullptr);
+
+/// @brief Prop up: audit event load by token_id.
+PropupResult propup_lcmd_audit_by_token_id(std::ostream* log = nullptr);
+
+/// @brief Prop up: license double-store returns true (idempotent semantics).
+PropupResult propup_lcmd_license_idempotent_store(std::ostream* log = nullptr);
+
+// ===========================================================================
+// JWT NEGATIVE PATHS
+// ===========================================================================
+
+/// @brief Prop up: JWT validation rejects wrong audience.
+PropupResult propup_jwt_wrong_audience(std::ostream* log = nullptr);
+
+/// @brief Prop up: JWT validation rejects past-expiry token.
+PropupResult propup_jwt_expired_token(std::ostream* log = nullptr);
+
+/// @brief Prop up: JWT refresh token rotation denies reuse of revoked refresh.
+PropupResult propup_jwt_revoked_refresh(std::ostream* log = nullptr);
+
+// ===========================================================================
+// DLL PRIMITIVES EXPANSION
+// ===========================================================================
+
+/// @brief Prop up: PBKDF2-SHA256 determinism and salt-sensitivity via DLL.
+PropupResult propup_lfssl_dll_pbkdf2(std::ostream* log = nullptr);
+
+/// @brief Prop up: AES-256 block encrypt/decrypt roundtrip via DLL.
+PropupResult propup_lfssl_dll_aes256_block(std::ostream* log = nullptr);
+
+/// @brief Prop up: random_bytes produces different output each call.
+PropupResult propup_lfssl_dll_random_non_determinism(std::ostream* log = nullptr);
+
+// ===========================================================================
+// GLOW ENGINE EDGE CASES
+// ===========================================================================
+
+/// @brief Prop up: GlowEngine on empty graph does not crash.
+PropupResult propup_glow_empty_graph(std::ostream* log = nullptr);
+
+/// @brief Prop up: single-node path query returns empty or valid self-loop.
+PropupResult propup_glow_single_node_path(std::ostream* log = nullptr);
+
+/// @brief Prop up: catchphrase query with empty string returns empty.
+PropupResult propup_glow_empty_catchphrase(std::ostream* log = nullptr);
+
+/// @brief Prop up: reinforcement on same bond twice amplifies weight.
+PropupResult propup_glow_bond_double_reinforcement(std::ostream* log = nullptr);
+
+// ===========================================================================
+// COMMAND / ANBP / METRO / SLIPSTREAM EDGE CASES
+// ===========================================================================
+
+/// @brief Prop up: command placeholder stored as LCMD preference.
+PropupResult propup_command_unknown(std::ostream* log = nullptr);
+
+/// @brief Prop up: empty command stores/loads via LCMD preference.
+PropupResult propup_command_empty(std::ostream* log = nullptr);
+
+/// @brief Prop up: LCMD extension entry accumulation under pressure.
+PropupResult propup_slipstream_eviction(std::ostream* log = nullptr);
+
+/// @brief Prop up: LCMD preference roundtrip acts as ANBP version proxy.
+PropupResult propup_anbp_wrong_version(std::ostream* log = nullptr);
+
+// ===========================================================================
+// Full test suite — runs all validators and returns aggregate report
+// ===========================================================================
+// COMMAND / ANBP / METRO / SLIPSTREAM EDGE CASES
+// ===========================================================================
+
+/// @brief Prop up: native softmax numerical stability.
+PropupResult propup_kernel_softmax_stability(std::ostream* log = nullptr);
+
+/// @brief Prop up: layernorm with zero-variance input (constant values).
+PropupResult propup_kernel_layernorm_zeros(std::ostream* log = nullptr);
+
+/// @brief Prop up: gelu on negative values produces correct nonlinearity.
+PropupResult propup_kernel_gelu_negative(std::ostream* log = nullptr);
+
+/// @brief Prop up: elementwise kernel rejects shape mismatched inputs.
+PropupResult propup_kernel_elementwise_shape_mismatch(std::ostream* log = nullptr);
+
+/// @brief Prop up: conv2d 1x1 acts as elementwise multiply.
+PropupResult propup_kernel_conv2d_1x1_identity(std::ostream* log = nullptr);
+
+// ===========================================================================
+// EXTENSION EDGE NEGATIVES
+// ===========================================================================
+
+/// @brief Prop up: extension with empty dependency list loads.
+PropupResult propup_extension_empty_deps(std::ostream* log = nullptr);
+
+/// @brief Prop up: extension metadata with missing required field handled.
+PropupResult propup_extension_metadata_missing(std::ostream* log = nullptr);
+
+/// @brief Prop up: extension without metadata_map still returns defaults.
+PropupResult propup_extension_no_metadata(std::ostream* log = nullptr);
 
 // ===========================================================================
 // Full test suite — runs all validators and returns aggregate report

@@ -15,6 +15,13 @@
 #include <lfssl/crypto/aes256.hpp>
 #include <lfssl/crypto/aes256_gcm.hpp>
 #include <lfssl/crypto/random.hpp>
+#include <lfssl/crypto/kyber_kem.hpp>
+#include <lfssl/crypto/dilithium.hpp>
+
+// Argon2id from LFSSL phc-argon2 (public domain)
+extern "C" {
+#include <argon2.h>
+}
 
 #ifdef BUILD_DLL
     #ifdef _WIN32
@@ -147,6 +154,194 @@ CERBERUS_LFSSL_API void cerberus_lfssl_random_bytes(uint8_t* out, size_t len) {
     if (!out || len == 0) return;
     std::vector<uint8_t> buf = LFSSL::Crypto::SecureRandom::instance().bytes(len);
     std::memcpy(out, buf.data(), len);
+}
+
+// ============================================================================
+// PQC — Kyber KEM (all three levels)
+// ============================================================================
+
+CERBERUS_LFSSL_API int cerberus_lfssl_kyber_keypair(
+    uint32_t level,
+    uint8_t* public_key, size_t public_key_len,
+    uint8_t* private_key, size_t private_key_len
+) {
+    LFSSL::Crypto::KyberKEM::SecurityLevel lvl;
+    size_t pk_sz = 0, sk_sz = 0;
+    switch (level) {
+        case 512: lvl = LFSSL::Crypto::KyberKEM::SecurityLevel::KYBER_512; pk_sz = 800; sk_sz = 1632; break;
+        case 768: lvl = LFSSL::Crypto::KyberKEM::SecurityLevel::KYBER_768; pk_sz = 1184; sk_sz = 2400; break;
+        case 1024: lvl = LFSSL::Crypto::KyberKEM::SecurityLevel::KYBER_1024; pk_sz = 1568; sk_sz = 3168; break;
+        default: return -1;
+    }
+    if (public_key_len < pk_sz || private_key_len < sk_sz) return -2;
+    std::vector<uint8_t> pk, sk;
+    if (!LFSSL::Crypto::KyberKEM::generate_keypair(lvl, pk, sk)) return -3;
+    std::memcpy(public_key, pk.data(), pk.size());
+    std::memcpy(private_key, sk.data(), sk.size());
+    return 0;
+}
+
+CERBERUS_LFSSL_API int cerberus_lfssl_kyber_encapsulate(
+    uint32_t level,
+    const uint8_t* public_key, size_t public_key_len,
+    uint8_t* ciphertext, size_t ciphertext_len,
+    uint8_t* shared_secret, size_t shared_secret_len
+) {
+    LFSSL::Crypto::KyberKEM::SecurityLevel lvl;
+    size_t ct_sz = 0, ss_sz = 0;
+    switch (level) {
+        case 512: lvl = LFSSL::Crypto::KyberKEM::SecurityLevel::KYBER_512; ct_sz = 768; ss_sz = 32; break;
+        case 768: lvl = LFSSL::Crypto::KyberKEM::SecurityLevel::KYBER_768; ct_sz = 1088; ss_sz = 32; break;
+        case 1024: lvl = LFSSL::Crypto::KyberKEM::SecurityLevel::KYBER_1024; ct_sz = 1568; ss_sz = 32; break;
+        default: return -1;
+    }
+    if (ciphertext_len < ct_sz || shared_secret_len < ss_sz) return -2;
+    std::vector<uint8_t> ct, ss;
+    std::vector<uint8_t> pk(public_key, public_key + public_key_len);
+    if (!LFSSL::Crypto::KyberKEM::encapsulate(lvl, pk, ct, ss)) return -3;
+    std::memcpy(ciphertext, ct.data(), ct.size());
+    std::memcpy(shared_secret, ss.data(), ss.size());
+    return 0;
+}
+
+CERBERUS_LFSSL_API int cerberus_lfssl_kyber_decapsulate(
+    uint32_t level,
+    const uint8_t* private_key, size_t private_key_len,
+    const uint8_t* ciphertext, size_t ciphertext_len,
+    uint8_t* shared_secret, size_t shared_secret_len
+) {
+    LFSSL::Crypto::KyberKEM::SecurityLevel lvl;
+    size_t sk_sz = 0, ct_sz = 0, ss_sz = 32;
+    switch (level) {
+        case 512: lvl = LFSSL::Crypto::KyberKEM::SecurityLevel::KYBER_512; sk_sz = 1632; ct_sz = 768; break;
+        case 768: lvl = LFSSL::Crypto::KyberKEM::SecurityLevel::KYBER_768; sk_sz = 2400; ct_sz = 1088; break;
+        case 1024: lvl = LFSSL::Crypto::KyberKEM::SecurityLevel::KYBER_1024; sk_sz = 3168; ct_sz = 1568; break;
+        default: return -1;
+    }
+    if (private_key_len < sk_sz || ciphertext_len < ct_sz || shared_secret_len < ss_sz) return -2;
+    std::vector<uint8_t> sk(private_key, private_key + private_key_len);
+    std::vector<uint8_t> ct(ciphertext, ciphertext + ciphertext_len);
+    std::vector<uint8_t> ss;
+    if (!LFSSL::Crypto::KyberKEM::decapsulate(lvl, sk, ct, ss)) return -3;
+    std::memcpy(shared_secret, ss.data(), ss.size());
+    return 0;
+}
+
+// ============================================================================
+// PQC — Dilithium signatures (all three levels)
+// ============================================================================
+
+CERBERUS_LFSSL_API int cerberus_lfssl_dilithium_keypair(
+    uint32_t level,
+    uint8_t* public_key, size_t public_key_len,
+    uint8_t* private_key, size_t private_key_len
+) {
+    LFSSL::Crypto::Dilithium::SecurityLevel lvl;
+    size_t pk_sz = 0, sk_sz = 0;
+    switch (level) {
+        // Sizes from dilithium reference api.h/params.h (not dilithium.hpp which has incorrect SK sizes)
+        case 2: lvl = LFSSL::Crypto::Dilithium::SecurityLevel::DILITHIUM2; pk_sz = 1312; sk_sz = 2560; break;
+        case 3: lvl = LFSSL::Crypto::Dilithium::SecurityLevel::DILITHIUM3; pk_sz = 1952; sk_sz = 4032; break;
+        case 5: lvl = LFSSL::Crypto::Dilithium::SecurityLevel::DILITHIUM5; pk_sz = 2592; sk_sz = 4896; break;
+        default: return -1;
+    }
+    if (public_key_len < pk_sz || private_key_len < sk_sz) return -2;
+    std::vector<uint8_t> pk, sk;
+    if (!LFSSL::Crypto::Dilithium::generate_keypair(lvl, pk, sk)) return -3;
+    std::memcpy(public_key, pk.data(), pk.size());
+    std::memcpy(private_key, sk.data(), sk.size());
+    return 0;
+}
+
+CERBERUS_LFSSL_API int cerberus_lfssl_dilithium_sign(
+    uint32_t level,
+    const uint8_t* data, size_t data_len,
+    const uint8_t* private_key, size_t private_key_len,
+    uint8_t* signature, size_t signature_len,
+    size_t* sig_out_len
+) {
+    LFSSL::Crypto::Dilithium::SecurityLevel lvl;
+    size_t sk_sz = 0, sig_sz = 0;
+    switch (level) {
+        // Reference SK sizes: DILITHIUM_MODE 2=2560, 3=4032, 5=4896 (dilithium.hpp has incorrect values)
+        case 2: lvl = LFSSL::Crypto::Dilithium::SecurityLevel::DILITHIUM2; sk_sz = 2560; sig_sz = 2420; break;
+        case 3: lvl = LFSSL::Crypto::Dilithium::SecurityLevel::DILITHIUM3; sk_sz = 4032; sig_sz = 3293; break;
+        case 5: lvl = LFSSL::Crypto::Dilithium::SecurityLevel::DILITHIUM5; sk_sz = 4896; sig_sz = 4595; break;
+        default: return -1;
+    }
+    if (private_key_len < sk_sz || signature_len < sig_sz) return -2;
+    std::vector<uint8_t> sk(private_key, private_key + private_key_len);
+    std::vector<uint8_t> msg(data, data + data_len);
+    std::vector<uint8_t> sig;
+    if (!LFSSL::Crypto::Dilithium::sign(lvl, msg, sk, sig)) return -3;
+    if (sig.size() > signature_len) return -4;
+    std::memcpy(signature, sig.data(), sig.size());
+    if (sig_out_len) *sig_out_len = sig.size();
+    return 0;
+}
+
+CERBERUS_LFSSL_API int cerberus_lfssl_dilithium_verify(
+    uint32_t level,
+    const uint8_t* data, size_t data_len,
+    const uint8_t* signature, size_t signature_len,
+    const uint8_t* public_key, size_t public_key_len
+) {
+    LFSSL::Crypto::Dilithium::SecurityLevel lvl;
+    size_t pk_sz = 0;
+    switch (level) {
+        case 2: lvl = LFSSL::Crypto::Dilithium::SecurityLevel::DILITHIUM2; pk_sz = 1312; break;
+        case 3: lvl = LFSSL::Crypto::Dilithium::SecurityLevel::DILITHIUM3; pk_sz = 1952; break;
+        case 5: lvl = LFSSL::Crypto::Dilithium::SecurityLevel::DILITHIUM5; pk_sz = 2592; break;
+        default: return -1;
+    }
+    if (public_key_len < pk_sz) return -2;
+    std::vector<uint8_t> pk(public_key, public_key + public_key_len);
+    std::vector<uint8_t> msg(data, data + data_len);
+    std::vector<uint8_t> sig(signature, signature + signature_len);
+    bool ok = LFSSL::Crypto::Dilithium::verify(lvl, msg, sig, pk);
+    return ok ? 0 : -3;
+}
+
+// ============================================================================
+// Argon2id — memory-hard password hashing
+// ============================================================================
+
+CERBERUS_LFSSL_API int cerberus_lfssl_argon2id(
+    uint32_t t_cost,
+    uint32_t m_cost,
+    uint32_t parallelism,
+    const uint8_t* password, size_t password_len,
+    const uint8_t* salt, size_t salt_len,
+    uint8_t* hash, size_t hash_len
+) {
+    if (!password || !salt || !hash) return -1;
+    int r = argon2id_hash_raw(t_cost, m_cost, parallelism,
+                              password, password_len,
+                              salt, salt_len,
+                              hash, hash_len);
+    return r;
+}
+
+CERBERUS_LFSSL_API int cerberus_lfssl_argon2id_verify(
+    uint32_t t_cost,
+    uint32_t m_cost,
+    uint32_t parallelism,
+    const uint8_t* password, size_t password_len,
+    const uint8_t* salt, size_t salt_len,
+    const uint8_t* expected_hash, size_t hash_len
+) {
+    if (!password || !salt || !expected_hash) return -1;
+    uint8_t* computed = static_cast<uint8_t*>(::malloc(hash_len));
+    if (!computed) return -2;
+    int r = argon2id_hash_raw(t_cost, m_cost, parallelism,
+                              password, password_len,
+                              salt, salt_len,
+                              computed, hash_len);
+    if (r != 0) { ::free(computed); return -3; }
+    volatile uint8_t diff = 0;
+    for (size_t i = 0; i < hash_len; ++i) diff |= (computed[i] ^ expected_hash[i]);
+    ::free(computed);
+    return (diff == 0) ? 0 : -4;
 }
 
 } // extern "C"

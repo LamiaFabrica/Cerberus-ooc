@@ -130,8 +130,8 @@ struct TierAllocation {
 struct TieredMemoryConfig {
     // Tier capacities (0 = tier disabled)
     std::size_t hot_capacity_bytes  = 0;              ///< GPU VRAM budget (0=auto from ROCm)
-    std::size_t warm_capacity_bytes = 128ULL << 30;   ///< Warm tier (CXL if available, else RAM; 128 GiB default)
-    std::size_t cool_capacity_bytes =  64ULL << 30;   ///< System RAM pool (64 GiB)
+    std::size_t warm_capacity_bytes = 1ULL << 30;   ///< Warm tier (CXL if available, else RAM; 1 GiB default for portability)
+    std::size_t cool_capacity_bytes = 512ULL << 20;   ///< System RAM pool (512 MiB)
     std::size_t cold_capacity_bytes =   4ULL << 40;   ///< NVMe budget (4 TiB)
 
     // Migration policy

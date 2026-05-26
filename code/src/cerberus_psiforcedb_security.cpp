@@ -2,10 +2,10 @@
 /// @copyright Copyright (c) 2026 D Hargreaves. All rights reserved.
 ///
 /// Thin LFSSL_Native_Crypto bridge — SHA256/HMAC/PBKDF2 inline-safe.
-/// AES-256-GCM now backed by cerberus_lfssl.dll when present; sentinel
-/// reflects runtime load state.  Kyber/Dilithium still delegated to PsiForceDB.
+/// AES-256-GCM, Kyber, Dilithium backed by cerberus_lfssl.dll when present;
+/// sentinel reflects runtime load state.
 ///
-/// @version 1.0.0
+/// @version 2.0.0
 
 #include "hq/cerberus_psiforcedb_security.hpp"
 
@@ -78,16 +78,30 @@ std::string LfsslSentinel::aes256_gcm_unavailable_reason() noexcept {
            "Cerberus delegates encryption to PsiForceDB at runtime.";
 }
 
-bool LfsslSentinel::kyber_available() noexcept { return false; }
-std::string LfsslSentinel::kyber_unavailable_reason() noexcept {
-    return "KyberKEM requires LFSSL compiled library. Linux .so available; "
-           "Windows build pending. Cerberus delegates PQC to PsiForceDB.";
+bool LfsslSentinel::kyber_available() noexcept {
+    static bool present = check_lfssl_dll_present();
+    return present;
 }
 
-bool LfsslSentinel::dilithium_available() noexcept { return false; }
+std::string LfsslSentinel::kyber_unavailable_reason() noexcept {
+    if (kyber_available()) {
+        return "KyberKEM available via cerberus_lfssl.dll (LFSSL runtime linked).";
+    }
+    return "KyberKEM requires LFSSL compiled library. "
+           "Cerberus delegates PQC to PsiForceDB at runtime.";
+}
+
+bool LfsslSentinel::dilithium_available() noexcept {
+    static bool present = check_lfssl_dll_present();
+    return present;
+}
+
 std::string LfsslSentinel::dilithium_unavailable_reason() noexcept {
-    return "Dilithium requires LFSSL compiled library. Linux .so available; "
-           "Windows build pending. Cerberus delegates PQC to PsiForceDB.";
+    if (dilithium_available()) {
+        return "Dilithium available via cerberus_lfssl.dll (LFSSL runtime linked).";
+    }
+    return "Dilithium requires LFSSL compiled library. "
+           "Cerberus delegates PQC to PsiForceDB at runtime.";
 }
 
 } // namespace hq::cerberus::security

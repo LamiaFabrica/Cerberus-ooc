@@ -640,4 +640,131 @@ void LocalMaintenanceDB::scrub_(std::vector<std::uint8_t>& buf) const noexcept {
     buf.clear();
 }
 
+// ============================================================================
+// TrustPolicy helpers
+// ============================================================================
+
+TrustPolicy TrustPolicy::default_policy() noexcept {
+    TrustPolicy tp;
+    tp.policy_id = "cerberus_rbpc_trust_default";
+    tp.deployment_model = "component_optional";
+    tp.credential_authority = "server_isolated";
+    tp.central_service_role = "relay_directory_update_only";
+    tp.medusaserv_role = "open_protocol_verifier";
+    tp.psiforcedb_role = "sealed_psmdb_authority_when_installed";
+    tp.psmdb_owner_scope = "d_hargreaves_only";
+    tp.proprietary_boundary = "sealed_vault_private";
+    tp.plaintext_storage = "forbidden";
+    tp.maintenance_encryption_layer = "lamia_fabrica_owned_required";
+    tp.psmdb_recovery = "forbidden";
+    tp.psmdb_reenrollment_model = "rebuild_not_recover";
+    tp.hash_suite = "BLAKE3+SHA256";
+    tp.pqc_profile = "hybrid_pqc_required";
+    tp.hardware_binding = "required";
+    tp.authority_scope = "local_login_pfql_medusaserv_psiforcedb_admin";
+    tp.rbpc_pin_source = "system_issued";
+    tp.rbpc_word_source = "user_memorized";
+    tp.rbpc_confirmation_window_seconds = "30";
+    tp.rbpc_failure_burn_threshold = "3";
+    tp.temporary_onboarding = "sealed_expiring_consumed_local";
+    tp.audit_scope = "local_psmdb";
+    tp.step_up_model = "partial_disclosure_rbpc";
+    tp.record_class = "rbpc_trust_policy";
+    return tp;
+}
+
+bool TrustPolicy::keeps_local_authority() const noexcept {
+    return plaintext_storage == "forbidden" &&
+           psmdb_recovery == "forbidden" &&
+           credential_authority != "central_only";
+}
+
+std::map<std::string, std::string> TrustPolicy::to_map() const noexcept {
+    std::map<std::string, std::string> m;
+    m["policy_id"] = policy_id;
+    m["deployment_model"] = deployment_model;
+    m["credential_authority"] = credential_authority;
+    m["central_service_role"] = central_service_role;
+    m["medusaserv_role"] = medusaserv_role;
+    m["psiforcedb_role"] = psiforcedb_role;
+    m["psmdb_owner_scope"] = psmdb_owner_scope;
+    m["proprietary_boundary"] = proprietary_boundary;
+    m["plaintext_storage"] = plaintext_storage;
+    m["maintenance_encryption_layer"] = maintenance_encryption_layer;
+    m["psmdb_recovery"] = psmdb_recovery;
+    m["psmdb_reenrollment_model"] = psmdb_reenrollment_model;
+    m["hash_suite"] = hash_suite;
+    m["pqc_profile"] = pqc_profile;
+    m["hardware_binding"] = hardware_binding;
+    m["authority_scope"] = authority_scope;
+    m["rbpc_pin_source"] = rbpc_pin_source;
+    m["rbpc_word_source"] = rbpc_word_source;
+    m["rbpc_confirmation_window_seconds"] = rbpc_confirmation_window_seconds;
+    m["rbpc_failure_burn_threshold"] = rbpc_failure_burn_threshold;
+    m["temporary_onboarding"] = temporary_onboarding;
+    m["audit_scope"] = audit_scope;
+    m["step_up_model"] = step_up_model;
+    m["record_class"] = record_class;
+    m["created_at"] = created_at;
+    m["updated_at"] = updated_at;
+    return m;
+}
+
+TrustPolicy TrustPolicy::from_map(const std::map<std::string, std::string>& m) {
+    TrustPolicy tp;
+    auto it = m.find("policy_id");
+    if (it != m.end()) tp.policy_id = it->second;
+    it = m.find("deployment_model");
+    if (it != m.end()) tp.deployment_model = it->second;
+    it = m.find("credential_authority");
+    if (it != m.end()) tp.credential_authority = it->second;
+    it = m.find("central_service_role");
+    if (it != m.end()) tp.central_service_role = it->second;
+    it = m.find("medusaserv_role");
+    if (it != m.end()) tp.medusaserv_role = it->second;
+    it = m.find("psiforcedb_role");
+    if (it != m.end()) tp.psiforcedb_role = it->second;
+    it = m.find("psmdb_owner_scope");
+    if (it != m.end()) tp.psmdb_owner_scope = it->second;
+    it = m.find("proprietary_boundary");
+    if (it != m.end()) tp.proprietary_boundary = it->second;
+    it = m.find("plaintext_storage");
+    if (it != m.end()) tp.plaintext_storage = it->second;
+    it = m.find("maintenance_encryption_layer");
+    if (it != m.end()) tp.maintenance_encryption_layer = it->second;
+    it = m.find("psmdb_recovery");
+    if (it != m.end()) tp.psmdb_recovery = it->second;
+    it = m.find("psmdb_reenrollment_model");
+    if (it != m.end()) tp.psmdb_reenrollment_model = it->second;
+    it = m.find("hash_suite");
+    if (it != m.end()) tp.hash_suite = it->second;
+    it = m.find("pqc_profile");
+    if (it != m.end()) tp.pqc_profile = it->second;
+    it = m.find("hardware_binding");
+    if (it != m.end()) tp.hardware_binding = it->second;
+    it = m.find("authority_scope");
+    if (it != m.end()) tp.authority_scope = it->second;
+    it = m.find("rbpc_pin_source");
+    if (it != m.end()) tp.rbpc_pin_source = it->second;
+    it = m.find("rbpc_word_source");
+    if (it != m.end()) tp.rbpc_word_source = it->second;
+    it = m.find("rbpc_confirmation_window_seconds");
+    if (it != m.end()) tp.rbpc_confirmation_window_seconds = it->second;
+    it = m.find("rbpc_failure_burn_threshold");
+    if (it != m.end()) tp.rbpc_failure_burn_threshold = it->second;
+    it = m.find("temporary_onboarding");
+    if (it != m.end()) tp.temporary_onboarding = it->second;
+    it = m.find("audit_scope");
+    if (it != m.end()) tp.audit_scope = it->second;
+    it = m.find("step_up_model");
+    if (it != m.end()) tp.step_up_model = it->second;
+    it = m.find("record_class");
+    if (it != m.end()) tp.record_class = it->second;
+    it = m.find("created_at");
+    if (it != m.end()) tp.created_at = it->second;
+    it = m.find("updated_at");
+    if (it != m.end()) tp.updated_at = it->second;
+    return tp;
+}
+
 } // namespace hq::cerberus::privacy
