@@ -699,6 +699,477 @@ PropupResult propup_extension_metadata_missing(std::ostream* log = nullptr);
 PropupResult propup_extension_no_metadata(std::ostream* log = nullptr);
 
 // ===========================================================================
+// FINAL 12 — reach 200+
+// ===========================================================================
+
+/// @brief Prop up: LCMD preference persists across re-initialization.
+PropupResult propup_lcmd_persist_load(std::ostream* log = nullptr);
+
+/// @brief Prop up: LCMD search with empty filter returns all entries.
+PropupResult propup_lcmd_search_empty_returns_all(std::ostream* log = nullptr);
+
+/// @brief Prop up: LCMD review overwrite with same id replaces previous.
+PropupResult propup_lcmd_review_store_overwrite(std::ostream* log = nullptr);
+
+/// @brief Prop up: LCMD rejects credential record with empty key.
+PropupResult propup_lcmd_credential_bad_record_rejected(std::ostream* log = nullptr);
+
+/// @brief Prop up: LCMD preference delete removes value.
+PropupResult propup_lcmd_preference_delete(std::ostream* log = nullptr);
+
+/// @brief Prop up: LCMD license revoke is idempotent.
+PropupResult propup_lcmd_license_revoke_idempotent(std::ostream* log = nullptr);
+
+/// @brief Prop up: RBPC generates different PINs each call.
+PropupResult propup_lcmd_rbpc_state_new_pin_different(std::ostream* log = nullptr);
+
+/// @brief Prop up: JWT refresh count increments jti each rotation.
+PropupResult propup_jwt_refresh_count(std::ostream* log = nullptr);
+
+/// @brief Prop up: LCMD extension entry search by name filter.
+PropupResult propup_lcmd_extension_entry_search_by_name(std::ostream* log = nullptr);
+
+/// @brief Prop up: LCMD onboarding grant consume is not idempotent.
+PropupResult propup_lcmd_onboarding_grant_idempotent(std::ostream* log = nullptr);
+
+/// @brief Prop up: LCMD offline sync queue count matches push count.
+PropupResult propup_lcmd_offline_sync_count(std::ostream* log = nullptr);
+
+/// @brief Prop up: LCMD offline mode flag toggles correctly.
+PropupResult propup_lcmd_offline_mode_flag(std::ostream* log = nullptr);
+
+/// @brief Prop up: replay_sync_queue with all-success callback drains queue.
+PropupResult propup_lcmd_replay_sync_all_success(std::ostream* log = nullptr);
+
+/// @brief Prop up: replay_sync_queue with partial-failure callback preserves failed records.
+PropupResult propup_lcmd_replay_sync_partial_failure(std::ostream* log = nullptr);
+
+/// @brief Prop up: replay_sync_queue on empty queue returns 0.
+PropupResult propup_lcmd_replay_sync_empty_queue(std::ostream* log = nullptr);
+
+/// @brief Prop up: offline writes auto-queue for sync.
+PropupResult propup_lcmd_offline_queue_auto_populate(std::ostream* log = nullptr);
+
+/// @brief Prop up: replay_sync_queue with max_records caps.
+PropupResult propup_lcmd_replay_max_records(std::ostream* log = nullptr);
+
+/// @brief Prop up: offline preference does NOT queue.
+PropupResult propup_lcmd_offline_preference_no_queue(std::ostream* log = nullptr);
+
+/// @brief Prop up: offline revenue share queues.
+PropupResult propup_lcmd_offline_revenue(std::ostream* log = nullptr);
+
+/// @brief Prop up: offline review queues.
+PropupResult propup_lcmd_offline_review(std::ostream* log = nullptr);
+
+/// @brief Prop up: offline extension stats queues.
+PropupResult propup_lcmd_offline_stats(std::ostream* log = nullptr);
+
+/// @brief Prop up: offline vip key queues.
+PropupResult propup_lcmd_offline_vip_key(std::ostream* log = nullptr);
+
+/// @brief Prop up: offline trust policy queues.
+PropupResult propup_lcmd_offline_trust_policy(std::ostream* log = nullptr);
+
+/// @brief Prop up: offline onboarding grant queues.
+PropupResult propup_lcmd_offline_onboarding(std::ostream* log = nullptr);
+
+/// @brief Prop up: offline rbpc state queues.
+PropupResult propup_lcmd_offline_rbpc(std::ostream* log = nullptr);
+
+/// @brief Prop up: offline audit event queues.
+PropupResult propup_lcmd_offline_audit(std::ostream* log = nullptr);
+
+/// @brief Prop up: LCMD sync count is consistent with pending_sync_count.
+PropupResult propup_lcmd_queue_count_consistency(std::ostream* log = nullptr);
+
+/// @brief Prop up: sync dedup (same key overwrites previous entry).
+PropupResult propup_lcmd_sync_queue_dedup(std::ostream* log = nullptr);
+
+/// @brief Prop up: replay fail then retry later.
+PropupResult propup_lcmd_replay_fail_retry(std::ostream* log = nullptr);
+
+/// @brief Prop up: replay callback exception-safe (no crash).
+PropupResult propup_lcmd_replay_callback_error_safe(std::ostream* log = nullptr);
+
+/// @brief Prop up: queue persists after offline mode toggled off.
+PropupResult propup_lcmd_queue_persists_offline_off(std::ostream* log = nullptr);
+
+/// @brief Prop up: offline license revocation queues.
+PropupResult propup_lcmd_offline_revoke_license(std::ostream* log = nullptr);
+
+/// @brief Prop up: LCMD search specific filter.
+PropupResult propup_lcmd_search_exact_filter(std::ostream* log = nullptr);
+
+/// @brief Prop up: LCMD preference delete removes key.
+PropupResult propup_lcmd_review_store_multiple(std::ostream* log = nullptr);
+
+/// @brief Prop up: LCMD credential load specific user.
+PropupResult propup_lcmd_credential_user_load(std::ostream* log = nullptr);
+
+/// @brief Prop up: LCMD audit event load with user filter.
+PropupResult propup_lcmd_audit_by_user(std::ostream* log = nullptr);
+
+/// @brief Prop up: LCMD RBPC state burn after 3 attempts.
+PropupResult propup_lcmd_rbpc_burn_after_3(std::ostream* log = nullptr);
+
+/// @brief Prop up: LCMD trust policy default roundtrip.
+PropupResult propup_lcmd_trust_policy_default(std::ostream* log = nullptr);
+
+/// @brief Prop up: LCMD VIP key existence check.
+PropupResult propup_lcmd_vip_key_exist(std::ostream* log = nullptr);
+
+/// @brief Prop up: LCMD license load specific user.
+PropupResult propup_lcmd_license_load_specific(std::ostream* log = nullptr);
+
+/// @brief Prop up: LCMD extension stats empty default.
+PropupResult propup_lcmd_extension_stats_empty(std::ostream* log = nullptr);
+
+/// @brief Prop up: LCMD onboarding grant load specific.
+PropupResult propup_lcmd_onboarding_load_grant(std::ostream* log = nullptr);
+
+// ===========================================================================
+// E2E DETECTABLE TESTBED — 25 additional propups (target 260+)
+// ===========================================================================
+
+/// @brief E2E: cold-tier NVMe spill roundtrip (small synthetic data).
+PropupResult propup_e2e_tier_cold_spill(std::ostream* log = nullptr);
+
+/// @brief E2E: promote a block from cool → warm and verify data integrity.
+PropupResult propup_e2e_tier_promote_warm(std::ostream* log = nullptr);
+
+/// @brief E2E: demote a block from warm → cool under memory pressure.
+PropupResult propup_e2e_tier_demote_cool(std::ostream* log = nullptr);
+
+/// @brief E2E: graph with 5-node chain compiles and executes end-to-end.
+PropupResult propup_e2e_graph_chain_5(std::ostream* log = nullptr);
+
+/// @brief E2E: graph with parallel branches fuses correctly.
+PropupResult propup_e2e_graph_parallel_branch(std::ostream* log = nullptr);
+
+/// @brief E2E: runtime handles an unsupported op gracefully without crash.
+PropupResult propup_e2e_runtime_unsupported_op(std::ostream* log = nullptr);
+
+/// @brief E2E: runtime empty input buffer produces non-empty diagnostic.
+PropupResult propup_e2e_runtime_empty_input(std::ostream* log = nullptr);
+
+/// @brief E2E: native backend matmul 128×128 stress within time budget.
+PropupResult propup_e2e_native_matmul_128(std::ostream* log = nullptr);
+
+/// @brief E2E: native backend add+mul fused chain produces correct results.
+PropupResult propup_e2e_native_fused_chain(std::ostream* log = nullptr);
+
+/// @brief E2E: DecisionEngine routes tiny matmul to fallback, large to native.
+PropupResult propup_e2e_decision_routing_tiny_vs_large(std::ostream* log = nullptr);
+
+/// @brief E2E: full inference pipeline (graph → compile → execute) on 2×2 matmul.
+PropupResult propup_e2e_full_pipeline_2x2(std::ostream* log = nullptr);
+
+/// @brief E2E: GlowEngine reinforcement after 3 traversals strengthens bond.
+PropupResult propup_e2e_glow_reinforcement_traversal(std::ostream* log = nullptr);
+
+/// @brief E2E: GlowEngine hot-path query after decay still returns strongest.
+PropupResult propup_e2e_glow_decay_retains_hot(std::ostream* log = nullptr);
+
+/// @brief E2E: ANBP gateway full handshake + command lifecycle.
+PropupResult propup_e2e_anbp_full_handshake(std::ostream* log = nullptr);
+
+/// @brief E2E: metro audit trail accumulation after 5 packets.
+PropupResult propup_e2e_metro_audit_5_packets(std::ostream* log = nullptr);
+
+/// @brief E2E: LCMD offline sync queue survives re-initialization.
+PropupResult propup_e2e_lcmd_sync_survives_init(std::ostream* log = nullptr);
+
+/// @brief E2E: LCMD replay all records then queue is empty.
+PropupResult propup_e2e_lcmd_replay_drains_queue(std::ostream* log = nullptr);
+
+/// @brief E2E: JWT create → validate → refresh → validate roundtrip.
+PropupResult propup_e2e_jwt_full_lifecycle(std::ostream* log = nullptr);
+
+/// @brief E2E: LFSSL DLL AES-256-GCM encrypt + tamper + decrypt rejects.
+PropupResult propup_e2e_lfssl_aes_gcm_tamper(std::ostream* log = nullptr);
+
+/// @brief E2E: LFSSL DLL Kyber encapsulate + decapsulate key matches.
+PropupResult propup_e2e_lfssl_kyber_encaps_decaps(std::ostream* log = nullptr);
+
+/// @brief E2E: LFSSL DLL Dilithium sign + verify roundtrip.
+PropupResult propup_e2e_lfssl_dilithium_sign_verify(std::ostream* log = nullptr);
+
+/// @brief E2E: RBPC PIN verify success resets failed attempts to 0.
+PropupResult propup_e2e_rbpc_pin_verify_reset(std::ostream* log = nullptr);
+
+/// @brief E2E: RBPC dual-factor confirmation with correct PIN + word succeeds.
+PropupResult propup_e2e_rbpc_dual_factor_success(std::ostream* log = nullptr);
+
+/// @brief E2E: CerberusRuntime command execution produces valid JSON response.
+PropupResult propup_e2e_runtime_command_execute(std::ostream* log = nullptr);
+
+/// @brief E2E: CerberusGraph dead-code elimination removes unreachable node.
+PropupResult propup_e2e_graph_dead_code_elim(std::ostream* log = nullptr);
+
+/// @brief E2E: native softmax kernel produces correct probabilities.
+PropupResult propup_e2e_native_softmax_accuracy(std::ostream* log = nullptr);
+
+/// @brief E2E: DecisionEngine fuses MatMul→Add→ReLU into single step.
+PropupResult propup_e2e_decision_fusion_matmul_bias_relu(std::ostream* log = nullptr);
+
+/// @brief E2E: GlowEngine catchphrase registry resolves exact phrase.
+PropupResult propup_e2e_glow_catchphrase_resolution(std::ostream* log = nullptr);
+
+/// @brief E2E: ANBP gateway rejects command when permission mode is NONE.
+PropupResult propup_e2e_anbp_permission_denied(std::ostream* log = nullptr);
+
+/// @brief E2E: MetroStation open→close→reopen lifecycle resets counters.
+PropupResult propup_e2e_metro_station_lifecycle(std::ostream* log = nullptr);
+
+/// @brief E2E: LCMD trust policy roundtrip with to_map/from_map.
+PropupResult propup_e2e_lcmd_trust_policy_roundtrip(std::ostream* log = nullptr);
+
+/// @brief E2E: JWT tampered signature is rejected.
+PropupResult propup_e2e_jwt_invalid_signature(std::ostream* log = nullptr);
+
+/// @brief E2E: LFSSL Argon2id hash + verify roundtrip.
+PropupResult propup_e2e_lfssl_argon2id_hash_verify(std::ostream* log = nullptr);
+
+/// @brief E2E: RBPC 3 failed attempts burns node permanently.
+PropupResult propup_e2e_rbpc_burn_locks_permanently(std::ostream* log = nullptr);
+
+/// @brief E2E: ExtensionFactory creates and returns valid extension.
+PropupResult propup_e2e_extension_factory_create(std::ostream* log = nullptr);
+
+/// @brief E2E: tier alignment request honored (256 B).
+PropupResult propup_e2e_tier_alignment_256(std::ostream* log = nullptr);
+
+/// @brief E2E: zero-size allocation rejected.
+PropupResult propup_e2e_tier_zero_size_rejected(std::ostream* log = nullptr);
+
+/// @brief E2E: multiple allocations in same tier.
+PropupResult propup_e2e_tier_multiple_allocs(std::ostream* log = nullptr);
+
+/// @brief E2E: cyclic graph rejected by topo_sort.
+PropupResult propup_e2e_graph_cycle_rejection(std::ostream* log = nullptr);
+
+/// @brief E2E: single-node graph compiles.
+PropupResult propup_e2e_graph_single_node(std::ostream* log = nullptr);
+
+/// @brief E2E: 4x4 matmul through full CerberusRuntime.
+PropupResult propup_e2e_runtime_matmul_4x4(std::ostream* log = nullptr);
+
+/// @brief E2E: 4-element add through full CerberusRuntime.
+PropupResult propup_e2e_runtime_add_4(std::ostream* log = nullptr);
+
+/// @brief E2E: native ReLU kernel correctness.
+PropupResult propup_e2e_native_relu_verify(std::ostream* log = nullptr);
+
+/// @brief E2E: native sigmoid kernel correctness.
+PropupResult propup_e2e_native_sigmoid_verify(std::ostream* log = nullptr);
+
+/// @brief E2E: native GELU kernel correctness.
+PropupResult propup_e2e_native_gelu_verify(std::ostream* log = nullptr);
+
+/// @brief E2E: native layernorm kernel correctness.
+PropupResult propup_e2e_native_layernorm_verify(std::ostream* log = nullptr);
+
+/// @brief E2E: small graph routed to native backend.
+PropupResult propup_e2e_decision_backend_native(std::ostream* log = nullptr);
+
+/// @brief E2E: graph routed to OpenVINO stub backend.
+PropupResult propup_e2e_decision_backend_openvino(std::ostream* log = nullptr);
+
+/// @brief E2E: Glow bond pruned after heavy decay.
+PropupResult propup_e2e_glow_bond_pruned(std::ostream* log = nullptr);
+
+/// @brief E2E: Glow path recording after repeated executions.
+PropupResult propup_e2e_glow_path_recording(std::ostream* log = nullptr);
+
+/// @brief E2E: Glow empty query returns empty result.
+PropupResult propup_e2e_glow_empty_query(std::ostream* log = nullptr);
+
+/// @brief E2E: ANBP session close lifecycle.
+PropupResult propup_e2e_anbp_session_close(std::ostream* log = nullptr);
+
+/// @brief E2E: Metro empty payload handling.
+PropupResult propup_e2e_metro_empty_payload(std::ostream* log = nullptr);
+
+/// @brief E2E: LCMD license store/load roundtrip.
+PropupResult propup_e2e_lcmd_license_roundtrip(std::ostream* log = nullptr);
+
+/// @brief E2E: LCMD review store/load roundtrip.
+PropupResult propup_e2e_lcmd_review_roundtrip(std::ostream* log = nullptr);
+
+/// @brief E2E: LCMD credential store/load roundtrip.
+PropupResult propup_e2e_lcmd_credential_roundtrip(std::ostream* log = nullptr);
+
+/// @brief E2E: LCMD preference store/load/delete roundtrip.
+PropupResult propup_e2e_lcmd_preference_roundtrip(std::ostream* log = nullptr);
+
+/// @brief E2E: JWT wrong issuer rejected.
+PropupResult propup_e2e_jwt_wrong_issuer(std::ostream* log = nullptr);
+
+/// @brief E2E: JWT expired token refresh behavior.
+PropupResult propup_e2e_jwt_expired_refresh(std::ostream* log = nullptr);
+
+/// @brief E2E: LFSSL random bytes are non-deterministic.
+PropupResult propup_e2e_lfssl_random_bytes(std::ostream* log = nullptr);
+
+/// @brief E2E: LFSSL AES-256 block encrypt/decrypt roundtrip.
+PropupResult propup_e2e_lfssl_aes_block_roundtrip(std::ostream* log = nullptr);
+
+/// @brief E2E: LFSSL PBKDF2 key derivation produces expected length.
+PropupResult propup_e2e_lfssl_pbkdf2_derive(std::ostream* log = nullptr);
+
+/// @brief E2E: LFSSL sentinel reports available when DLL present.
+PropupResult propup_e2e_security_lfssl_sentinel(std::ostream* log = nullptr);
+
+/// @brief E2E: extension status query returns valid metadata.
+PropupResult propup_e2e_extension_status_query(std::ostream* log = nullptr);
+
+/// @brief E2E: graph bridge PFQL routing produces non-empty plan.
+PropupResult propup_e2e_graph_bridge_pfql(std::ostream* log = nullptr);
+
+// ===========================================================================
+// INFRASTRUCTURE / MISSING GROUPS — 35 new propups to reach 300+
+// ===========================================================================
+
+/// @brief FirstRun unavailable_reason is non-empty and informative.
+PropupResult propup_first_run_unavailable_reason(std::ostream* log = nullptr);
+
+/// @brief FirstRun generates distinct node_ids across calls.
+PropupResult propup_first_run_node_id_unique(std::ostream* log = nullptr);
+
+/// @brief FirstRun rejects empty passphrase.
+PropupResult propup_first_run_rejects_empty_passphrase(std::ostream* log = nullptr);
+
+/// @brief FirstRun rejects short memorable word.
+PropupResult propup_first_run_rejects_short_word(std::ostream* log = nullptr);
+
+/// @brief FirstRun registration produces provisional result when PsiForceDB unreachable.
+PropupResult propup_first_run_local_only_provisional(std::ostream* log = nullptr);
+
+/// @brief FirstRun unlock_existing returns diagnostic when DB missing.
+PropupResult propup_first_run_unlock_no_db(std::ostream* log = nullptr);
+
+/// @brief SMDU unavailable_reason contains Argon2id mention.
+PropupResult propup_smdi_unavailable_reason(std::ostream* log = nullptr);
+
+/// @brief SMDU provision returns nullopt when LFSSL absent (honest failure).
+PropupResult propup_smdi_provision_honest_failure(std::ostream* log = nullptr);
+
+/// @brief SMDU unlock returns nullopt when LFSSL absent.
+PropupResult propup_smdi_unlock_returns_nullopt(std::ostream* log = nullptr);
+
+/// @brief SMDU sentinel available() returns false on this host.
+PropupResult propup_smdi_sentinel_available_false(std::ostream* log = nullptr);
+
+/// @brief TensorView 2D construction, indexing, and flat_size correct.
+PropupResult propup_tensor_view_2d_indexing(std::ostream* log = nullptr);
+
+/// @brief TensorView 4D from_storage and num_elements correct.
+PropupResult propup_tensor_view_4d_storage(std::ostream* log = nullptr);
+
+/// @brief TensorView is_contiguous detects packed C layout.
+PropupResult propup_tensor_view_contiguous(std::ostream* log = nullptr);
+
+/// @brief TensorView CHW/HWC stride views map correctly.
+PropupResult propup_tensor_view_chw_hwc(std::ostream* log = nullptr);
+
+/// @brief CLIPTokenizer built-in vocab loads and encodes known word.
+PropupResult propup_clip_tokenizer_builtin_vocab(std::ostream* log = nullptr);
+
+/// @brief CLIPTokenizer encode respects max_length (pad/truncate to 77).
+PropupResult propup_clip_tokenizer_max_length(std::ostream* log = nullptr);
+
+/// @brief CLIPTokenizer decode roundtrip on synthetic token IDs.
+PropupResult propup_clip_tokenizer_decode_roundtrip(std::ostream* log = nullptr);
+
+/// @brief CLIPTokenizer special token IDs match CLIP spec.
+PropupResult propup_clip_tokenizer_special_tokens(std::ostream* log = nullptr);
+
+/// @brief BenchmarkLogger records events and reports correct count.
+PropupResult propup_benchmark_logger_record_count(std::ostream* log = nullptr);
+
+/// @brief BenchmarkLogger stats_for_phase computes p50/p95 on synthetic data.
+PropupResult propup_benchmark_logger_stats(std::ostream* log = nullptr);
+
+/// @brief BenchmarkLogger clear resets count without freeing memory.
+PropupResult propup_benchmark_logger_clear(std::ostream* log = nullptr);
+
+/// @brief PipelineHealthScore compute produces grade A when all metrics excellent.
+PropupResult propup_health_score_grade_a(std::ostream* log = nullptr);
+
+/// @brief PipelineHealthScore compute produces grade F when all metrics terrible.
+PropupResult propup_health_score_grade_f(std::ostream* log = nullptr);
+
+/// @brief PipelineHealthScore weight normalization sums to 1.0.
+PropupResult propup_health_score_weights_normalize(std::ostream* log = nullptr);
+
+/// @brief PipelineHealthScore recovery rate affects score correctly.
+PropupResult propup_health_score_recovery_rate(std::ostream* log = nullptr);
+
+/// @brief StagingManager acquire/release roundtrip.
+PropupResult propup_staging_acquire_release(std::ostream* log = nullptr);
+
+/// @brief StagingManager copy_in writes correct byte count.
+PropupResult propup_staging_copy_in(std::ostream* log = nullptr);
+
+/// @brief StagingManager pool exhaustion returns PoolExhausted error.
+PropupResult propup_staging_pool_exhausted(std::ostream* log = nullptr);
+
+/// @brief NpuBackendFactory initialize probes all backends without crash.
+PropupResult propup_npu_factory_init(std::ostream* log = nullptr);
+
+/// @brief NpuBackendFactory best_for "cpu" returns CpuFallbackBackend.
+PropupResult propup_npu_factory_best_cpu(std::ostream* log = nullptr);
+
+/// @brief NpuBackendFactory by_name "ONNX-CPU-Fallback" is available.
+PropupResult propup_npu_factory_by_name_cpu(std::ostream* log = nullptr);
+
+/// @brief CpuFallbackBackend is_available returns true.
+PropupResult propup_cpu_fallback_available(std::ostream* log = nullptr);
+
+/// @brief CpuFallbackBackend compile produces valid CompiledKernel metadata.
+PropupResult propup_cpu_fallback_compile(std::ostream* log = nullptr);
+
+/// @brief IntelOpenVinoBackend unavailable_reason is non-empty on this host.
+PropupResult propup_openvino_unavailable_reason(std::ostream* log = nullptr);
+
+/// @brief CudaBackend unavailable_reason is non-empty on this host.
+PropupResult propup_cuda_unavailable_reason(std::ostream* log = nullptr);
+
+/// @brief KernelGraph move semantics preserve nodes and cleanup.
+PropupResult propup_kernel_graph_move(std::ostream* log = nullptr);
+
+/// @brief CompiledKernel move semantics nullify source handle.
+PropupResult propup_compiled_kernel_move(std::ostream* log = nullptr);
+
+/// @brief ShadowState compress produces bounded u8 error.
+PropupResult propup_shadow_compress_bounded(std::ostream* log = nullptr);
+
+/// @brief ShadowState restore produces bounded error from compressed.
+PropupResult propup_shadow_restore_bounded(std::ostream* log = nullptr);
+
+/// @brief ExecutionPredictor update and lookup roundtrip.
+PropupResult propup_predictor_update_lookup(std::ostream* log = nullptr);
+
+/// @brief ExecutionPredictor hit_rate starts at 0 then improves.
+PropupResult propup_predictor_hit_rate(std::ostream* log = nullptr);
+
+/// @brief DEISScheduler precompute produces non-empty coefficient arrays.
+PropupResult propup_deis_precompute(std::ostream* log = nullptr);
+
+/// @brief DEISScheduler step_coeff_x0 and step_coeff_eps are accessible.
+PropupResult propup_deis_coeff_access(std::ostream* log = nullptr);
+
+/// @brief HailoMonitor unavailable_reason is non-empty without HailoRT.
+PropupResult propup_hailo_unavailable(std::ostream* log = nullptr);
+
+/// @brief GPUMonitor initialize returns error honestly on this host.
+PropupResult propup_gpu_monitor_init_honest(std::ostream* log = nullptr);
+
+/// @brief HIPGraphDenoiser is_available returns false without HIP.
+PropupResult propup_hip_graph_unavailable(std::ostream* log = nullptr);
+
+// ===========================================================================
 // Full test suite — runs all validators and returns aggregate report
 // ===========================================================================
 

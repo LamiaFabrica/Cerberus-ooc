@@ -9,6 +9,7 @@
 #include <cmath>
 #include <format>
 #include <limits>
+#include <sstream>
 #if UM790_HAS_STD_PRINT
 #  include <print>
 #endif
@@ -323,10 +324,8 @@ std::string PipelineHealthScore::build_summary(const SubScores& sub,
                                                const RawHealthMetrics& raw,
                                                float overall)
 {
-    const float worst_temp = std::max(raw.gpu_temperature_c, raw.hailo_temperature_c);
+    const float worst_temp = std::max(raw.gpu_temperature_c, raw.gpu_temperature_c);
     const bool hailo_is_hotter = raw.hailo_temperature_c > raw.gpu_temperature_c;
-    // Store grade_name() results in locals: GCC 14 make_format_args requires
-    // non-const lvalue refs, so rvalue const char* wouldn't bind.
     std::string_view g_gpu    = grade_name(score_to_grade(sub.gpu_utilization));
     std::string_view g_hailo  = grade_name(score_to_grade(sub.hailo_utilization));
     std::string_view g_npu    = grade_name(score_to_grade(sub.npu_utilization));
@@ -337,19 +336,18 @@ std::string PipelineHealthScore::build_summary(const SubScores& sub,
     std::string_view g_therm  = grade_name(score_to_grade(sub.thermal));
     std::string_view g_stab   = grade_name(score_to_grade(sub.stability));
     std::string_view g_all    = grade_name(score_to_grade(overall));
-    return std::format(
-        "GPU {:.0f}%({}), Hailo {:.0f}%({}), NPU {:.0f}%({}), TBT {:.1f}ms({}), "
-        "Mem {:.0f}%({}), Rec {:.0f}%({}), Therm {:.1f}C{}({}), Drift {:.1f}%({}), Overall {:.1f}({})",
-        raw.gpu_utilization_percent, g_gpu,
-        raw.hailo_utilization_percent, g_hailo,
-        raw.npu_utilization_percent, g_npu,
-        raw.time_between_steps_ms, g_lat,
-        raw.memory_bandwidth_percent, g_mem,
-        raw.recovery_success_rate_percent, g_rec,
-        worst_temp, therm_src, g_therm,
-        raw.latency_drift_percent, g_stab,
-        overall, g_all
-    );
+
+    std::ostringstream oss;
+    oss << "GPU " << static_cast<int>(raw.gpu_utilization_percent) << "%(" << g_gpu << "), "
+        << "Hailo " << static_cast<int>(raw.hailo_utilization_percent) << "%(" << g_hailo << "), "
+        << "NPU " << static_cast<int>(raw.npu_utilization_percent) << "%(" << g_npu << "), "
+        << "TBT " << raw.time_between_steps_ms << "ms(" << g_lat << "), "
+        << "Mem " << static_cast<int>(raw.memory_bandwidth_percent) << "%(" << g_mem << "), "
+        << "Rec " << static_cast<int>(raw.recovery_success_rate_percent) << "%(" << g_rec << "), "
+        << "Therm " << worst_temp << "C" << therm_src << "(" << g_therm << "), "
+        << "Drift " << raw.latency_drift_percent << "%(" << g_stab << "), "
+        << "Overall " << overall << "(" << g_all << ")";
+    return oss.str();
 }
 
 // ------------------------------------------------------------------

@@ -112,7 +112,8 @@ RegistrationResult FirstRun::register_new_install(
     }
 
     // Generate master secret from passphrase + salt
-    std::vector<std::uint8_t> hmac_key(std::string(passphrase).begin(), std::string(passphrase).end());
+    std::string passphrase_str(passphrase);
+    std::vector<std::uint8_t> hmac_key(passphrase_str.begin(), passphrase_str.end());
     hmac_key.insert(hmac_key.end(), install_salt.begin(), install_salt.end());
     auto master_secret_b = hq::cerberus::security::CryptoBridge::hmac_sha256(
         hmac_key, "cerberus_smdi_mpi");

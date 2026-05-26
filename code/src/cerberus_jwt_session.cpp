@@ -65,7 +65,7 @@ bool JWTPayload::is_expired() const noexcept {
     const auto now = static_cast<std::uint64_t>(
         std::chrono::duration_cast<std::chrono::seconds>(
             std::chrono::system_clock::now().time_since_epoch()).count());
-    return now > exp;
+    return now >= exp;
 }
 
 bool JWTPayload::is_audience_allowed(const std::vector<std::string>& allowed) const {

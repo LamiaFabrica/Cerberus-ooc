@@ -95,6 +95,60 @@ std::size_t LocalMaintenanceDB::pending_sync_count() const {
 }
 
 // ============================================================================
+// Offline mode
+// ============================================================================
+
+void LocalMaintenanceDB::set_offline_mode(bool offline) noexcept {
+    std::lock_guard<std::mutex> lock(mutex_);
+    offline_mode_ = offline;
+}
+
+bool LocalMaintenanceDB::is_offline_mode() const noexcept {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return offline_mode_;
+}
+
+// ============================================================================
+// Sync queue replay
+// ============================================================================
+
+std::size_t LocalMaintenanceDB::replay_sync_queue(
+    SyncReplayCallback callback,
+    std::size_t max_records) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (sync_queue_.empty()) return 0;
+
+    std::size_t limit = (max_records == 0) ? sync_queue_.size()
+                                           : std::min(max_records, sync_queue_.size());
+    std::vector<SyncRecord> remaining;
+    remaining.reserve(sync_queue_.size());
+
+    std::size_t replayed = 0;
+    for (std::size_t i = 0; i < sync_queue_.size(); ++i) {
+        if (replayed < limit) {
+            bool ok = false;
+            try {
+                ok = callback(sync_queue_[i].table,
+                              sync_queue_[i].key,
+                              sync_queue_[i].record);
+            } catch (...) {
+                ok = false; // callback threw; treat as failure, keep record
+            }
+            if (ok) {
+                ++replayed;
+                continue;
+            } else {
+                remaining.push_back(std::move(sync_queue_[i]));
+            }
+        } else {
+            remaining.push_back(std::move(sync_queue_[i]));
+        }
+    }
+    sync_queue_ = std::move(remaining);
+    return replayed;
+}
+
+// ============================================================================
 // License management
 // ============================================================================
 
@@ -123,7 +177,7 @@ bool LocalMaintenanceDB::store_license(const std::string& extension_id,
     const std::string key = extension_id + ":" + user_id;
     licenses_[key] = rec;
 
-    queue_for_sync("licenses", key, rec);
+    if (offline_mode_) queue_for_sync("licenses", key, rec);
     return true;
 }
 
@@ -141,6 +195,7 @@ bool LocalMaintenanceDB::revoke_license(const std::string& license_key_hash, con
     if (!initialized_) return false;
     std::lock_guard<std::mutex> lock(mutex_);
     revoked_hashes_[license_key_hash] = reason.empty() ? "revoked" : reason;
+    if (offline_mode_) queue_for_sync("license_revocations", license_key_hash, { {"hash",license_key_hash}, {"reason",reason.empty() ? "revoked" : reason} });
     return true;
 }
 
@@ -159,7 +214,7 @@ bool LocalMaintenanceDB::store_extension_entry(const std::map<std::string, std::
     if (it == entry.end() || it->second.empty()) return false;
     std::lock_guard<std::mutex> lock(mutex_);
     extension_entries_[it->second] = entry;
-    queue_for_sync("extension_entries", it->second, entry);
+    if (offline_mode_) queue_for_sync("extension_entries", it->second, entry);
     return true;
 }
 
@@ -203,7 +258,7 @@ bool LocalMaintenanceDB::store_revenue_share_record(const std::map<std::string, 
                      : ("rev_" + std::to_string(revenue_records_.size()));
     std::lock_guard<std::mutex> lock(mutex_);
     revenue_records_[key] = record;
-    queue_for_sync("revenue_records", key, record);
+    if (offline_mode_) queue_for_sync("revenue_records", key, record);
     return true;
 }
 
@@ -234,7 +289,7 @@ bool LocalMaintenanceDB::store_review(const std::map<std::string, std::string>& 
                      : ("review_" + std::to_string(reviews_.size()));
     std::lock_guard<std::mutex> lock(mutex_);
     reviews_[key] = review;
-    queue_for_sync("reviews", key, review);
+    if (offline_mode_) queue_for_sync("reviews", key, review);
     return true;
 }
 
@@ -259,7 +314,7 @@ bool LocalMaintenanceDB::update_extension_stats(const std::string& extension_id,
     if (!initialized_ || extension_id.empty()) return false;
     std::lock_guard<std::mutex> lock(mutex_);
     extension_stats_[extension_id] = stats;
-    queue_for_sync("extension_stats", extension_id, stats);
+    if (offline_mode_) queue_for_sync("extension_stats", extension_id, stats);
     return true;
 }
 
@@ -288,6 +343,7 @@ bool LocalMaintenanceDB::store_vip_key(const std::string& key_hash,
     rec["record_class"] = "vip_key";
     rec["plaintext_storage"] = "forbidden";
     vip_keys_[key_hash] = rec;
+    if (offline_mode_) queue_for_sync("vip_keys", key_hash, rec);
     return true;
 }
 
@@ -309,6 +365,7 @@ bool LocalMaintenanceDB::update_vip_key_status(const std::string& key_hash,
     auto it = vip_keys_.find(key_hash);
     if (it == vip_keys_.end()) return false;
     for (const auto& [k, v] : status_data) it->second[k] = v;
+    if (offline_mode_) queue_for_sync("vip_keys", key_hash, it->second);
     return true;
 }
 
@@ -334,6 +391,7 @@ bool LocalMaintenanceDB::store_onboarding_grant(const std::map<std::string, std:
     safe["plaintext_storage"] = "forbidden";
     if (!safe.count("consumed")) safe["consumed"] = "false";
     onboarding_grants_[key] = safe;
+    if (offline_mode_) queue_for_sync("onboarding_grants", key, safe);
     return true;
 }
 
@@ -383,6 +441,8 @@ bool LocalMaintenanceDB::store_trust_policy(const TrustPolicy& policy) {
     if (!initialized_) return false;
     std::lock_guard<std::mutex> lock(mutex_);
     trust_policy_ = policy;
+    auto map = policy.to_map();
+    if (offline_mode_) queue_for_sync("trust_policy", "trust_policy", map);
     return true;
 }
 
@@ -447,7 +507,7 @@ bool LocalMaintenanceDB::store_credential_record(const std::map<std::string, std
     safe["updated_at"] = std::to_string(sec);
 
     credential_records_[key] = safe;
-    queue_for_sync("credential_records", key, safe);
+    if (offline_mode_) queue_for_sync("credential_records", key, safe);
     return true;
 }
 
@@ -481,6 +541,7 @@ bool LocalMaintenanceDB::save_rbpc_state(const RBPCState& state) {
     rec["record_class"] = "rbpc_state";
 
     rbpc_state_records_[state.node_id] = rec;
+    if (offline_mode_) queue_for_sync("rbpc_state", state.node_id, rec);
     return true;
 }
 
@@ -573,7 +634,7 @@ bool LocalMaintenanceDB::store_audit_event(const std::map<std::string, std::stri
     if (!rec.count("timestamp")) rec["timestamp"] = std::to_string(sec);
 
     audit_events_[event_id] = rec;
-    queue_for_sync("audit_events", event_id, rec);
+    if (offline_mode_) queue_for_sync("audit_events", event_id, rec);
     return true;
 }
 

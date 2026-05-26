@@ -53,6 +53,7 @@
 #include <chrono>
 #include <filesystem>
 #include <ctime>
+#include <functional>
 
 namespace hq::cerberus::privacy {
 
@@ -265,10 +266,24 @@ public:
     [[nodiscard]] std::string load_preference(const std::string& key) const;
 
     // ------------------------------------------------------------------------
+    // Offline mode
+    // ------------------------------------------------------------------------
+    void set_offline_mode(bool offline) noexcept;
+    [[nodiscard]] bool is_offline_mode() const noexcept;
+
+    // ------------------------------------------------------------------------
     // Sync queue (records to replay to PsiForceDB on reconnect)
     // ------------------------------------------------------------------------
     void queue_for_sync(const std::string& table, const std::string& key,
                         const std::map<std::string, std::string>& record);
+
+    /// Replay the sync queue until drained or max_records. Returns number
+    /// of records successfully replayed.
+    using SyncReplayCallback = std::function<bool(const std::string& table,
+                                                   const std::string& key,
+                                                   const std::map<std::string,std::string>& record)>;
+    std::size_t replay_sync_queue(SyncReplayCallback callback,
+                                   std::size_t max_records = 0);
 
     // MANDATORY unavailable_reason per AGENTS.md
     [[nodiscard]] static std::string unavailable_reason() noexcept;

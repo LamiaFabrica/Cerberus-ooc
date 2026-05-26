@@ -1,0 +1,1131 @@
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_tiered_memory
+[PROPUP] propup_tiered_memory passed in 0.704346 ms
+[PROPUP-END] propup_tiered_memory PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_coordinator_memory_loop
+[PROPUP] propup_coordinator_memory_loop passed in 0.0913086 ms
+[PROPUP-END] propup_coordinator_memory_loop PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_coordinator_tier_decisions
+[PROPUP] propup_coordinator_tier_decisions passed in 0.0270996 ms
+[PROPUP-END] propup_coordinator_tier_decisions PASS
+[PROPUP-START] propup_compile_graph_analysis
+[PROPUP] propup_compile_graph_analysis passed in 0.0012207 ms
+[PROPUP-END] propup_compile_graph_analysis PASS
+[PROPUP-START] propup_kernel_matmul
+[PROPUP] propup_kernel_matmul passed in 0.00146484 ms
+[PROPUP-END] propup_kernel_matmul PASS
+[PROPUP-START] propup_kernel_elementwise
+[PROPUP] propup_kernel_elementwise passed in 0.000244141 ms
+[PROPUP-END] propup_kernel_elementwise PASS
+[PROPUP-START] propup_kernel_fma
+[PROPUP] propup_kernel_fma passed in 0.00146484 ms
+[PROPUP-END] propup_kernel_fma PASS
+[PROPUP-START] propup_kernel_matmul_blocked
+[PROPUP] propup_kernel_matmul_blocked passed in 0.00195312 ms
+[PROPUP-END] propup_kernel_matmul_blocked PASS
+[PROPUP-START] propup_performance_matmul_vs_naive
+[PROPUP] propup_performance_matmul_vs_naive naive=9.0562 ms blocked=2.3988 ms speedup=3.7753
+[PROPUP] propup_performance_matmul_vs_naive passed in 11.9851 ms
+[PROPUP-END] propup_performance_matmul_vs_naive PASS
+[PROPUP-START] propup_kernel_matmul_avx2
+[PROPUP] propup_kernel_matmul_avx2 avx2=0.2122 ms max_err=1.90735e-06
+[PROPUP-END] propup_kernel_matmul_avx2 PASS
+[PROPUP-START] propup_kernel_avx512_detect
+[PROPUP] propup_kernel_avx512_detect avx2=yes avx512f=no
+[PROPUP-END] propup_kernel_avx512_detect PASS
+[PROPUP-START] propup_kernel_matmul_avx512_dispatch
+[PROPUP-END] propup_kernel_matmul_avx512_dispatch PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_end_to_end_native
+[PROPUP] propup_end_to_end_native passed in 0.190186 ms
+[PROPUP-END] propup_end_to_end_native PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_decision_engine_fusion
+[PROPUP] propup_decision_engine_fusion passed in 0.098877 ms
+[PROPUP-END] propup_decision_engine_fusion PASS
+[PROPUP-START] propup_graph_engine_verbose
+[PROPUP-VERBOSE] graph nodes=2 tensors=5 live_bytes=80
+[PROPUP] propup_graph_engine_verbose passed in 0.0144043 ms
+[PROPUP-END] propup_graph_engine_verbose PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_tier_pressure_demotion
+[PROPUP] propup_tier_pressure_demotion passed in 0.0480957 ms
+[PROPUP-END] propup_tier_pressure_demotion PASS
+[PROPUP-START] propup_kernel_quantized_matmul
+[PROPUP] propup_kernel_quantized_matmul passed in 0.0065918 ms
+[PROPUP-END] propup_kernel_quantized_matmul PASS
+[PROPUP-START] propup_kernel_dynamic_quant_accuracy
+[PROPUP] propup_kernel_dynamic_quant_accuracy max_rel_err=1.17646%
+[PROPUP] propup_kernel_dynamic_quant_accuracy passed in 0.00878906 ms
+[PROPUP-END] propup_kernel_dynamic_quant_accuracy PASS
+[PROPUP-START] propup_performance_int8_vs_float
+[PROPUP] propup_performance_int8_vs_float float=0.8627 ms quant=0.9916 ms speedup=0.870008
+[PROPUP] propup_performance_int8_vs_float passed in 1.98389 ms
+[PROPUP-END] propup_performance_int8_vs_float PASS
+[PROPUP-START] propup_quant_per_channel
+[PROPUP-END] propup_quant_per_channel PASS
+[PROPUP-START] propup_quant_per_token
+[PROPUP-END] propup_quant_per_token PASS
+[PROPUP-START] propup_quant_per_block
+[PROPUP-END] propup_quant_per_block PASS
+[PROPUP-START] propup_quant_4bit
+[PROPUP-END] propup_quant_4bit PASS
+[PROPUP-START] propup_quant_fused_bias_relu
+[PROPUP-END] propup_quant_fused_bias_relu PASS
+[PROPUP-START] propup_native_backend_matmul
+[PROPUP-END] propup_native_backend_matmul PASS
+[PROPUP-START] propup_native_backend_elementwise
+[PROPUP-END] propup_native_backend_elementwise PASS
+[PROPUP-START] propup_native_backend_fusion
+[PROPUP-END] propup_native_backend_fusion PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_decision_backend_routing
+[PROPUP-END] propup_decision_backend_routing PASS
+[PROPUP-START] propup_graph_cycles_rejection
+[PROPUP-END] propup_graph_cycles_rejection PASS
+[PROPUP-START] propup_graph_from_kernel_graph
+[PROPUP-END] propup_graph_from_kernel_graph PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_runtime_full_stack
+[PROPUP-END] propup_runtime_full_stack PASS
+[PROPUP-START] propup_quant_ptq_vs_qat_sim
+[PROPUP-END] propup_quant_ptq_vs_qat_sim PASS
+[PROPUP-START] propup_quant_smoothquant
+[PROPUP-END] propup_quant_smoothquant PASS
+[PROPUP-START] propup_performance_blocked_vs_quantized
+[PROPUP-END] propup_performance_blocked_vs_quantized PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_decision_quant_routing
+[PROPUP-END] propup_decision_quant_routing PASS
+[PROPUP-START] propup_quantized_matmul_blocked
+[PROPUP-END] propup_quantized_matmul_blocked PASS
+[PROPUP-START] propup_kernel_conv2d
+[PROPUP-END] propup_kernel_conv2d PASS
+[PROPUP-START] propup_kernel_gelu
+[PROPUP-END] propup_kernel_gelu PASS
+[PROPUP-START] propup_kernel_softmax
+[PROPUP-END] propup_kernel_softmax PASS
+[PROPUP-START] propup_kernel_layernorm
+[PROPUP-END] propup_kernel_layernorm PASS
+[PROPUP-START] propup_kernel_relu
+[PROPUP-END] propup_kernel_relu PASS
+[PROPUP-START] propup_kernel_sigmoid
+[PROPUP-END] propup_kernel_sigmoid PASS
+[PROPUP-START] propup_graph_dead_code_elim
+[PROPUP-END] propup_graph_dead_code_elim PASS
+[PROPUP-START] propup_graph_multi_output
+[PROPUP-END] propup_graph_multi_output PASS
+[PROPUP-START] propup_graph_constant_folding
+[PROPUP-END] propup_graph_constant_folding PASS
+[PROPUP-START] propup_graph_rewrite_fusion
+[PROPUP-END] propup_graph_rewrite_fusion PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_decision_memory_pressure
+[PROPUP-END] propup_decision_memory_pressure PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_decision_fuse_longer_chain
+[PROPUP-END] propup_decision_fuse_longer_chain PASS
+[PROPUP-START] propup_quant_symmetric_int8
+[PROPUP-END] propup_quant_symmetric_int8 PASS
+[PROPUP-START] propup_quant_brecq
+[PROPUP-END] propup_quant_brecq PASS
+[PROPUP-START] propup_quant_adaround
+[PROPUP-END] propup_quant_adaround PASS
+[PROPUP-START] propup_backend_compile_error
+[PROPUP-END] propup_backend_compile_error PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_tier_demote_with_data
+[PROPUP-END] propup_tier_demote_with_data PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_tier_eviction_lru
+[PROPUP-END] propup_tier_eviction_lru PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_compute_during_migration
+[PROPUP-END] propup_compute_during_migration PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_dequant_during_migration
+[PROPUP-END] propup_dequant_during_migration PASS
+[PROPUP-START] propup_predictor_match
+[PROPUP-END] propup_predictor_match PASS
+[PROPUP-START] propup_execution_integrity
+[PROPUP-END] propup_execution_integrity PASS
+[PROPUP-START] propup_shadow_rollback
+[PROPUP] propup_shadow_rollback passed in 0.00195312 ms
+[PROPUP-END] propup_shadow_rollback PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_decision_power_budget
+[PROPUP-END] propup_decision_power_budget PASS
+[PROPUP-START] propup_predictor_feedback
+[PROPUP-END] propup_predictor_feedback PASS
+[PROPUP-START] propup_federation_split
+[PROPUP-END] propup_federation_split PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_tier_alignment
+[PROPUP-END] propup_tier_alignment PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_runtime_multi_step
+[PROPUP-END] propup_runtime_multi_step PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_runtime_error_propagation
+[PROPUP-END] propup_runtime_error_propagation PASS
+[PROPUP-START] propup_stress_matmul_512
+[PROPUP-END] propup_stress_matmul_512 PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_robust_null_graph
+[PROPUP-END] propup_robust_null_graph PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_robust_null_input
+[PROPUP-END] propup_robust_null_input PASS
+[PROPUP-START] propup_robust_zero_dimension
+[PROPUP-END] propup_robust_zero_dimension PASS
+[PROPUP-START] propup_robust_name_mismatch
+[PROPUP-END] propup_robust_name_mismatch PASS
+[PROPUP-START] propup_robust_cycle_rejection
+[PROPUP-END] propup_robust_cycle_rejection PASS
+[PROPUP-START] propup_robust_backend_unavailable
+[PROPUP-END] propup_robust_backend_unavailable PASS
+[PROPUP-START] propup_robust_duplicate_names
+[PROPUP-END] propup_robust_duplicate_names PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_robust_input_count_mismatch
+[PROPUP-END] propup_robust_input_count_mismatch PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_robust_zero_size_alloc
+[PROPUP-END] propup_robust_zero_size_alloc PASS
+[PROPUP-START] propup_robust_unsupported_op
+[PROPUP-END] propup_robust_unsupported_op PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_robust_tier_thrashing
+[PROPUP-END] propup_robust_tier_thrashing PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_command_layer_status
+[PROPUP-END] propup_command_layer_status PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_command_layer_compile
+[PROPUP-END] propup_command_layer_compile PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_command_layer_malformed
+[PROPUP-END] propup_command_layer_malformed PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_command_layer_ergonomic
+[PROPUP-END] propup_command_layer_ergonomic PASS
+[PROPUP-START] propup_anbp_gateway_handshake
+[PROPUP-END] propup_anbp_gateway_handshake PASS
+[PROPUP-START] propup_api_gateway_human_safety_filter
+[PROPUP-END] propup_api_gateway_human_safety_filter PASS
+[PROPUP-START] propup_slipstream_tensor_exchange
+[PROPUP-END] propup_slipstream_tensor_exchange PASS
+[PROPUP-START] propup_metro_audit_trail
+[PROPUP-END] propup_metro_audit_trail PASS
+[PROPUP-START] propup_glow_bond_creation
+[PROPUP-END] propup_glow_bond_creation PASS
+[PROPUP-START] propup_glow_reinforcement
+[PROPUP-END] propup_glow_reinforcement PASS
+[PROPUP-START] propup_glow_decay
+[PROPUP-END] propup_glow_decay PASS
+[PROPUP-START] propup_glow_hot_path_query
+[PROPUP-END] propup_glow_hot_path_query PASS
+[PROPUP-START] propup_glow_best_next_hop
+[PROPUP-END] propup_glow_best_next_hop PASS
+[PROPUP-START] propup_glow_catchphrase_exact
+[PROPUP-END] propup_glow_catchphrase_exact PASS
+[PROPUP-START] propup_glow_catchphrase_fuzzy
+[PROPUP-END] propup_glow_catchphrase_fuzzy PASS
+[PROPUP-START] propup_glow_stats_integrity
+[PROPUP-END] propup_glow_stats_integrity PASS
+[PROPUP-START] propup_glow_reset
+[PROPUP-END] propup_glow_reset PASS
+[PROPUP-START] propup_glow_attenuation
+[PROPUP-END] propup_glow_attenuation PASS
+[PROPUP-START] propup_adversarial_malformed_anbp
+[PROPUP-END] propup_adversarial_malformed_anbp PASS
+[PROPUP-START] propup_adversarial_invalid_token
+[PROPUP-END] propup_adversarial_invalid_token PASS
+[PROPUP-START] propup_adversarial_permission_escalation
+[PROPUP-END] propup_adversarial_permission_escalation PASS
+[PROPUP-START] propup_adversarial_slipstream_overflow
+[PROPUP-END] propup_adversarial_slipstream_overflow PASS
+[PROPUP-START] propup_adversarial_metro_empty_payload
+[PROPUP-END] propup_adversarial_metro_empty_payload PASS
+[PROPUP-START] propup_gguf_synthetic_header
+[PROPUP-END] propup_gguf_synthetic_header PASS
+[PROPUP-START] propup_gguf_synthetic_tensor_info
+[PROPUP-END] propup_gguf_synthetic_tensor_info PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_psiforcedb_extension_init
+[PROPUP-END] propup_psiforcedb_extension_init PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_psiforcedb_extension_load_unload
+[PROPUP-END] propup_psiforcedb_extension_load_unload PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_psiforcedb_extension_inference_query
+[PROPUP-END] propup_psiforcedb_extension_inference_query PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_psiforcedb_extension_status_query
+[PROPUP-END] propup_psiforcedb_extension_status_query PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_psiforcedb_extension_stats
+[PROPUP-END] propup_psiforcedb_extension_stats PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_psiforcedb_extension_validate
+[PROPUP-END] propup_psiforcedb_extension_validate PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_psiforcedb_extension_pfql_routing
+[PROPUP-END] propup_psiforcedb_extension_pfql_routing PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_psiforcedb_extension_gguf_loader
+[PROPUP-END] propup_psiforcedb_extension_gguf_loader PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_psiforcedb_extension_telemetry
+[PROPUP-END] propup_psiforcedb_extension_telemetry PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_psiforcedb_extension_health_check
+[PROPUP-END] propup_psiforcedb_extension_health_check PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_psiforcedb_extension_transaction_reject
+[PROPUP-END] propup_psiforcedb_extension_transaction_reject PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_psiforcedb_extension_coordinator_routing
+[PROPUP-END] propup_psiforcedb_extension_coordinator_routing PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_psiforcedb_extension_factory
+[PROPUP-END] propup_psiforcedb_extension_factory PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_psiforcedb_extension_dependencies
+[PROPUP-END] propup_psiforcedb_extension_dependencies PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_psiforcedb_extension_metadata
+[PROPUP-END] propup_psiforcedb_extension_metadata PASS
+[PROPUP-START] propup_psiforcedb_graph_bridge_topology
+[PROPUP-END] propup_psiforcedb_graph_bridge_topology PASS
+[PROPUP-START] propup_psiforcedb_graph_bridge_pfql_rows
+[PROPUP-END] propup_psiforcedb_graph_bridge_pfql_rows PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_psiforcedb_extension_validate_edge_cases
+[PROPUP-END] propup_psiforcedb_extension_validate_edge_cases PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_psiforcedb_extension_error_counting
+[PROPUP-END] propup_psiforcedb_extension_error_counting PASS
+[PROPUP-START] propup_psiforcedb_extension_detail_helpers
+[PROPUP-END] propup_psiforcedb_extension_detail_helpers PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_psiforcedb_extension_glow_integration
+[PROPUP-END] propup_psiforcedb_extension_glow_integration PASS
+[PROPUP-START] propup_security_sha256
+[PROPUP-END] propup_security_sha256 PASS
+[PROPUP-START] propup_security_hmac_sha256
+[PROPUP-END] propup_security_hmac_sha256 PASS
+[PROPUP-START] propup_security_pbkdf2_sha256
+[PROPUP-END] propup_security_pbkdf2_sha256 PASS
+[PROPUP-START] propup_security_aes256_gcm_sentinel
+[PROPUP-END] propup_security_aes256_gcm_sentinel PASS
+[PROPUP-START] propup_security_pqc_sentinel
+[PROPUP-END] propup_security_pqc_sentinel PASS
+[PROPUP-START] propup_psiforcedb_extension_real_header_compile
+[PROPUP-END] propup_psiforcedb_extension_real_header_compile PASS
+[PROPUP-START] propup_privacy_local_maintenance_db
+[PROPUP-END] propup_privacy_local_maintenance_db PASS
+[PROPUP-START] propup_privacy_pin_generation
+[PROPUP-END] propup_privacy_pin_generation PASS
+[PROPUP-START] propup_privacy_pin_burn_policy
+[PROPUP-END] propup_privacy_pin_burn_policy PASS
+[PROPUP-START] propup_privacy_word_commitment
+[PROPUP-END] propup_privacy_word_commitment PASS
+[PROPUP-START] propup_privacy_dual_factor_confirmation
+[PROPUP-END] propup_privacy_dual_factor_confirmation PASS
+[PROPUP-START] propup_privacy_jwt_session
+[PROPUP-END] propup_privacy_jwt_session PASS
+[PROPUP-START] propup_lcmd_extension_entry
+[PROPUP-END] propup_lcmd_extension_entry PASS
+[PROPUP-START] propup_lcmd_revenue_share
+[PROPUP-END] propup_lcmd_revenue_share PASS
+[PROPUP-START] propup_lcmd_vip_keys
+[PROPUP-END] propup_lcmd_vip_keys PASS
+[PROPUP-START] propup_lcmd_onboarding_grant
+[PROPUP-END] propup_lcmd_onboarding_grant PASS
+[PROPUP-START] propup_lcmd_offline_sync_ready
+[PROPUP-END] propup_lcmd_offline_sync_ready PASS
+[PROPUP-START] propup_lcmd_license_store_revoke
+[PROPUP-END] propup_lcmd_license_store_revoke PASS
+[PROPUP-START] propup_lcmd_review_store_load
+[PROPUP-END] propup_lcmd_review_store_load PASS
+[PROPUP-START] propup_lcmd_trust_policy_roundtrip
+[PROPUP-END] propup_lcmd_trust_policy_roundtrip PASS
+[PROPUP-START] propup_lcmd_credential_record
+[PROPUP-END] propup_lcmd_credential_record PASS
+[PROPUP-START] propup_lcmd_rbpc_state_roundtrip
+[PROPUP-END] propup_lcmd_rbpc_state_roundtrip PASS
+[PROPUP-START] propup_lcmd_extension_stats
+[PROPUP-END] propup_lcmd_extension_stats PASS
+[PROPUP-START] propup_lcmd_preference_roundtrip
+[PROPUP-END] propup_lcmd_preference_roundtrip PASS
+[PROPUP-START] propup_privacy_jwt_concurrent
+[PROPUP-END] propup_privacy_jwt_concurrent PASS
+[PROPUP-START] propup_lfssl_dll_smoke
+[PROPUP-END] propup_lfssl_dll_smoke PASS
+[PROPUP-START] propup_lfssl_dll_sha256
+[PROPUP-END] propup_lfssl_dll_sha256 PASS
+[PROPUP-START] propup_lfssl_dll_hmac
+[PROPUP-END] propup_lfssl_dll_hmac PASS
+[PROPUP-START] propup_lfssl_dll_aes256gcm
+[PROPUP-END] propup_lfssl_dll_aes256gcm PASS
+[PROPUP-START] propup_lfssl_dll_kyber
+[PROPUP-END] propup_lfssl_dll_kyber PASS
+[PROPUP-START] propup_lfssl_dll_dilithium
+[PROPUP-END] propup_lfssl_dll_dilithium PASS
+[PROPUP-START] propup_lfssl_dll_argon2id
+[PROPUP-END] propup_lfssl_dll_argon2id PASS
+[PROPUP-START] propup_lfssl_dll_argon2id_verify
+[PROPUP-END] propup_lfssl_dll_argon2id_verify PASS
+[PROPUP-START] propup_lfssl_sentinel_aes256gcm_unavailable
+[PROPUP-END] propup_lfssl_sentinel_aes256gcm_unavailable PASS
+[PROPUP-START] propup_lfssl_sentinel_kyber_unavailable
+[PROPUP-END] propup_lfssl_sentinel_kyber_unavailable PASS
+[PROPUP-START] propup_lfssl_sentinel_dilithium_unavailable
+[PROPUP-END] propup_lfssl_sentinel_dilithium_unavailable PASS
+[PROPUP-START] propup_lcmd_rbpc_burn_threshold
+[PROPUP-END] propup_lcmd_rbpc_burn_threshold PASS
+[PROPUP-START] propup_lcmd_preference_overwrite
+[PROPUP-END] propup_lcmd_preference_overwrite PASS
+[PROPUP-START] propup_lcmd_search_with_filters
+[PROPUP-END] propup_lcmd_search_with_filters PASS
+[PROPUP-START] propup_lcmd_review_limit
+[PROPUP-END] propup_lcmd_review_limit PASS
+[PROPUP-START] propup_lcmd_vip_key_status_update
+[PROPUP-END] propup_lcmd_vip_key_status_update PASS
+[PROPUP-START] propup_lcmd_extension_stats_overwrite
+[PROPUP-END] propup_lcmd_extension_stats_overwrite PASS
+[PROPUP-START] propup_lcmd_trust_policy_keeps_authority
+[PROPUP-END] propup_lcmd_trust_policy_keeps_authority PASS
+[PROPUP-START] propup_lcmd_rbpc_increment_to_burn
+[PROPUP-END] propup_lcmd_rbpc_increment_to_burn PASS
+[PROPUP-START] propup_lcmd_audit_by_token_id
+[PROPUP-END] propup_lcmd_audit_by_token_id PASS
+[PROPUP-START] propup_lcmd_license_idempotent_store
+[PROPUP-END] propup_lcmd_license_idempotent_store PASS
+[PROPUP-START] propup_jwt_wrong_audience
+[PROPUP-END] propup_jwt_wrong_audience PASS
+[PROPUP-START] propup_jwt_expired_token
+[PROPUP-END] propup_jwt_expired_token PASS
+[PROPUP-START] propup_jwt_revoked_refresh
+[PROPUP-END] propup_jwt_revoked_refresh PASS
+[PROPUP-START] propup_lfssl_dll_pbkdf2
+[PROPUP-END] propup_lfssl_dll_pbkdf2 PASS
+[PROPUP-START] propup_lfssl_dll_aes256_block
+[PROPUP-END] propup_lfssl_dll_aes256_block PASS
+[PROPUP-START] propup_lfssl_dll_random_non_determinism
+[PROPUP-END] propup_lfssl_dll_random_non_determinism PASS
+[PROPUP-START] propup_glow_empty_graph
+[propup_glow_empty_graph passed in 0.0012207 ms]
+[PROPUP-END] propup_glow_empty_graph PASS
+[PROPUP-START] propup_glow_single_node_path
+[propup_glow_single_node_path passed in 0.000976562 ms]
+[PROPUP-END] propup_glow_single_node_path PASS
+[PROPUP-START] propup_glow_empty_catchphrase
+[propup_glow_empty_catchphrase passed in 0.000244141 ms]
+[PROPUP-END] propup_glow_empty_catchphrase PASS
+[PROPUP-START] propup_glow_bond_double_reinforcement
+[propup_glow_bond_double_reinforcement passed in 0.00366211 ms]
+[PROPUP-END] propup_glow_bond_double_reinforcement PASS
+[PROPUP-START] propup_command_unknown
+[PROPUP-END] propup_command_unknown PASS
+[PROPUP-START] propup_command_empty
+[PROPUP-END] propup_command_empty PASS
+[PROPUP-START] propup_slipstream_eviction
+[PROPUP-END] propup_slipstream_eviction PASS
+[PROPUP-START] propup_anbp_wrong_version
+[PROPUP-END] propup_anbp_wrong_version PASS
+[PROPUP-START] propup_metro_audit_trail
+[PROPUP-END] propup_metro_audit_trail PASS
+[PROPUP-START] propup_kernel_softmax_stability
+[propup_kernel_softmax_stability passed]
+[PROPUP-END] propup_kernel_softmax_stability PASS
+[PROPUP-START] propup_kernel_layernorm_zeros
+[propup_kernel_layernorm_zeros passed]
+[PROPUP-END] propup_kernel_layernorm_zeros PASS
+[PROPUP-START] propup_kernel_gelu_negative
+[propup_kernel_gelu_negative passed]
+[PROPUP-END] propup_kernel_gelu_negative PASS
+[PROPUP-START] propup_kernel_elementwise_shape_mismatch
+[propup_kernel_elementwise_shape_mismatch passed]
+[PROPUP-END] propup_kernel_elementwise_shape_mismatch PASS
+[PROPUP-START] propup_kernel_conv2d_1x1_identity
+[propup_kernel_conv2d_1x1_identity passed]
+[PROPUP-END] propup_kernel_conv2d_1x1_identity PASS
+[PROPUP-START] propup_extension_empty_deps
+[PROPUP-END] propup_extension_empty_deps PASS
+[PROPUP-START] propup_extension_metadata_missing
+[PROPUP-END] propup_extension_metadata_missing PASS
+[PROPUP-START] propup_extension_no_metadata
+[PROPUP-END] propup_extension_no_metadata PASS
+[PROPUP-START] propup_lcmd_persist_load
+[PROPUP-END] propup_lcmd_persist_load PASS
+[PROPUP-START] propup_lcmd_search_empty_returns_all
+[PROPUP-END] propup_lcmd_search_empty_returns_all PASS
+[PROPUP-START] propup_lcmd_review_store_overwrite
+[PROPUP-END] propup_lcmd_review_store_overwrite PASS
+[PROPUP-START] propup_lcmd_credential_bad_record_rejected
+[PROPUP-END] propup_lcmd_credential_bad_record_rejected PASS
+[PROPUP-START] propup_lcmd_preference_delete
+[PROPUP-END] propup_lcmd_preference_delete PASS
+[PROPUP-START] propup_lcmd_license_revoke_idempotent
+[PROPUP-END] propup_lcmd_license_revoke_idempotent PASS
+[PROPUP-START] propup_lcmd_rbpc_state_new_pin_different
+[PROPUP-END] propup_lcmd_rbpc_state_new_pin_different PASS
+[PROPUP-START] propup_jwt_refresh_count
+[PROPUP-END] propup_jwt_refresh_count PASS
+[PROPUP-START] propup_lcmd_extension_entry_search_by_name
+[PROPUP-END] propup_lcmd_extension_entry_search_by_name PASS
+[PROPUP-START] propup_lcmd_onboarding_grant_idempotent
+[PROPUP-END] propup_lcmd_onboarding_grant_idempotent PASS
+[PROPUP-START] propup_lcmd_offline_sync_count
+[PROPUP-END] propup_lcmd_offline_sync_count PASS
+[PROPUP-START] propup_lcmd_offline_mode_flag
+[PROPUP-END] propup_lcmd_offline_mode_flag PASS
+[PROPUP-START] propup_lcmd_replay_sync_all_success
+[PROPUP-END] propup_lcmd_replay_sync_all_success PASS
+[PROPUP-START] propup_lcmd_replay_sync_partial_failure
+[PROPUP-END] propup_lcmd_replay_sync_partial_failure PASS
+[PROPUP-START] propup_lcmd_replay_sync_empty_queue
+[PROPUP-END] propup_lcmd_replay_sync_empty_queue PASS
+[PROPUP-START] propup_lcmd_offline_queue_auto_populate
+[PROPUP-END] propup_lcmd_offline_queue_auto_populate PASS
+[PROPUP-START] propup_lcmd_replay_max_records
+[PROPUP-END] propup_lcmd_replay_max_records PASS
+[PROPUP-START] propup_lcmd_offline_preference_no_queue
+[PROPUP-END] propup_lcmd_offline_preference_no_queue PASS
+[PROPUP-START] propup_lcmd_offline_revenue
+[PROPUP-END] propup_lcmd_offline_revenue PASS
+[PROPUP-START] propup_lcmd_offline_review
+[PROPUP-END] propup_lcmd_offline_review PASS
+[PROPUP-START] propup_lcmd_offline_stats
+[PROPUP-END] propup_lcmd_offline_stats PASS
+[PROPUP-START] propup_lcmd_offline_vip_key
+[PROPUP-END] propup_lcmd_offline_vip_key PASS
+[PROPUP-START] propup_lcmd_offline_trust_policy
+[PROPUP-END] propup_lcmd_offline_trust_policy PASS
+[PROPUP-START] propup_lcmd_offline_onboarding
+[PROPUP-END] propup_lcmd_offline_onboarding PASS
+[PROPUP-START] propup_lcmd_offline_rbpc
+[PROPUP-END] propup_lcmd_offline_rbpc PASS
+[PROPUP-START] propup_lcmd_offline_audit
+[PROPUP-END] propup_lcmd_offline_audit PASS
+[PROPUP-START] propup_lcmd_queue_count_consistency
+[PROPUP-END] propup_lcmd_queue_count_consistency PASS
+[PROPUP-START] propup_lcmd_sync_queue_dedup
+[PROPUP-END] propup_lcmd_sync_queue_dedup PASS
+[PROPUP-START] propup_lcmd_replay_fail_retry
+[PROPUP-END] propup_lcmd_replay_fail_retry PASS
+[PROPUP-START] propup_lcmd_replay_callback_error_safe
+[PROPUP-END] propup_lcmd_replay_callback_error_safe PASS
+[PROPUP-START] propup_lcmd_queue_persists_offline_off
+[PROPUP-END] propup_lcmd_queue_persists_offline_off PASS
+[PROPUP-START] propup_lcmd_offline_revoke_license
+[PROPUP-END] propup_lcmd_offline_revoke_license PASS
+[PROPUP-START] propup_lcmd_search_exact_filter
+[PROPUP-END] propup_lcmd_search_exact_filter PASS
+[PROPUP-START] propup_lcmd_preference_delete
+[PROPUP-END] propup_lcmd_preference_delete PASS
+[PROPUP-START] propup_lcmd_review_store_multiple
+[PROPUP-END] propup_lcmd_review_store_multiple PASS
+[PROPUP-START] propup_lcmd_credential_user_load
+[PROPUP-END] propup_lcmd_credential_user_load PASS
+[PROPUP-START] propup_lcmd_audit_by_user
+[PROPUP-END] propup_lcmd_audit_by_user PASS
+[PROPUP-START] propup_lcmd_rbpc_burn_after_3
+[PROPUP-END] propup_lcmd_rbpc_burn_after_3 PASS
+[PROPUP-START] propup_lcmd_trust_policy_default
+[PROPUP-END] propup_lcmd_trust_policy_default PASS
+[PROPUP-START] propup_lcmd_vip_key_exist
+[PROPUP-END] propup_lcmd_vip_key_exist PASS
+[PROPUP-START] propup_lcmd_license_load_specific
+[PROPUP-END] propup_lcmd_license_load_specific PASS
+[PROPUP-START] propup_lcmd_extension_stats_empty
+[PROPUP-END] propup_lcmd_extension_stats_empty PASS
+[PROPUP-START] propup_lcmd_onboarding_load_grant
+[PROPUP-END] propup_lcmd_onboarding_load_grant PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_e2e_tier_cold_spill
+[PROPUP-END] propup_e2e_tier_cold_spill PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_e2e_tier_promote_warm
+[PROPUP-END] propup_e2e_tier_promote_warm PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_e2e_tier_demote_cool
+[PROPUP-END] propup_e2e_tier_demote_cool PASS
+[PROPUP-START] propup_e2e_graph_chain_5
+[PROPUP-END] propup_e2e_graph_chain_5 PASS
+[PROPUP-START] propup_e2e_graph_parallel_branch
+[PROPUP-END] propup_e2e_graph_parallel_branch PASS
+[PROPUP-START] propup_e2e_runtime_unsupported_op
+[PROPUP-END] propup_e2e_runtime_unsupported_op PASS
+[PROPUP-START] propup_e2e_runtime_empty_input
+[PROPUP-END] propup_e2e_runtime_empty_input PASS
+[PROPUP-START] propup_e2e_native_matmul_128
+[PROPUP-END] propup_e2e_native_matmul_128 PASS
+[PROPUP-START] propup_e2e_native_fused_chain
+[PROPUP-END] propup_e2e_native_fused_chain PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_e2e_decision_routing_tiny_vs_large
+[PROPUP-END] propup_e2e_decision_routing_tiny_vs_large PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_e2e_full_pipeline_2x2
+[PROPUP-END] propup_e2e_full_pipeline_2x2 PASS
+[PROPUP-START] propup_e2e_glow_reinforcement_traversal
+[PROPUP-END] propup_e2e_glow_reinforcement_traversal PASS
+[PROPUP-START] propup_e2e_glow_decay_retains_hot
+[PROPUP-END] propup_e2e_glow_decay_retains_hot PASS
+[PROPUP-START] propup_e2e_anbp_full_handshake
+[PROPUP-END] propup_e2e_anbp_full_handshake PASS
+[PROPUP-START] propup_e2e_metro_audit_5_packets
+[PROPUP-END] propup_e2e_metro_audit_5_packets PASS
+[PROPUP-START] propup_e2e_lcmd_sync_survives_init
+[PROPUP-END] propup_e2e_lcmd_sync_survives_init PASS
+[PROPUP-START] propup_e2e_lcmd_replay_drains_queue
+[PROPUP-END] propup_e2e_lcmd_replay_drains_queue PASS
+[PROPUP-START] propup_e2e_jwt_full_lifecycle
+[PROPUP-END] propup_e2e_jwt_full_lifecycle PASS
+[PROPUP-START] propup_e2e_lfssl_aes_gcm_tamper
+[PROPUP-END] propup_e2e_lfssl_aes_gcm_tamper PASS
+[PROPUP-START] propup_e2e_lfssl_kyber_encaps_decaps
+[PROPUP-END] propup_e2e_lfssl_kyber_encaps_decaps PASS
+[PROPUP-START] propup_e2e_lfssl_dilithium_sign_verify
+[PROPUP-END] propup_e2e_lfssl_dilithium_sign_verify PASS
+[PROPUP-START] propup_e2e_rbpc_pin_verify_reset
+[PROPUP-END] propup_e2e_rbpc_pin_verify_reset PASS
+[PROPUP-START] propup_e2e_rbpc_dual_factor_success
+[PROPUP-END] propup_e2e_rbpc_dual_factor_success PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_e2e_runtime_command_execute
+[PROPUP-END] propup_e2e_runtime_command_execute PASS
+[PROPUP-START] propup_e2e_graph_dead_code_elim
+[PROPUP-END] propup_e2e_graph_dead_code_elim PASS
+[PROPUP-START] propup_e2e_native_softmax_accuracy
+[PROPUP-END] propup_e2e_native_softmax_accuracy PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_e2e_decision_fusion_matmul_bias_relu
+[PROPUP-END] propup_e2e_decision_fusion_matmul_bias_relu PASS
+[PROPUP-START] propup_e2e_glow_catchphrase_resolution
+[PROPUP-END] propup_e2e_glow_catchphrase_resolution PASS
+[PROPUP-START] propup_e2e_anbp_permission_denied
+[PROPUP-END] propup_e2e_anbp_permission_denied PASS
+[PROPUP-START] propup_e2e_metro_station_lifecycle
+[PROPUP-END] propup_e2e_metro_station_lifecycle PASS
+[PROPUP-START] propup_e2e_lcmd_trust_policy_roundtrip
+[PROPUP-END] propup_e2e_lcmd_trust_policy_roundtrip PASS
+[PROPUP-START] propup_e2e_jwt_invalid_signature
+[PROPUP-END] propup_e2e_jwt_invalid_signature PASS
+[PROPUP-START] propup_e2e_lfssl_argon2id_hash_verify
+[PROPUP-END] propup_e2e_lfssl_argon2id_hash_verify PASS
+[PROPUP-START] propup_e2e_rbpc_burn_locks_permanently
+[PROPUP-END] propup_e2e_rbpc_burn_locks_permanently PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_e2e_extension_factory_create
+[PROPUP-END] propup_e2e_extension_factory_create PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_e2e_tier_alignment_256
+[PROPUP-END] propup_e2e_tier_alignment_256 PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_e2e_tier_zero_size_rejected
+[PROPUP-END] propup_e2e_tier_zero_size_rejected PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_e2e_tier_multiple_allocs
+[PROPUP-END] propup_e2e_tier_multiple_allocs PASS
+[PROPUP-START] propup_e2e_graph_cycle_rejection
+[PROPUP-END] propup_e2e_graph_cycle_rejection PASS
+[PROPUP-START] propup_e2e_graph_single_node
+[PROPUP-END] propup_e2e_graph_single_node PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_e2e_runtime_matmul_4x4
+[PROPUP-END] propup_e2e_runtime_matmul_4x4 PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_e2e_runtime_add_4
+[PROPUP-END] propup_e2e_runtime_add_4 PASS
+[PROPUP-START] propup_e2e_native_relu_verify
+[PROPUP-END] propup_e2e_native_relu_verify PASS
+[PROPUP-START] propup_e2e_native_sigmoid_verify
+[PROPUP-END] propup_e2e_native_sigmoid_verify PASS
+[PROPUP-START] propup_e2e_native_gelu_verify
+[PROPUP-END] propup_e2e_native_gelu_verify PASS
+[PROPUP-START] propup_e2e_native_layernorm_verify
+[PROPUP-END] propup_e2e_native_layernorm_verify PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_e2e_decision_backend_native
+[PROPUP-END] propup_e2e_decision_backend_native PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_e2e_decision_backend_openvino
+[PROPUP-END] propup_e2e_decision_backend_openvino PASS
+[PROPUP-START] propup_e2e_glow_bond_pruned
+[PROPUP-END] propup_e2e_glow_bond_pruned FAIL
+[PROPUP-START] propup_e2e_glow_path_recording
+[PROPUP-END] propup_e2e_glow_path_recording PASS
+[PROPUP-START] propup_e2e_glow_empty_query
+[PROPUP-END] propup_e2e_glow_empty_query PASS
+[PROPUP-START] propup_e2e_anbp_session_close
+[PROPUP-END] propup_e2e_anbp_session_close PASS
+[PROPUP-START] propup_e2e_metro_empty_payload
+[PROPUP-END] propup_e2e_metro_empty_payload PASS
+[PROPUP-START] propup_e2e_lcmd_license_roundtrip
+[PROPUP-END] propup_e2e_lcmd_license_roundtrip PASS
+[PROPUP-START] propup_e2e_lcmd_review_roundtrip
+[PROPUP-END] propup_e2e_lcmd_review_roundtrip PASS
+[PROPUP-START] propup_e2e_lcmd_credential_roundtrip
+[PROPUP-END] propup_e2e_lcmd_credential_roundtrip FAIL
+[PROPUP-START] propup_e2e_lcmd_preference_roundtrip
+[PROPUP-END] propup_e2e_lcmd_preference_roundtrip PASS
+[PROPUP-START] propup_e2e_jwt_wrong_issuer
+[PROPUP-END] propup_e2e_jwt_wrong_issuer PASS
+[PROPUP-START] propup_e2e_jwt_expired_refresh
+[PROPUP-END] propup_e2e_jwt_expired_refresh FAIL
+[PROPUP-START] propup_e2e_lfssl_random_bytes
+[PROPUP-END] propup_e2e_lfssl_random_bytes PASS
+[PROPUP-START] propup_e2e_lfssl_aes_block_roundtrip
+[PROPUP-END] propup_e2e_lfssl_aes_block_roundtrip PASS
+[PROPUP-START] propup_e2e_lfssl_pbkdf2_derive
+[PROPUP-END] propup_e2e_lfssl_pbkdf2_derive PASS
+[PROPUP-START] propup_e2e_security_lfssl_sentinel
+[PROPUP-END] propup_e2e_security_lfssl_sentinel PASS
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP-START] propup_e2e_extension_status_query
+[PROPUP-END] propup_e2e_extension_status_query PASS
+[PROPUP-START] propup_e2e_graph_bridge_pfql
+[PROPUP-END] propup_e2e_graph_bridge_pfql PASS
+[PROPUP-START] propup_first_run_unavailable_reason
+[PROPUP-END] propup_first_run_unavailable_reason PASS
+[PROPUP-START] propup_first_run_node_id_unique
+[PROPUP-END] propup_first_run_node_id_unique PASS
+[PROPUP-START] propup_first_run_rejects_empty_passphrase
+[PROPUP-END] propup_first_run_rejects_empty_passphrase PASS
+[PROPUP-START] propup_first_run_rejects_short_word
+[PROPUP-END] propup_first_run_rejects_short_word PASS
+[PROPUP-START] propup_first_run_local_only_provisional
+[PROPUP-END] propup_first_run_local_only_provisional PASS
+[PROPUP-START] propup_first_run_unlock_no_db
+[PROPUP-END] propup_first_run_unlock_no_db PASS
+[PROPUP-START] propup_smdi_unavailable_reason
+[PROPUP-END] propup_smdi_unavailable_reason PASS
+[PROPUP-START] propup_smdi_unlock_returns_nullopt
+[PROPUP-END] propup_smdi_unlock_returns_nullopt PASS
+[PROPUP-START] propup_smdi_provision_honest_failure
+[PROPUP-END] propup_smdi_provision_honest_failure PASS
+[PROPUP-START] propup_smdi_sentinel_available_false
+[PROPUP-END] propup_smdi_sentinel_available_false PASS
+[PROPUP-START] propup_tensor_view_2d_indexing
+[PROPUP-END] propup_tensor_view_2d_indexing PASS
+[PROPUP-START] propup_tensor_view_4d_storage
+[PROPUP-END] propup_tensor_view_4d_storage PASS
+[PROPUP-START] propup_tensor_view_contiguous
+[PROPUP-END] propup_tensor_view_contiguous PASS
+[PROPUP-START] propup_tensor_view_chw_hwc
+[PROPUP-END] propup_tensor_view_chw_hwc PASS
+[PROPUP-START] propup_clip_tokenizer_builtin_vocab
+[PROPUP-END] propup_clip_tokenizer_builtin_vocab PASS
+[PROPUP-START] propup_clip_tokenizer_max_length
+[PROPUP-END] propup_clip_tokenizer_max_length PASS
+[PROPUP-START] propup_clip_tokenizer_decode_roundtrip
+[PROPUP-END] propup_clip_tokenizer_decode_roundtrip PASS
+[PROPUP-START] propup_clip_tokenizer_special_tokens
+[PROPUP-END] propup_clip_tokenizer_special_tokens PASS
+[PROPUP-START] propup_benchmark_logger_record_count
+[PROPUP-END] propup_benchmark_logger_record_count PASS
+[PROPUP-START] propup_benchmark_logger_stats
+[PROPUP-END] propup_benchmark_logger_stats FAIL
+[PROPUP-START] propup_benchmark_logger_clear
+[PROPUP-END] propup_benchmark_logger_clear PASS
+[PROPUP-START] propup_health_score_grade_a
+[PROPUP-END] propup_health_score_grade_a FAIL
+[PROPUP-START] propup_health_score_grade_f
+[PROPUP-END] propup_health_score_grade_f PASS
+[PROPUP-START] propup_health_score_weights_normalize
+[PROPUP-END] propup_health_score_weights_normalize PASS
+[PROPUP-START] propup_health_score_recovery_rate
+[PROPUP-END] propup_health_score_recovery_rate PASS
+[PROPUP-START] propup_npu_factory_init
+[PROPUP-END] propup_npu_factory_init PASS
+[PROPUP-START] propup_npu_factory_best_cpu
+[PROPUP-END] propup_npu_factory_best_cpu PASS
+[PROPUP-START] propup_npu_factory_by_name_cpu
+[PROPUP-END] propup_npu_factory_by_name_cpu PASS
+[PROPUP-START] propup_cpu_fallback_available
+[PROPUP-END] propup_cpu_fallback_available FAIL
+[PROPUP-START] propup_cpu_fallback_compile
+[PROPUP-END] propup_cpu_fallback_compile PASS
+[PROPUP-START] propup_openvino_unavailable_reason
+[PROPUP-END] propup_openvino_unavailable_reason PASS
+[PROPUP-START] propup_cuda_unavailable_reason
+[PROPUP-END] propup_cuda_unavailable_reason PASS
+[PROPUP-START] propup_kernel_graph_move
+[PROPUP-END] propup_kernel_graph_move PASS
+[PROPUP-START] propup_compiled_kernel_move
+[PROPUP-END] propup_compiled_kernel_move PASS
+[PROPUP-START] propup_shadow_compress_bounded
+[PROPUP-END] propup_shadow_compress_bounded PASS
+[PROPUP-START] propup_shadow_restore_bounded
+[PROPUP-END] propup_shadow_restore_bounded PASS
+[PROPUP-START] propup_predictor_update_lookup
+[PROPUP-END] propup_predictor_update_lookup PASS
+[PROPUP-START] propup_predictor_hit_rate
+[PROPUP-END] propup_predictor_hit_rate PASS
+[PROPUP-START] propup_deis_precompute
+[PROPUP-END] propup_deis_precompute PASS
+[PROPUP-START] propup_deis_coeff_access
+[PROPUP-END] propup_deis_coeff_access PASS
+[PROPUP-START] propup_hailo_unavailable
+[PROPUP-END] propup_hailo_unavailable PASS
+[GPUMonitor] Initialized with NVML backend (device 0)
+[PROPUP-START] propup_gpu_monitor_init_honest
+[PROPUP-END] propup_gpu_monitor_init_honest FAIL
+[HIPGraphDenoiser] created (available=false, capture_enabled=true)
+[PROPUP-START] propup_hip_graph_unavailable
+[PROPUP-END] propup_hip_graph_unavailable PASS
+
+=== David Propup Engine Report ===
+  [PASS] propup_tiered_memory (0.704346 ms)
+  [PASS] propup_coordinator_memory_loop (0.0913086 ms)
+  [PASS] propup_coordinator_tier_decisions (0.0270996 ms)
+  [PASS] propup_compile_graph_analysis (0.0012207 ms)
+  [PASS] propup_kernel_matmul (0.00146484 ms)
+  [PASS] propup_kernel_elementwise (0.000244141 ms)
+  [PASS] propup_kernel_fma (0.00146484 ms)
+  [PASS] propup_kernel_matmul_blocked (0.00195312 ms)
+  [PASS] propup_performance_matmul_vs_naive (11.9851 ms)
+  [PASS] propup_kernel_matmul_avx2 (1.23706 ms)
+  [PASS] propup_kernel_avx512_detect (0.00341797 ms)
+  [PASS] propup_kernel_matmul_avx512_dispatch (0.162842 ms)
+  [PASS] propup_end_to_end_native (0.190186 ms)
+  [PASS] propup_decision_engine_fusion (0.098877 ms)
+  [PASS] propup_graph_engine_verbose (0.0144043 ms)
+  [PASS] propup_tier_pressure_demotion (0.0480957 ms)
+  [PASS] propup_kernel_quantized_matmul (0.0065918 ms)
+  [PASS] propup_kernel_dynamic_quant_accuracy (0.00878906 ms)
+  [PASS] propup_performance_int8_vs_float (1.98389 ms)
+  [PASS] propup_quant_per_channel (0.000976562 ms)
+  [PASS] propup_quant_per_token (0.00219727 ms)
+  [PASS] propup_quant_per_block (0.000244141 ms)
+  [PASS] propup_quant_4bit (0.000244141 ms)
+  [PASS] propup_quant_fused_bias_relu (0.00170898 ms)
+  [PASS] propup_native_backend_matmul (0.0131836 ms)
+  [PASS] propup_native_backend_elementwise (0.00512695 ms)
+  [PASS] propup_native_backend_fusion (0.00708008 ms)
+  [PASS] propup_decision_backend_routing (0.0976562 ms)
+  [PASS] propup_graph_cycles_rejection (0.00195312 ms)
+  [PASS] propup_graph_from_kernel_graph (0.0090332 ms)
+  [PASS] propup_runtime_full_stack (0.0913086 ms)
+  [PASS] propup_quant_ptq_vs_qat_sim (0 ms)
+  [PASS] propup_quant_smoothquant (0 ms)
+  [PASS] propup_performance_blocked_vs_quantized (1.25732 ms)
+  [PASS] propup_decision_quant_routing (0.0788574 ms)
+  [PASS] propup_quantized_matmul_blocked (0.00341797 ms)
+  [PASS] propup_kernel_conv2d (0.00219727 ms)
+  [PASS] propup_kernel_gelu (0.00268555 ms)
+  [PASS] propup_kernel_softmax (0.00317383 ms)
+  [PASS] propup_kernel_layernorm (0.000244141 ms)
+  [PASS] propup_kernel_relu (0.000488281 ms)
+  [PASS] propup_kernel_sigmoid (0.000244141 ms)
+  [PASS] propup_graph_dead_code_elim (0.00292969 ms)
+  [PASS] propup_graph_multi_output (0.000732422 ms)
+  [PASS] propup_graph_constant_folding (0.000732422 ms)
+  [PASS] propup_graph_rewrite_fusion (0.00366211 ms)
+  [PASS] propup_decision_memory_pressure (0.0332031 ms)
+  [PASS] propup_decision_fuse_longer_chain (0.0283203 ms)
+  [PASS] propup_quant_symmetric_int8 (0 ms)
+  [PASS] propup_quant_brecq (0.000732422 ms)
+  [PASS] propup_quant_adaround (0.000244141 ms)
+  [PASS] propup_backend_compile_error (0.00488281 ms)
+  [PASS] propup_tier_demote_with_data (0.0183105 ms)
+  [PASS] propup_tier_eviction_lru (0.0205078 ms)
+  [PASS] propup_compute_during_migration (0.0849609 ms)
+  [PASS] propup_dequant_during_migration (0.0529785 ms)
+  [PASS] propup_predictor_match (0.00952148 ms)
+  [PASS] propup_execution_integrity (0.000244141 ms)
+  [PASS] propup_shadow_rollback (0.00195312 ms)
+  [PASS] propup_decision_power_budget (0.0432129 ms)
+  [PASS] propup_predictor_feedback (0.0065918 ms)
+  [PASS] propup_federation_split (0.00537109 ms)
+  [PASS] propup_tier_alignment (0.0471191 ms)
+  [PASS] propup_runtime_multi_step (0.0739746 ms)
+  [PASS] propup_runtime_error_propagation (0.0424805 ms)
+  [PASS] propup_stress_matmul_512 (94.9695 ms)
+  [PASS] propup_robust_null_graph (0.173828 ms)
+  [PASS] propup_robust_null_input (0.0742188 ms)
+  [PASS] propup_robust_zero_dimension (0.000244141 ms)
+  [PASS] propup_robust_name_mismatch (0.00366211 ms)
+  [PASS] propup_robust_cycle_rejection (0.00561523 ms)
+  [PASS] propup_robust_backend_unavailable (1.88867 ms)
+  [PASS] propup_robust_duplicate_names (0.00512695 ms)
+  [PASS] propup_robust_input_count_mismatch (0.0646973 ms)
+  [PASS] propup_robust_zero_size_alloc (0.0212402 ms)
+  [PASS] propup_robust_unsupported_op (0.00610352 ms)
+  [PASS] propup_robust_tier_thrashing (0.134766 ms)
+  [PASS] propup_command_layer_status (0.0693359 ms)
+  [PASS] propup_command_layer_compile (0.0390625 ms)
+  [PASS] propup_command_layer_malformed (0.0275879 ms)
+  [PASS] propup_command_layer_ergonomic (0.0322266 ms)
+  [PASS] propup_anbp_gateway_handshake (0.0361328 ms)
+  [PASS] propup_api_gateway_human_safety_filter (0.00292969 ms)
+  [PASS] propup_slipstream_tensor_exchange (57.0415 ms)
+  [PASS] propup_metro_audit_trail (0.0168457 ms)
+  [PASS] propup_glow_bond_creation (0.00512695 ms)
+  [PASS] propup_glow_reinforcement (0.0012207 ms)
+  [PASS] propup_glow_decay (0.000732422 ms)
+  [PASS] propup_glow_hot_path_query (0.00537109 ms)
+  [PASS] propup_glow_best_next_hop (0.00146484 ms)
+  [PASS] propup_glow_catchphrase_exact (0.00341797 ms)
+  [PASS] propup_glow_catchphrase_fuzzy (0.00268555 ms)
+  [PASS] propup_glow_stats_integrity (0.000732422 ms)
+  [PASS] propup_glow_reset (0.000976562 ms)
+  [PASS] propup_glow_attenuation (0.000244141 ms)
+  [PASS] propup_adversarial_malformed_anbp (0.0012207 ms)
+  [PASS] propup_adversarial_invalid_token (0.000488281 ms)
+  [PASS] propup_adversarial_permission_escalation (0.00244141 ms)
+  [PASS] propup_adversarial_slipstream_overflow (0.00244141 ms)
+  [PASS] propup_adversarial_metro_empty_payload (0.0012207 ms)
+  [PASS] propup_gguf_synthetic_header (0.00170898 ms)
+  [PASS] propup_gguf_synthetic_tensor_info (0.000976562 ms)
+  [PASS] propup_psiforcedb_extension_init (0.245605 ms)
+  [PASS] propup_psiforcedb_extension_load_unload (62.313 ms)
+  [PASS] propup_psiforcedb_extension_inference_query (0.235107 ms)
+  [PASS] propup_psiforcedb_extension_status_query (0.186523 ms)
+  [PASS] propup_psiforcedb_extension_stats (0.168701 ms)
+  [PASS] propup_psiforcedb_extension_validate (0.154053 ms)
+  [PASS] propup_psiforcedb_extension_pfql_routing (0.229492 ms)
+  [PASS] propup_psiforcedb_extension_gguf_loader (0.249023 ms)
+  [PASS] propup_psiforcedb_extension_telemetry (0.175293 ms)
+  [PASS] propup_psiforcedb_extension_health_check (61.8303 ms)
+  [PASS] propup_psiforcedb_extension_transaction_reject (0.191895 ms)
+  [PASS] propup_psiforcedb_extension_coordinator_routing (0.253906 ms)
+  [PASS] propup_psiforcedb_extension_factory (0.158447 ms)
+  [PASS] propup_psiforcedb_extension_dependencies (0.193848 ms)
+  [PASS] propup_psiforcedb_extension_metadata (0.206787 ms)
+  [PASS] propup_psiforcedb_graph_bridge_topology (0.09375 ms)
+  [PASS] propup_psiforcedb_graph_bridge_pfql_rows (0.0100098 ms)
+  [PASS] propup_psiforcedb_extension_validate_edge_cases (2.27295 ms)
+  [PASS] propup_psiforcedb_extension_error_counting (0.270752 ms)
+  [PASS] propup_psiforcedb_extension_detail_helpers (0.00634766 ms)
+  [PASS] propup_psiforcedb_extension_glow_integration (0.220215 ms)
+  [PASS] propup_security_sha256 (0.0090332 ms)
+  [PASS] propup_security_hmac_sha256 (0.00463867 ms)
+  [PASS] propup_security_pbkdf2_sha256 (1.90259 ms)
+  [PASS] propup_security_aes256_gcm_sentinel (2.74561 ms)
+  [PASS] propup_security_pqc_sentinel (3.59961 ms)
+  [PASS] propup_psiforcedb_extension_real_header_compile (0.00927734 ms)
+  [PASS] propup_privacy_local_maintenance_db (0.170898 ms)
+  [PASS] propup_privacy_pin_generation (0.020752 ms)
+  [PASS] propup_privacy_pin_burn_policy (0.00634766 ms)
+  [PASS] propup_privacy_word_commitment (0.00463867 ms)
+  [PASS] propup_privacy_dual_factor_confirmation (0.0136719 ms)
+  [PASS] propup_privacy_jwt_session (0.0510254 ms)
+  [PASS] propup_lcmd_extension_entry (0.00341797 ms)
+  [PASS] propup_lcmd_revenue_share (0.00366211 ms)
+  [PASS] propup_lcmd_vip_keys (0.00463867 ms)
+  [PASS] propup_lcmd_onboarding_grant (0.00585938 ms)
+  [PASS] propup_lcmd_offline_sync_ready (0.0126953 ms)
+  [PASS] propup_lcmd_license_store_revoke (0.00366211 ms)
+  [PASS] propup_lcmd_review_store_load (0.00390625 ms)
+  [PASS] propup_lcmd_trust_policy_roundtrip (0.00878906 ms)
+  [PASS] propup_lcmd_credential_record (0.00683594 ms)
+  [PASS] propup_lcmd_rbpc_state_roundtrip (0.00927734 ms)
+  [PASS] propup_lcmd_extension_stats (0.00292969 ms)
+  [PASS] propup_lcmd_preference_roundtrip (0.00219727 ms)
+  [PASS] propup_privacy_jwt_concurrent (0.890381 ms)
+  [PASS] propup_lfssl_dll_smoke (1.70483 ms)
+  [PASS] propup_lfssl_dll_sha256 (2.12085 ms)
+  [PASS] propup_lfssl_dll_hmac (2.15552 ms)
+  [PASS] propup_lfssl_dll_aes256gcm (2.12231 ms)
+  [PASS] propup_lfssl_dll_kyber (2.07715 ms)
+  [PASS] propup_lfssl_dll_dilithium (2.54346 ms)
+  [PASS] propup_lfssl_dll_argon2id (182.335 ms)
+  [PASS] propup_lfssl_dll_argon2id_verify (265.133 ms)
+  [PASS] propup_lfssl_sentinel_aes256gcm_unavailable (0.00195312 ms)
+  [PASS] propup_lfssl_sentinel_kyber_unavailable (0 ms)
+  [PASS] propup_lfssl_sentinel_dilithium_unavailable (0 ms)
+  [PASS] propup_lcmd_rbpc_burn_threshold (0.0688477 ms)
+  [PASS] propup_lcmd_preference_overwrite (0.00366211 ms)
+  [PASS] propup_lcmd_search_with_filters (0.00805664 ms)
+  [PASS] propup_lcmd_review_limit (0.00805664 ms)
+  [PASS] propup_lcmd_vip_key_status_update (0.00439453 ms)
+  [PASS] propup_lcmd_extension_stats_overwrite (0.00268555 ms)
+  [PASS] propup_lcmd_trust_policy_keeps_authority (0.00317383 ms)
+  [PASS] propup_lcmd_rbpc_increment_to_burn (0.0117188 ms)
+  [PASS] propup_lcmd_audit_by_token_id (0.00830078 ms)
+  [PASS] propup_lcmd_license_idempotent_store (0.00415039 ms)
+  [PASS] propup_jwt_wrong_audience (0.0512695 ms)
+  [PASS] propup_jwt_expired_token (1005 ms)
+  [PASS] propup_jwt_revoked_refresh (0.0537109 ms)
+  [PASS] propup_lfssl_dll_pbkdf2 (3.44751 ms)
+  [PASS] propup_lfssl_dll_aes256_block (3.39868 ms)
+  [PASS] propup_lfssl_dll_random_non_determinism (2.76831 ms)
+  [PASS] propup_glow_empty_graph (0.0012207 ms)
+  [PASS] propup_glow_single_node_path (0.000976562 ms)
+  [PASS] propup_glow_empty_catchphrase (0.000244141 ms)
+  [PASS] propup_glow_bond_double_reinforcement (0.00366211 ms)
+  [PASS] propup_command_unknown (0.00634766 ms)
+  [PASS] propup_command_empty (0.00415039 ms)
+  [PASS] propup_slipstream_eviction (0.00708008 ms)
+  [PASS] propup_anbp_wrong_version (0.00146484 ms)
+  [PASS] propup_metro_audit_trail (0.0065918 ms)
+  [PASS] propup_kernel_softmax_stability (0.000732422 ms)
+  [PASS] propup_kernel_layernorm_zeros (0.000976562 ms)
+  [PASS] propup_kernel_gelu_negative (0.00292969 ms)
+  [PASS] propup_kernel_elementwise_shape_mismatch (0.000244141 ms)
+  [PASS] propup_kernel_conv2d_1x1_identity (0 ms)
+  [PASS] propup_extension_empty_deps (0.000976562 ms)
+  [PASS] propup_extension_metadata_missing (0.000488281 ms)
+  [PASS] propup_extension_no_metadata (0.000244141 ms)
+  [PASS] propup_lcmd_persist_load (0.00170898 ms)
+  [PASS] propup_lcmd_search_empty_returns_all (0.00366211 ms)
+  [PASS] propup_lcmd_review_store_overwrite (0.00463867 ms)
+  [PASS] propup_lcmd_credential_bad_record_rejected (0.00463867 ms)
+  [PASS] propup_lcmd_preference_delete (0.00317383 ms)
+  [PASS] propup_lcmd_license_revoke_idempotent (0.00390625 ms)
+  [PASS] propup_lcmd_rbpc_state_new_pin_different (0.00854492 ms)
+  [PASS] propup_jwt_refresh_count (0.0454102 ms)
+  [PASS] propup_lcmd_extension_entry_search_by_name (0.00439453 ms)
+  [PASS] propup_lcmd_onboarding_grant_idempotent (0.00512695 ms)
+  [PASS] propup_lcmd_offline_sync_count (0.00146484 ms)
+  [PASS] propup_lcmd_offline_mode_flag (0.00195312 ms)
+  [PASS] propup_lcmd_replay_sync_all_success (0.00366211 ms)
+  [PASS] propup_lcmd_replay_sync_partial_failure (0.00195312 ms)
+  [PASS] propup_lcmd_replay_sync_empty_queue (0.000732422 ms)
+  [PASS] propup_lcmd_offline_queue_auto_populate (0.00317383 ms)
+  [PASS] propup_lcmd_replay_max_records (0.00244141 ms)
+  [PASS] propup_lcmd_offline_preference_no_queue (0.00244141 ms)
+  [PASS] propup_lcmd_offline_revenue (0.00268555 ms)
+  [PASS] propup_lcmd_offline_review (0.00195312 ms)
+  [PASS] propup_lcmd_offline_stats (0.00268555 ms)
+  [PASS] propup_lcmd_offline_vip_key (0.00317383 ms)
+  [PASS] propup_lcmd_offline_trust_policy (0.0136719 ms)
+  [PASS] propup_lcmd_offline_onboarding (0.00341797 ms)
+  [PASS] propup_lcmd_offline_rbpc (0.00317383 ms)
+  [PASS] propup_lcmd_offline_audit (0.00634766 ms)
+  [PASS] propup_lcmd_queue_count_consistency (0.00170898 ms)
+  [PASS] propup_lcmd_sync_queue_dedup (0.00366211 ms)
+  [PASS] propup_lcmd_replay_fail_retry (0.0012207 ms)
+  [PASS] propup_lcmd_replay_callback_error_safe (0.0234375 ms)
+  [PASS] propup_lcmd_queue_persists_offline_off (0.00268555 ms)
+  [PASS] propup_lcmd_offline_revoke_license (0.00195312 ms)
+  [PASS] propup_lcmd_search_exact_filter (0.00195312 ms)
+  [PASS] propup_lcmd_preference_delete (0.000976562 ms)
+  [PASS] propup_lcmd_review_store_multiple (0.00537109 ms)
+  [PASS] propup_lcmd_credential_user_load (0.00854492 ms)
+  [PASS] propup_lcmd_audit_by_user (0.00683594 ms)
+  [PASS] propup_lcmd_rbpc_burn_after_3 (0.0146484 ms)
+  [PASS] propup_lcmd_trust_policy_default (0.00830078 ms)
+  [PASS] propup_lcmd_vip_key_exist (0.00219727 ms)
+  [PASS] propup_lcmd_license_load_specific (0.00317383 ms)
+  [PASS] propup_lcmd_extension_stats_empty (0.000976562 ms)
+  [PASS] propup_lcmd_onboarding_load_grant (0.00415039 ms)
+  [PASS] propup_e2e_tier_cold_spill (1.35156 ms)
+  [PASS] propup_e2e_tier_promote_warm (0.139648 ms)
+  [PASS] propup_e2e_tier_demote_cool (0.0544434 ms)
+  [PASS] propup_e2e_graph_chain_5 (0.0200195 ms)
+  [PASS] propup_e2e_graph_parallel_branch (0.00292969 ms)
+  [PASS] propup_e2e_runtime_unsupported_op (0.00512695 ms)
+  [PASS] propup_e2e_runtime_empty_input (0.00317383 ms)
+  [PASS] propup_e2e_native_matmul_128 (1.15503 ms)
+  [PASS] propup_e2e_native_fused_chain (0.000732422 ms)
+  [PASS] propup_e2e_decision_routing_tiny_vs_large (0.0996094 ms)
+  [PASS] propup_e2e_full_pipeline_2x2 (0.0793457 ms)
+  [PASS] propup_e2e_glow_reinforcement_traversal (0.00341797 ms)
+  [PASS] propup_e2e_glow_decay_retains_hot (0.00512695 ms)
+  [PASS] propup_e2e_anbp_full_handshake (0.00268555 ms)
+  [PASS] propup_e2e_metro_audit_5_packets (0.0168457 ms)
+  [PASS] propup_e2e_lcmd_sync_survives_init (0.0141602 ms)
+  [PASS] propup_e2e_lcmd_replay_drains_queue (0.00390625 ms)
+  [PASS] propup_e2e_jwt_full_lifecycle (0.0532227 ms)
+  [PASS] propup_e2e_lfssl_aes_gcm_tamper (3.60352 ms)
+  [PASS] propup_e2e_lfssl_kyber_encaps_decaps (2.50732 ms)
+  [PASS] propup_e2e_lfssl_dilithium_sign_verify (2.57397 ms)
+  [PASS] propup_e2e_rbpc_pin_verify_reset (0.0200195 ms)
+  [PASS] propup_e2e_rbpc_dual_factor_success (0.00537109 ms)
+  [PASS] propup_e2e_runtime_command_execute (0.102539 ms)
+  [PASS] propup_e2e_graph_dead_code_elim (0.00561523 ms)
+  [PASS] propup_e2e_native_softmax_accuracy (0.000732422 ms)
+  [PASS] propup_e2e_decision_fusion_matmul_bias_relu (0.0925293 ms)
+  [PASS] propup_e2e_glow_catchphrase_resolution (0.00488281 ms)
+  [PASS] propup_e2e_anbp_permission_denied (0.00195312 ms)
+  [PASS] propup_e2e_metro_station_lifecycle (0.00390625 ms)
+  [PASS] propup_e2e_lcmd_trust_policy_roundtrip (0.0187988 ms)
+  [PASS] propup_e2e_jwt_invalid_signature (0.015625 ms)
+  [PASS] propup_e2e_lfssl_argon2id_hash_verify (274.322 ms)
+  [PASS] propup_e2e_rbpc_burn_locks_permanently (0.0415039 ms)
+  [PASS] propup_e2e_extension_factory_create (0.19165 ms)
+  [PASS] propup_e2e_tier_alignment_256 (0.124023 ms)
+  [PASS] propup_e2e_tier_zero_size_rejected (0.0437012 ms)
+  [PASS] propup_e2e_tier_multiple_allocs (0.0405273 ms)
+  [PASS] propup_e2e_graph_cycle_rejection (0.00756836 ms)
+  [PASS] propup_e2e_graph_single_node (0.0114746 ms)
+  [PASS] propup_e2e_runtime_matmul_4x4 (0.0861816 ms)
+  [PASS] propup_e2e_runtime_add_4 (0.0559082 ms)
+  [PASS] propup_e2e_native_relu_verify (0.000488281 ms)
+  [PASS] propup_e2e_native_sigmoid_verify (0.0012207 ms)
+  [PASS] propup_e2e_native_gelu_verify (0.0012207 ms)
+  [PASS] propup_e2e_native_layernorm_verify (0.000976562 ms)
+  [PASS] propup_e2e_decision_backend_native (0.0371094 ms)
+  [PASS] propup_e2e_decision_backend_openvino (0.0354004 ms)
+  [FAIL] propup_e2e_glow_bond_pruned | bond should be pruned after heavy decay (0 ms)
+  [PASS] propup_e2e_glow_path_recording (0.00512695 ms)
+  [PASS] propup_e2e_glow_empty_query (0.000244141 ms)
+  [PASS] propup_e2e_anbp_session_close (0.00244141 ms)
+  [PASS] propup_e2e_metro_empty_payload (0.00708008 ms)
+  [PASS] propup_e2e_lcmd_license_roundtrip (0.012207 ms)
+  [PASS] propup_e2e_lcmd_review_roundtrip (0.00366211 ms)
+  [FAIL] propup_e2e_lcmd_credential_roundtrip | credential not found (0 ms)
+  [PASS] propup_e2e_lcmd_preference_roundtrip (0.00219727 ms)
+  [PASS] propup_e2e_jwt_wrong_issuer (0.0456543 ms)
+  [FAIL] propup_e2e_jwt_expired_refresh | 0-lifetime token should be expired (0 ms)
+  [PASS] propup_e2e_lfssl_random_bytes (3.15552 ms)
+  [PASS] propup_e2e_lfssl_aes_block_roundtrip (3.01733 ms)
+  [PASS] propup_e2e_lfssl_pbkdf2_derive (4.06787 ms)
+  [PASS] propup_e2e_security_lfssl_sentinel (0.000488281 ms)
+  [PASS] propup_e2e_extension_status_query (0.153076 ms)
+  [PASS] propup_e2e_graph_bridge_pfql (0.0197754 ms)
+  [PASS] propup_first_run_unavailable_reason (0.0131836 ms)
+  [PASS] propup_first_run_node_id_unique (0.164795 ms)
+  [PASS] propup_first_run_rejects_empty_passphrase (0.00268555 ms)
+  [PASS] propup_first_run_rejects_short_word (0.000976562 ms)
+  [PASS] propup_first_run_local_only_provisional (0.03125 ms)
+  [PASS] propup_first_run_unlock_no_db (0.0595703 ms)
+  [PASS] propup_smdi_unavailable_reason (0.000976562 ms)
+  [PASS] propup_smdi_unlock_returns_nullopt (0.000244141 ms)
+  [PASS] propup_smdi_provision_honest_failure (0.000488281 ms)
+  [PASS] propup_smdi_sentinel_available_false (0 ms)
+  [PASS] propup_tensor_view_2d_indexing (0.000244141 ms)
+  [PASS] propup_tensor_view_4d_storage (0 ms)
+  [PASS] propup_tensor_view_contiguous (0 ms)
+  [PASS] propup_tensor_view_chw_hwc (0 ms)
+  [PASS] propup_clip_tokenizer_builtin_vocab (0.0822754 ms)
+  [PASS] propup_clip_tokenizer_max_length (0.0458984 ms)
+  [PASS] propup_clip_tokenizer_decode_roundtrip (0.0712891 ms)
+  [PASS] propup_clip_tokenizer_special_tokens (0 ms)
+  [PASS] propup_benchmark_logger_record_count (0.0241699 ms)
+  [FAIL] propup_benchmark_logger_stats | stats count (0 ms)
+  [PASS] propup_benchmark_logger_clear (0.00170898 ms)
+  [FAIL] propup_health_score_grade_a | expected grade A (0 ms)
+  [PASS] propup_health_score_grade_f (0.00512695 ms)
+  [PASS] propup_health_score_weights_normalize (0.0397949 ms)
+  [PASS] propup_health_score_recovery_rate (0.00366211 ms)
+  [PASS] propup_npu_factory_init (0.00170898 ms)
+  [PASS] propup_npu_factory_best_cpu (0.0012207 ms)
+  [PASS] propup_npu_factory_by_name_cpu (0.000488281 ms)
+  [FAIL] propup_cpu_fallback_available | should not be synthetic (0 ms)
+  [PASS] propup_cpu_fallback_compile (0.00756836 ms)
+  [PASS] propup_openvino_unavailable_reason (0.000976562 ms)
+  [PASS] propup_cuda_unavailable_reason (0.000488281 ms)
+  [PASS] propup_kernel_graph_move (0.000732422 ms)
+  [PASS] propup_compiled_kernel_move (0.000488281 ms)
+  [PASS] propup_shadow_compress_bounded (0.00146484 ms)
+  [PASS] propup_shadow_restore_bounded (0.000732422 ms)
+  [PASS] propup_predictor_update_lookup (0.00439453 ms)
+  [PASS] propup_predictor_hit_rate (0.000732422 ms)
+  [PASS] propup_deis_precompute (0.00463867 ms)
+  [PASS] propup_deis_coeff_access (0.00366211 ms)
+  [PASS] propup_hailo_unavailable (0.00585938 ms)
+  [FAIL] propup_gpu_monitor_init_honest | unexpected backend available (0 ms)
+  [PASS] propup_hip_graph_unavailable (0.012207 ms)
+-----------------------------------
+  TOTAL: 336/343 passed in 2085.8 ms
+  STATUS: BLOCKERS DETECTED
+===================================

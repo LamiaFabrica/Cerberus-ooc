@@ -1,0 +1,32 @@
+The requested API version [21] is not available, only API versions [1, 17] are supported in this build. Current ORT Version is: 1.17.1
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP] propup_tiered_memory passed in 0.402344 ms
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP] propup_coordinator_memory_loop passed in 0.0512695 ms
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP] propup_coordinator_tier_decisions passed in 0.0180664 ms
+[PROPUP] propup_compile_graph_analysis passed in 0.00219727 ms
+[PROPUP] propup_kernel_matmul passed in 0.0012207 ms
+[PROPUP] propup_kernel_elementwise passed in 0.000244141 ms
+[PROPUP] propup_kernel_fma passed in 0.0012207 ms
+[PROPUP] propup_kernel_matmul_blocked passed in 0.00244141 ms
+[PROPUP] propup_performance_matmul_vs_naive naive=8.754 ms blocked=2.1293 ms speedup=4.11121
+[PROPUP] propup_performance_matmul_vs_naive passed in 11.2083 ms
+[PROPUP] propup_kernel_matmul_avx2 avx2=0.1741 ms max_err=1.90735e-06
+[PROPUP] propup_kernel_avx512_detect avx2=yes avx512f=no
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP] propup_end_to_end_native passed in 0.0717773 ms
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP] propup_decision_engine_fusion passed in 0.0480957 ms
+[PROPUP-VERBOSE] graph nodes=2 tensors=5 live_bytes=80
+[PROPUP] propup_graph_engine_verbose passed in 0.00927734 ms
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP] propup_tier_pressure_demotion passed in 0.0202637 ms
+[PROPUP] propup_kernel_quantized_matmul passed in 0.00195312 ms
+[PROPUP] propup_kernel_dynamic_quant_accuracy max_rel_err=1.17646%
+[PROPUP] propup_kernel_dynamic_quant_accuracy passed in 0.00634766 ms
+[PROPUP] propup_performance_int8_vs_float float=0.5925 ms quant=0.8879 ms speedup=0.667305
+[PROPUP] propup_performance_int8_vs_float passed in 1.57227 ms
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
