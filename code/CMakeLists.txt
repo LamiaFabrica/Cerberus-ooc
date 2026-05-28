@@ -580,7 +580,7 @@ set(CPACK_PACKAGE_DESCRIPTION
     "High-performance AI image generation pipeline for MinisForum UM790 Pro. \
      Integrates ROCm/HIP GPU compute, HailoRT edge inference, and ONNX Runtime.")
 set(CPACK_PACKAGE_CONTACT "https://github.com/hybridquant/um790-pipeline")
-set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
+set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/../LICENSE")
 set(CPACK_DEBIAN_PACKAGE_DEPENDS "rocm-hip, hailort, libonnxruntime")
 set(CPACK_RPM_PACKAGE_REQUIRES "rocm-hip, hailort, onnxruntime")
 set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE "amd64")

@@ -320,6 +320,28 @@ private:
     std::vector<SyncRecord> sync_queue_;
 
     void scrub_(std::vector<std::uint8_t>& buf) const noexcept;
+
+    // ------------------------------------------------------------------------
+    // Disk persistence (LFSSL AES-256-GCM encrypted at rest)
+    // ------------------------------------------------------------------------
+    [[nodiscard]] bool flush_to_disk_() const;
+    [[nodiscard]] bool load_from_disk_();
+
+    // Serialization helpers
+    void serialize_table_(const std::map<std::string, std::string>&,
+                          std::vector<std::uint8_t>& out) const;
+    void serialize_table_(const std::map<std::string, std::map<std::string,std::string>>&, std::vector<std::uint8_t>& out) const;
+    [[nodiscard]] bool deserialize_all_(const std::vector<std::uint8_t>& in);
+
+    // LFSSL AES-256-GCM helpers (forward-declared Windows API in .cpp)
+    struct LfsslAesGcm {
+        void*   lib{nullptr};
+        int (*encrypt)(const std::uint8_t*, const std::uint8_t*, size_t, const std::uint8_t*, size_t, const std::uint8_t*, size_t, std::uint8_t*, size_t, size_t*){nullptr};
+        int (*decrypt)(const std::uint8_t*, const std::uint8_t*, size_t, const std::uint8_t*, size_t, const std::uint8_t*, size_t, std::uint8_t*, size_t, size_t*){nullptr};
+        bool init();
+        bool available() const noexcept { return lib && encrypt && decrypt; }
+    };
+    static LfsslAesGcm& lfssl_();
 };
 
 } // namespace hq::cerberus::privacy

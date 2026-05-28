@@ -1,8 +1,6 @@
 # Contributing to Cerberus
 
-Thank you for your interest! Cerberus is a **work-in-progress passion project**
-and I welcome contributions of all kinds — code, documentation, design feedback,
-and especially **hardware expertise** for the GPU/NPU paths that are currently stubbed.
+All contributions are welcome. Cerberus is a professional-grade heterogeneous inference runtime being built to prove that local AI on consumer hardware is achievable with modern C++ and disciplined engineering. Every contribution — code, documentation, testing, hardware expertise — directly helps reach production quality.
 
 ## Quick Start for Contributors
 
@@ -17,60 +15,59 @@ and especially **hardware expertise** for the GPU/NPU paths that are currently s
 
 ### High Priority
 
-- **Ubuntu + ROCm build verification** — I can't test this on Windows
-- **HIP zero-copy staging** — Replace the `false` gate in `hip_staging_` with real `hipMalloc`/`hipMemcpy`
-- **HailoRT integration** — Linux-only; I have no HailoRT on this host
-- **AVX-512 kernel correctness** — Dispatch exists but hardware is unavailable
-- **End-to-end inference with real ONNX models** — Text encoder / UNet / VAE on real weights
+- **Ubuntu + ROCm build verification**
+- **HIP zero-copy staging**
+- **HailoRT integration**
+- **AVX-512 kernel correctness**
+- **End-to-end inference with real ONNX models**
 
 ### Medium Priority
 
-- **Code review of safety-critical paths** — `denoise_step_()`, `Scheduler::step()`, `TMM::promote()`
-- **AddressSanitizer / Valgrind runs** — There is a cross-test heap corruption I'm chasing
-- **Better error messages** — `unavailable_reason()` strings should be actionable
-- **Documentation** — The C++26 concepts (`NpuBackend<T>`, `NpuAccelerator<T>`) need examples
+- **Code review of safety-critical paths**
+- **AddressSanitizer / Valgrind runs**
+- **Better error messages**
+- **Documentation**
 
 ### Low Priority / Nice-to-Have
 
-- **README translations** — I only write English
+- **README translations**
 - **Build scripts for other platforms** — macOS, WSL2
-- **Pretty printing / TUI improvements** — The `cerberus monitor` dashboard is functional but ugly
+- **Pretty printing / TUI improvements**
 
 ## Code Conventions
 
-- **C++26 minimum** — `std::expected`, `std::format`, designated initializers are required
-- **Zero tolerance for commented-out code** — If it's dead, delete it. Exception: 3 staging tests with known cross-test heap contamination
-- **Honest unavailability** — Every hardware-gated component must implement `unavailable_reason()` returning a descriptive string (never empty, never `false` without explanation)
-- **No `std::format` with `char const*` args** — GCC 15 MinGW segfaults. Use `std::ostringstream` instead
-- **`<windows.h>` banned from propup units** — Forward declarations in headers; isolated `.cpp` files only
-- **No empty feature stubs** — `-1.0f` sentinels and `unavailable_reason()` mandatory
+- **C++26 minimum**
+- **Zero tolerance for commented-out code**
+- **Honest unavailability**
+- **No `std::format` with `char const*` args** — GCC 15 MinGW segfaults
+- **`<windows.h>` banned from propup units**
+- **No empty feature stubs**
 
 ## Test Philosophy
 
 - **The KPI is sacred.** `david_propup_engine` must always show **347/347 passed**
-- **Synthetic tests only** — No external file dependencies in the test suite
-- **E2E detectable** — Every test must be callable via `run_one<>` in `david_propup_engine.cpp`
+- **Synthetic tests only**
+- **E2E detectable**
 
 ## Security
 
-Do **not** open a public issue for security vulnerabilities. Email me directly at the address
-in my GitHub profile with "Cerberus Security" in the subject line.
+Do **not** open a public issue for security vulnerabilities. Email me directly with "Cerberus Security" in the subject line.
 
-## License
+## Support
 
-By contributing, you agree that your contributions will be licensed under the
-**MIT License** (see [LICENSE](LICENSE)).
-
----
+**Patreon**: [https://www.patreon.com/TheMedusaInitiative](https://www.patreon.com/TheMedusaInitiative)  
+£25/month removes ads from all software at 200 subscribers. Every contribution funds continued development and infrastructure.
 
 ## About the Author
 
-I am a **systems analyst, network engineer, programmer, and web developer** who moved to passion projects after leaving paid corporate employment. After years working in systems architecture, infrastructure, and full-stack development, I am now building these projects independently while navigating physical disability and limited capacity for traditional full-time work.
+I am a **systems analyst, network engineer, programmer, and web developer** committed to building open infrastructure for local AI inference. This is not a spare-time project. It is a strategic commitment of all available resources toward building an A-Team of neurodiverse developers plus AI, to overcome physical and mental limitations and produce production-quality results.
 
-Cerberus is built by one person in their spare time, heavily constrained by health. Every hour of development is hard-won. If you find this project valuable and want to see it reach production quality — real CXL memory tiering, proper Thunderbolt 5 clustering, broader hardware support, and post-quantum security — support is welcome.
-
-**Patreon**: [https://www.patreon.com/TheMedusaInitiative](https://www.patreon.com/TheMedusaInitiative) — £25/month removes ads from all software at 200 subscribers
+I do not leave my house. I do not have a social network. The workday is solitary. It is a deliberate choice to redirect all available capacity into this infrastructure.
 
 Every contribution, code or financial, directly funds continued development and keeps the hardware running.
 
 — David Hargreaves (Roylepython), May 2026
+
+## License
+
+By contributing, you agree that your contributions will be licensed under the **MIT License** (see [LICENSE](LICENSE)).

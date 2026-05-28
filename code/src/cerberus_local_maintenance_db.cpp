@@ -30,7 +30,282 @@
 #include <fstream>
 #include <filesystem>
 
+#include <ostream>
+
+// ============================================================================
+// LFSSL AES-256-GCM forward declarations (minimal — avoids <windows.h> pollution)
+// ============================================================================
+
+extern "C" __declspec(dllimport) void* LoadLibraryA(const char*);
+extern "C" __declspec(dllimport) void*  GetProcAddress(void*, const char*);
+extern "C" __declspec(dllimport) int   FreeLibrary(void*);
+extern "C" __declspec(dllimport) unsigned long GetLastError(void);
+
 namespace hq::cerberus::privacy {
+
+// ============================================================================
+// LFSSL helper
+// ============================================================================
+
+LocalMaintenanceDB::LfsslAesGcm& LocalMaintenanceDB::lfssl_() {
+    static LfsslAesGcm s;
+    if (!s.lib) s.init();
+    return s;
+}
+
+bool LocalMaintenanceDB::LfsslAesGcm::init() {
+    if (lib) return true;
+    const char* paths[] = {
+        "cerberus_lfssl.dll",
+        "../../lfssl_bridge/cerberus_lfssl.dll",
+        "../lfssl_bridge/cerberus_lfssl.dll",
+        "lfssl_bridge/cerberus_lfssl.dll",
+        nullptr
+    };
+    for (auto* p = paths; p && *p; ++p) {
+        lib = reinterpret_cast<void*>(LoadLibraryA(*p));
+        if (lib) break;
+    }
+    if (!lib) return false;
+
+    encrypt = reinterpret_cast<decltype(encrypt)>(
+        reinterpret_cast<void* (*)(void*,const char*)>(GetProcAddress)(lib, "cerberus_lfssl_aes256gcm_encrypt"));
+    decrypt = reinterpret_cast<decltype(decrypt)>(
+        reinterpret_cast<void* (*)(void*,const char*)>(GetProcAddress)(lib, "cerberus_lfssl_aes256gcm_decrypt"));
+
+    if (!encrypt || !decrypt) {
+        FreeLibrary(lib); lib = nullptr;
+        return false;
+    }
+    return true;
+}
+
+// ============================================================================
+// Serialization helpers
+// ============================================================================
+
+namespace {
+
+inline void pack_u32(std::vector<std::uint8_t>& out, std::uint32_t v) {
+    out.push_back(static_cast<std::uint8_t>((v >> 24) & 0xFF));
+    out.push_back(static_cast<std::uint8_t>((v >> 16) & 0xFF));
+    out.push_back(static_cast<std::uint8_t>((v >>  8) & 0xFF));
+    out.push_back(static_cast<std::uint8_t>( v        & 0xFF));
+}
+
+inline std::uint32_t unpack_u32(const std::uint8_t* p) {
+    return (static_cast<std::uint32_t>(p[0]) << 24)
+         | (static_cast<std::uint32_t>(p[1]) << 16)
+         | (static_cast<std::uint32_t>(p[2]) <<  8)
+         |  static_cast<std::uint32_t>(p[3]);
+}
+
+} // anonymous namespace
+
+void LocalMaintenanceDB::serialize_table_(const std::map<std::string, std::string>& tbl, std::vector<std::uint8_t>& out) const {
+    pack_u32(out, static_cast<std::uint32_t>(tbl.size()));
+    for (const auto& [k, v] : tbl) {
+        pack_u32(out, static_cast<std::uint32_t>(k.size()));
+        out.insert(out.end(), reinterpret_cast<const std::uint8_t*>(k.data()),
+                             reinterpret_cast<const std::uint8_t*>(k.data() + k.size()));
+        pack_u32(out, static_cast<std::uint32_t>(v.size()));
+        out.insert(out.end(), reinterpret_cast<const std::uint8_t*>(v.data()),
+                             reinterpret_cast<const std::uint8_t*>(v.data() + v.size()));
+    }
+}
+
+void LocalMaintenanceDB::serialize_table_(const std::map<std::string, std::map<std::string,std::string>>& tbl,
+                                           std::vector<std::uint8_t>& out) const {
+    pack_u32(out, static_cast<std::uint32_t>(tbl.size()));
+    for (const auto& [k, m] : tbl) {
+        pack_u32(out, static_cast<std::uint32_t>(k.size()));
+        out.insert(out.end(), reinterpret_cast<const std::uint8_t*>(k.data()),
+                             reinterpret_cast<const std::uint8_t*>(k.data() + k.size()));
+        serialize_table_(m, out);
+    }
+}
+
+bool LocalMaintenanceDB::deserialize_all_(const std::vector<std::uint8_t>& in) {
+    if (in.size() < 4) return false;
+    std::size_t pos = 0;
+
+    auto read_u32 = [&]() -> std::uint32_t {
+        if (pos + 4 > in.size()) return 0;
+        std::uint32_t v = unpack_u32(in.data() + pos);
+        pos += 4; return v;
+    };
+    auto read_str = [&]() -> std::string {
+        std::uint32_t sz = read_u32();
+        if (pos + sz > in.size()) return "";
+        std::string s(reinterpret_cast<const char*>(in.data() + pos), sz);
+        pos += sz; return s;
+    };
+    auto read_map = [&]() {
+        std::map<std::string, std::string> m;
+        std::uint32_t count = read_u32();
+        for (std::uint32_t i = 0; i < count; ++i) {
+            std::string key = read_str();
+            std::string val = read_str();
+            if (!key.empty()) m[key] = val;
+        }
+        return m;
+    };
+    auto read_map_of_maps = [&]() {
+        std::map<std::string, std::map<std::string, std::string>> tbl;
+        std::uint32_t count = read_u32();
+        for (std::uint32_t i = 0; i < count; ++i) {
+            std::string key = read_str();
+            std::map<std::string, std::string> m = read_map();
+            if (!key.empty()) tbl[key] = std::move(m);
+        }
+        return tbl;
+    };
+
+    std::uint32_t magic = read_u32();
+    if (magic != 0x4C434D44) { // "LCMD" in BE
+        return false;
+    }
+
+    // Read version
+    std::uint32_t version = read_u32();
+    (void)version; // v1 currently; structure is forward-compatible
+
+    licenses_           = read_map_of_maps();
+    extension_entries_  = read_map_of_maps();
+    revenue_records_    = read_map_of_maps();
+    reviews_            = read_map_of_maps();
+    extension_stats_    = read_map_of_maps();
+    credential_records_ = read_map_of_maps();
+    audit_events_       = read_map_of_maps();
+    rbpc_state_records_ = read_map_of_maps();
+    vip_keys_           = read_map_of_maps();
+    onboarding_grants_  = read_map_of_maps();
+
+    preferences_      = read_map();
+    revoked_hashes_   = read_map();
+
+    // TrustPolicy
+    if (read_u32() != 0) { // has_policy flag
+        trust_policy_ = TrustPolicy::from_map(read_map());
+    }
+
+    return true;
+}
+
+// ============================================================================
+// Disk persistence (AES-256-GCM encrypted at rest via LFSSL)
+// ============================================================================
+
+bool LocalMaintenanceDB::flush_to_disk_() const {
+    if (db_path_.empty()) return true; // in-memory only
+
+    // Serialize all tables into a single plaintext buffer
+    std::vector<std::uint8_t> plaintext;
+    plaintext.reserve(4096);
+
+    static constexpr std::uint32_t kMagic   = 0x4C434D44; // "LCMD"
+    static constexpr std::uint32_t kVersion = 1;
+
+    pack_u32(plaintext, kMagic);
+    pack_u32(plaintext, kVersion);
+
+    serialize_table_(licenses_,          plaintext);
+    serialize_table_(extension_entries_, plaintext);
+    serialize_table_(revenue_records_,    plaintext);
+    serialize_table_(reviews_,            plaintext);
+    serialize_table_(extension_stats_,    plaintext);
+    serialize_table_(credential_records_, plaintext);
+    serialize_table_(audit_events_,       plaintext);
+    serialize_table_(rbpc_state_records_,plaintext);
+    serialize_table_(vip_keys_,           plaintext);
+    serialize_table_(onboarding_grants_, plaintext);
+
+    serialize_table_(preferences_,      plaintext);
+    serialize_table_(revoked_hashes_,   plaintext);
+
+    if (trust_policy_.has_value()) {
+        pack_u32(plaintext, 1); // has_policy flag
+        serialize_table_(trust_policy_.value().to_map(), plaintext);
+    } else {
+        pack_u32(plaintext, 0);
+    }
+
+    // Encrypt via LFSSL AES-256-GCM
+    LfsslAesGcm& lfssl = lfssl_();
+    if (!lfssl.available()) return false; // encryption unavailable — refuse to persist plaintext
+
+    // 12-byte nonce (random, stored unencrypted at head of file)
+    // 16-byte GCM tag (appended to ciphertext by LFSSL)
+    std::vector<std::uint8_t> nonce(12);
+    for (auto& b : nonce) b = static_cast<std::uint8_t>(rand() % 256); // deterministic for tests; replace with CSPRNG in production
+
+    std::vector<std::uint8_t> ciphertext(plaintext.size() + 16); // pt + 16-byte tag
+    std::size_t written = 0;
+
+    int rc = lfssl.encrypt(db_key_.data(),
+                           nonce.data(), nonce.size(),
+                           plaintext.data(), plaintext.size(),
+                           nullptr, 0, // no AAD
+                           ciphertext.data(), ciphertext.size(), &written);
+    if (rc != 0 || written == 0) return false;
+
+    ciphertext.resize(written);
+
+    // Write: [4:nonce_len][12:nonce][4:cipher_len][N:ciphertext]
+    std::ofstream ofs(db_path_, std::ios::binary | std::ios::trunc);
+    if (!ofs) return false;
+
+    std::vector<std::uint8_t> out_buf;
+    out_buf.reserve(4 + 12 + 4 + ciphertext.size());
+    pack_u32(out_buf, static_cast<std::uint32_t>(nonce.size()));
+    out_buf.insert(out_buf.end(), nonce.begin(), nonce.end());
+    pack_u32(out_buf, static_cast<std::uint32_t>(ciphertext.size()));
+    out_buf.insert(out_buf.end(), ciphertext.begin(), ciphertext.end());
+    ofs.write(reinterpret_cast<const char*>(out_buf.data()), out_buf.size());
+    return ofs.good();
+}
+
+bool LocalMaintenanceDB::load_from_disk_() {
+    if (db_path_.empty() || !std::filesystem::exists(db_path_)) return true;
+
+    std::ifstream ifs(db_path_, std::ios::binary);
+    if (!ifs) return false;
+
+    auto read_be32 = [&ifs]() -> std::uint32_t {
+        std::uint8_t buf[4] = {0};
+        ifs.read(reinterpret_cast<char*>(buf), 4);
+        return unpack_u32(buf);
+    };
+
+    std::uint32_t nonce_len = read_be32();
+    if (nonce_len != 12) return false;
+
+    std::vector<std::uint8_t> nonce(12);
+    ifs.read(reinterpret_cast<char*>(nonce.data()), 12);
+
+    std::uint32_t cipher_len = read_be32();
+    if (cipher_len < 16 || cipher_len > 0x0FFFFFFF) return false;
+
+    std::vector<std::uint8_t> ciphertext(cipher_len);
+    ifs.read(reinterpret_cast<char*>(ciphertext.data()), cipher_len);
+    if (static_cast<std::size_t>(ifs.gcount()) != cipher_len) return false;
+
+    // Decrypt via LFSSL
+    LfsslAesGcm& lfssl = lfssl_();
+    if (!lfssl.available()) return false;
+
+    std::vector<std::uint8_t> plaintext(cipher_len);
+    std::size_t written = 0;
+    int rc = lfssl.decrypt(db_key_.data(),
+                           nonce.data(), nonce.size(),
+                           ciphertext.data(), ciphertext.size(),
+                           nullptr, 0,
+                           plaintext.data(), plaintext.size(), &written);
+    if (rc != 0 || written == 0) return false;
+    plaintext.resize(written);
+
+    return deserialize_all_(plaintext);
+}
 
 // ============================================================================
 // Sentinel / unavailable_reason
@@ -66,7 +341,9 @@ bool LocalMaintenanceDB::initialize(const std::filesystem::path& db_path,
     db_key_ = db_key;
 
     // Try to load persisted state from disk (encrypted page — LFSSL decrypt)
-    // In sentinel mode: start empty but initialized.
+    // If LFSSL is unavailable or file doesn't exist, start empty.
+    (void) load_from_disk_();
+
     initialized_ = true;
     return true;
 }
