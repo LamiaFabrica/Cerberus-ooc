@@ -36,10 +36,14 @@
 // LFSSL AES-256-GCM forward declarations (minimal — avoids <windows.h> pollution)
 // ============================================================================
 
-extern "C" __declspec(dllimport) void* LoadLibraryA(const char*);
-extern "C" __declspec(dllimport) void*  GetProcAddress(void*, const char*);
-extern "C" __declspec(dllimport) int   FreeLibrary(void*);
-extern "C" __declspec(dllimport) unsigned long GetLastError(void);
+#ifdef _WIN32
+  extern "C" __declspec(dllimport) void* LoadLibraryA(const char*);
+  extern "C" __declspec(dllimport) void*  GetProcAddress(void*, const char*);
+  extern "C" __declspec(dllimport) int   FreeLibrary(void*);
+  extern "C" __declspec(dllimport) unsigned long GetLastError(void);
+#else
+  #include <dlfcn.h>
+#endif
 
 namespace hq::cerberus::privacy {
 
@@ -55,6 +59,7 @@ LocalMaintenanceDB::LfsslAesGcm& LocalMaintenanceDB::lfssl_() {
 
 bool LocalMaintenanceDB::LfsslAesGcm::init() {
     if (lib) return true;
+#ifdef _WIN32
     const char* paths[] = {
         "cerberus_lfssl.dll",
         "../../lfssl_bridge/cerberus_lfssl.dll",
@@ -66,15 +71,38 @@ bool LocalMaintenanceDB::LfsslAesGcm::init() {
         lib = reinterpret_cast<void*>(LoadLibraryA(*p));
         if (lib) break;
     }
+#else
+    const char* paths[] = {
+        "./libcerberus_lfssl.so",
+        "../../lfssl_bridge/libcerberus_lfssl.so",
+        "../lfssl_bridge/libcerberus_lfssl.so",
+        "lfssl_bridge/libcerberus_lfssl.so",
+        nullptr
+    };
+    for (auto* p = paths; p && *p; ++p) {
+        lib = dlopen(*p, RTLD_NOW);
+        if (lib) break;
+    }
+#endif
     if (!lib) return false;
 
+#ifdef _WIN32
     encrypt = reinterpret_cast<decltype(encrypt)>(
         reinterpret_cast<void* (*)(void*,const char*)>(GetProcAddress)(lib, "cerberus_lfssl_aes256gcm_encrypt"));
     decrypt = reinterpret_cast<decltype(decrypt)>(
         reinterpret_cast<void* (*)(void*,const char*)>(GetProcAddress)(lib, "cerberus_lfssl_aes256gcm_decrypt"));
+#else
+    encrypt = reinterpret_cast<decltype(encrypt)>(dlsym(lib, "cerberus_lfssl_aes256gcm_encrypt"));
+    decrypt = reinterpret_cast<decltype(decrypt)>(dlsym(lib, "cerberus_lfssl_aes256gcm_decrypt"));
+#endif
 
     if (!encrypt || !decrypt) {
-        FreeLibrary(lib); lib = nullptr;
+#ifdef _WIN32
+        FreeLibrary(lib);
+#else
+        dlclose(lib);
+#endif
+        lib = nullptr;
         return false;
     }
     return true;

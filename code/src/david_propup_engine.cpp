@@ -49,11 +49,22 @@
 #include <fstream>
 
 // Minimal Windows API forward declarations (avoid <windows.h> macro pollution)
+#ifdef _WIN32
 using HMODULE = void*;
 extern "C" __declspec(dllimport) HMODULE LoadLibraryA(const char*);
 extern "C" __declspec(dllimport) void*   GetProcAddress(HMODULE, const char*);
 extern "C" __declspec(dllimport) int     FreeLibrary(HMODULE);
 extern "C" __declspec(dllimport) unsigned long GetLastError(void);
+using HMOD = HMODULE;
+#else
+#  include <dlfcn.h>
+using HMOD = void*;
+#  define HMODULE HMOD
+#  define LoadLibraryA(p) dlopen(p, RTLD_NOW)
+#  define GetProcAddress(h, n) dlsym(h, n)
+#  define FreeLibrary(h) dlclose(h)
+#  define GetLastError() 0
+#endif
 
 using hq::cerberus::CerberusNativeBackend;
 using hq::cerberus::DecisionEngine;

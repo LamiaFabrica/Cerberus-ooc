@@ -358,7 +358,8 @@ IntelOpenVinoBackend::IntelOpenVinoBackend() : impl_(std::make_unique<Impl>()) {
 IntelOpenVinoBackend::~IntelOpenVinoBackend() = default;
 
 std::expected<CompiledKernel, std::string>
-IntelOpenVinoBackend::compile(const KernelGraph& graph, const TargetConfig& cfg) {
+IntelOpenVinoBackend::compile([[maybe_unused]] const KernelGraph& graph,
+                              [[maybe_unused]] const TargetConfig& cfg) {
     if (!impl_->initialized)
         return std::unexpected{impl_->unavailable_reason};
 #if OPENVINO_DYNAMIC_LOAD

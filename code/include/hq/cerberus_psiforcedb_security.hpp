@@ -31,8 +31,14 @@
 #include <optional>
 
 // LFSSL Native Crypto — SHA256/HMAC/PBKDF2 are inline; AES/GCM is NOT.
-#include <cstdio>
-#include <lfssl/LFSSL_Native_Crypto.hpp>
+// On Linux/WSL, LFSSL may not be present in the include path — guard the include.
+#if __has_include(<lfssl/LFSSL_Native_Crypto.hpp>)
+#  include <lfssl/LFSSL_Native_Crypto.hpp>
+#  define CERBERUS_HAS_LFSSL_NATIVE_CRYPTO 1
+#else
+#  pragma message("LFSSL_Native_Crypto.hpp not found — CryptoBridge uses runtime DLL fallback only")
+#  define CERBERUS_HAS_LFSSL_NATIVE_CRYPTO 0
+#endif
 
 namespace hq::cerberus::security {
 

@@ -6,9 +6,34 @@
 # =============================================================================
 cmake_minimum_required(VERSION 3.28)
 
-# Force the known-good GCC 15.2.0 toolchain (WinLibs MCF UCRT)
-set(CMAKE_C_COMPILER   "C:/gcc-15.2.0/mingw64/bin/gcc.exe"  CACHE FILEPATH "C compiler" FORCE)
-set(CMAKE_CXX_COMPILER "C:/gcc-15.2.0/mingw64/bin/g++.exe" CACHE FILEPATH "C++ compiler" FORCE)
+# Platform-conditional toolchain selection
+# Windows: Force the known-good GCC 15.2.0 toolchain (WinLibs MCF UCRT)
+# Linux (Ubuntu/WSL): Require GCC 15+ for full C++26 support
+if(WIN32)
+    set(CMAKE_C_COMPILER   "C:/gcc-15.2.0/mingw64/bin/gcc.exe"  CACHE FILEPATH "C compiler" FORCE)
+    set(CMAKE_CXX_COMPILER "C:/gcc-15.2.0/mingw64/bin/g++.exe" CACHE FILEPATH "C++ compiler" FORCE)
+else()
+    # Ubuntu: GCC 15+ is required for full C++26 feature completeness.
+    # GCC 14 is insufficient — we need designated initializers, std::print,
+    # and other P2300/P2537 features that are only stable in GCC 15+.
+    find_program(GXX_15 g++-15)
+    find_program(GCC_15 gcc-15)
+    if(GXX_15 AND GCC_15)
+        set(CMAKE_C_COMPILER   "${GCC_15}" CACHE FILEPATH "C compiler" FORCE)
+        set(CMAKE_CXX_COMPILER "${GXX_15}" CACHE FILEPATH "C++ compiler" FORCE)
+        message(STATUS "Linux toolchain: GCC 15 (${GXX_15})")
+    else()
+        message(FATAL_ERROR
+            "GCC 15+ is required on Linux but was not found.\n"
+            "  Install GCC 15 from the ubuntu-toolchain-r PPA:\n"
+            "    sudo add-apt-repository ppa:ubuntu-toolchain-r/test\n"
+            "    sudo apt-get update\n"
+            "    sudo apt-get install g++-15 gcc-15\n"
+            "  Or build GCC 15 from source:\n"
+            "    wget https://ftp.gnu.org/gnu/gcc/gcc-15.2.0/gcc-15.2.0.tar.gz\n"
+            "    # ... standard GCC build procedure\n")
+    endif()
+endif()
 
 project(um790_pipeline
     VERSION 1.0.0
@@ -20,14 +45,37 @@ project(um790_pipeline
 # ---------------------------------------------------------------------------
 # C++26 Standard Configuration
 # ---------------------------------------------------------------------------
-set(CMAKE_CXX_STANDARD 26)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+# CMake 3.28 does not recognise "CXX26" as a dialect name (added in 3.30).
+# GCC 14+ supports -std=c++26 natively. We set the flag manually when CMake
+# is too old to handle cxx_std_26.
+if(CMAKE_VERSION VERSION_LESS "3.30")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++26" CACHE STRING "C++ flags" FORCE)
+    message(STATUS "CMake ${CMAKE_VERSION}: C++26 enabled via -std=c++26 flag")
+    # Do NOT set CMAKE_CXX_STANDARD to 26 here — it leaks into try_compile
+    # subprojects and CMake 3.28 fails because it doesn't recognise CXX26.
+    set(CERBERUS_CXX_STANDARD_SET_BY_FLAGS TRUE)
+else()
+    set(CMAKE_CXX_STANDARD 26)
+    set(CMAKE_CXX_STANDARD_REQUIRED ON)
+endif()
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 # ---------------------------------------------------------------------------
 # Feature Detection: Verify the compiler actually supports requested C++26
 # ---------------------------------------------------------------------------
+# CMake 3.28 does not recognise "CXX26" as a dialect name. When
+# CMAKE_CXX_STANDARD is set to anything (even 20), CMake appends -std=c++20
+# AFTER CMAKE_REQUIRED_FLAGS, overriding -std=c++26. We must CLEAR
+# CMAKE_CXX_STANDARD entirely before the feature-check module.
+set(_SAVED_CXX_STANDARD ${CMAKE_CXX_STANDARD})
+unset(CMAKE_CXX_STANDARD)
+set(CMAKE_CXX_STANDARD_REQUIRED OFF)
 include(cmake/CheckCXX26Features.cmake)
+set(CMAKE_CXX_STANDARD ${_SAVED_CXX_STANDARD})
+unset(_SAVED_CXX_STANDARD)
+if(CERBERUS_CXX_STANDARD_SET_BY_FLAGS)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++26" CACHE STRING "C++ flags" FORCE)
+endif()
 
 # ---------------------------------------------------------------------------
 # Threading support (required by std::thread, std::jthread, std::mutex)
@@ -274,6 +322,8 @@ target_compile_options(um790_compile_options INTERFACE
     $<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:
         -march=native        # Detect host CPU features (Zen 4 on UM790, Arrow Lake on G18 dev)
         -Wall -Wextra -Wpedantic -Werror
+        -std=c++26
+        -fPIC               # Required for static libs linked into .so on Linux
 
         # --- Maximum diagnostic verbosity ---
         # Show the source line with a caret (^) pointing at the exact character
@@ -302,7 +352,9 @@ target_compile_options(um790_compile_options INTERFACE
     $<$<CXX_COMPILER_ID:GNU>:-fcoroutines>
     $<$<CXX_COMPILER_ID:Clang,AppleClang>:-stdlib=libc++ -fcoroutines>
 )
-target_compile_features(um790_compile_options INTERFACE cxx_std_26)
+target_compile_features(um790_compile_options INTERFACE
+    $<$<NOT:$<VERSION_LESS:${CMAKE_VERSION},3.30>>:cxx_std_26>
+)
 
 # ---------------------------------------------------------------------------
 # Link Flags
