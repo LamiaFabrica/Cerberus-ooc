@@ -25,6 +25,7 @@
 
 #include <cstring>
 #include <cstdint>
+#include <random>
 #include <chrono>
 #include <algorithm>
 #include <fstream>
@@ -91,12 +92,15 @@ bool LocalMaintenanceDB::LfsslAesGcm::init() {
         reinterpret_cast<void* (*)(void*,const char*)>(GetProcAddress)(lib, "cerberus_lfssl_aes256gcm_encrypt"));
     decrypt = reinterpret_cast<decltype(decrypt)>(
         reinterpret_cast<void* (*)(void*,const char*)>(GetProcAddress)(lib, "cerberus_lfssl_aes256gcm_decrypt"));
+    random_bytes = reinterpret_cast<decltype(random_bytes)>(
+        reinterpret_cast<void* (*)(void*,const char*)>(GetProcAddress)(lib, "cerberus_lfssl_random_bytes"));
 #else
     encrypt = reinterpret_cast<decltype(encrypt)>(dlsym(lib, "cerberus_lfssl_aes256gcm_encrypt"));
     decrypt = reinterpret_cast<decltype(decrypt)>(dlsym(lib, "cerberus_lfssl_aes256gcm_decrypt"));
+    random_bytes = reinterpret_cast<decltype(random_bytes)>(dlsym(lib, "cerberus_lfssl_random_bytes"));
 #endif
 
-    if (!encrypt || !decrypt) {
+    if (!encrypt || !decrypt || !random_bytes) {
 #ifdef _WIN32
         FreeLibrary(lib);
 #else
@@ -262,10 +266,22 @@ bool LocalMaintenanceDB::flush_to_disk_() const {
     LfsslAesGcm& lfssl = lfssl_();
     if (!lfssl.available()) return false; // encryption unavailable — refuse to persist plaintext
 
-    // 12-byte nonce (random, stored unencrypted at head of file)
-    // 16-byte GCM tag (appended to ciphertext by LFSSL)
+    // 12-byte nonce using LFSSL CSPRNG (critical: NEVER reuse with same key)
+    // If LFSSL CSPRNG unavailable, use std::random_device (OS entropy pool)
     std::vector<std::uint8_t> nonce(12);
-    for (auto& b : nonce) b = static_cast<std::uint8_t>(rand() % 256); // deterministic for tests; replace with CSPRNG in production
+    if (lfssl.random_bytes) {
+        int rc_rng = lfssl.random_bytes(nonce.data(), nonce.size());
+        if (rc_rng != 0) {
+            // LFSSL RNG failed — refuse to encrypt rather than reuse nonce
+            return false;
+        }
+    } else {
+        // OS fallback: std::random_device pulls from OS entropy source
+        // (/dev/urandom on Linux, BCryptGenRandom on Windows via C++ runtime)
+        std::random_device rd;
+        std::uniform_int_distribution<int> dist(0, 255);
+        for (auto& b : nonce) b = static_cast<std::uint8_t>(dist(rd));
+    }
 
     std::vector<std::uint8_t> ciphertext(plaintext.size() + 16); // pt + 16-byte tag
     std::size_t written = 0;
@@ -380,7 +396,12 @@ void LocalMaintenanceDB::shutdown() {
     std::lock_guard<std::mutex> lock(mutex_);
     if (!initialized_) return;
 
-    // In production: flush encrypted pages to disk via LFSSL.
+    // Persist encrypted pages to disk before clearing
+    if (dirty_.exchange(false, std::memory_order_relaxed)) {
+        (void)flush_to_disk_();
+    }
+
+    // In production: clear sensitive memory after flush.
     // In sentinel: clear everything.
 
     scrub_(db_key_);
@@ -483,6 +504,7 @@ bool LocalMaintenanceDB::store_license(const std::string& extension_id,
     const std::string key = extension_id + ":" + user_id;
     licenses_[key] = rec;
 
+    mark_dirty_();
     if (offline_mode_) queue_for_sync("licenses", key, rec);
     return true;
 }
@@ -501,6 +523,7 @@ bool LocalMaintenanceDB::revoke_license(const std::string& license_key_hash, con
     if (!initialized_) return false;
     std::lock_guard<std::mutex> lock(mutex_);
     revoked_hashes_[license_key_hash] = reason.empty() ? "revoked" : reason;
+    mark_dirty_();
     if (offline_mode_) queue_for_sync("license_revocations", license_key_hash, { {"hash",license_key_hash}, {"reason",reason.empty() ? "revoked" : reason} });
     return true;
 }
@@ -520,6 +543,7 @@ bool LocalMaintenanceDB::store_extension_entry(const std::map<std::string, std::
     if (it == entry.end() || it->second.empty()) return false;
     std::lock_guard<std::mutex> lock(mutex_);
     extension_entries_[it->second] = entry;
+    mark_dirty_();
     if (offline_mode_) queue_for_sync("extension_entries", it->second, entry);
     return true;
 }
@@ -564,6 +588,7 @@ bool LocalMaintenanceDB::store_revenue_share_record(const std::map<std::string, 
                      : ("rev_" + std::to_string(revenue_records_.size()));
     std::lock_guard<std::mutex> lock(mutex_);
     revenue_records_[key] = record;
+    mark_dirty_();
     if (offline_mode_) queue_for_sync("revenue_records", key, record);
     return true;
 }
@@ -595,6 +620,7 @@ bool LocalMaintenanceDB::store_review(const std::map<std::string, std::string>& 
                      : ("review_" + std::to_string(reviews_.size()));
     std::lock_guard<std::mutex> lock(mutex_);
     reviews_[key] = review;
+    mark_dirty_();
     if (offline_mode_) queue_for_sync("reviews", key, review);
     return true;
 }
@@ -620,6 +646,7 @@ bool LocalMaintenanceDB::update_extension_stats(const std::string& extension_id,
     if (!initialized_ || extension_id.empty()) return false;
     std::lock_guard<std::mutex> lock(mutex_);
     extension_stats_[extension_id] = stats;
+    mark_dirty_();
     if (offline_mode_) queue_for_sync("extension_stats", extension_id, stats);
     return true;
 }
@@ -649,6 +676,7 @@ bool LocalMaintenanceDB::store_vip_key(const std::string& key_hash,
     rec["record_class"] = "vip_key";
     rec["plaintext_storage"] = "forbidden";
     vip_keys_[key_hash] = rec;
+    mark_dirty_();
     if (offline_mode_) queue_for_sync("vip_keys", key_hash, rec);
     return true;
 }
@@ -671,6 +699,7 @@ bool LocalMaintenanceDB::update_vip_key_status(const std::string& key_hash,
     auto it = vip_keys_.find(key_hash);
     if (it == vip_keys_.end()) return false;
     for (const auto& [k, v] : status_data) it->second[k] = v;
+    mark_dirty_();
     if (offline_mode_) queue_for_sync("vip_keys", key_hash, it->second);
     return true;
 }
@@ -697,6 +726,7 @@ bool LocalMaintenanceDB::store_onboarding_grant(const std::map<std::string, std:
     safe["plaintext_storage"] = "forbidden";
     if (!safe.count("consumed")) safe["consumed"] = "false";
     onboarding_grants_[key] = safe;
+    mark_dirty_();
     if (offline_mode_) queue_for_sync("onboarding_grants", key, safe);
     return true;
 }
@@ -748,6 +778,7 @@ bool LocalMaintenanceDB::store_trust_policy(const TrustPolicy& policy) {
     std::lock_guard<std::mutex> lock(mutex_);
     trust_policy_ = policy;
     auto map = policy.to_map();
+    mark_dirty_();
     if (offline_mode_) queue_for_sync("trust_policy", "trust_policy", map);
     return true;
 }
@@ -813,6 +844,7 @@ bool LocalMaintenanceDB::store_credential_record(const std::map<std::string, std
     safe["updated_at"] = std::to_string(sec);
 
     credential_records_[key] = safe;
+    mark_dirty_();
     if (offline_mode_) queue_for_sync("credential_records", key, safe);
     return true;
 }
@@ -847,6 +879,7 @@ bool LocalMaintenanceDB::save_rbpc_state(const RBPCState& state) {
     rec["record_class"] = "rbpc_state";
 
     rbpc_state_records_[state.node_id] = rec;
+    mark_dirty_();
     if (offline_mode_) queue_for_sync("rbpc_state", state.node_id, rec);
     return true;
 }
@@ -940,6 +973,7 @@ bool LocalMaintenanceDB::store_audit_event(const std::map<std::string, std::stri
     if (!rec.count("timestamp")) rec["timestamp"] = std::to_string(sec);
 
     audit_events_[event_id] = rec;
+    mark_dirty_();
     if (offline_mode_) queue_for_sync("audit_events", event_id, rec);
     return true;
 }
@@ -976,6 +1010,7 @@ bool LocalMaintenanceDB::store_preference(const std::string& key, const std::str
     if (!initialized_ || key.empty()) return false;
     std::lock_guard<std::mutex> lock(mutex_);
     preferences_[key] = value;
+    mark_dirty_();
     return true;
 }
 

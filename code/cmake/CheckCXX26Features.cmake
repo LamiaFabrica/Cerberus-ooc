@@ -18,7 +18,9 @@ message(STATUS "CMAKE_REQUIRED_FLAGS = ${CMAKE_REQUIRED_FLAGS}")
 
 # Helper: compile a snippet and return TRUE if it succeeds
 function(_cerberus_check_feature name snippet out_var)
-    set(src "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/_cerberus_check_${name}.cpp")
+    # Replace reserved characters for Windows filenames (: is drive-letter separator)
+    string(REPLACE ":" "_" safe_name "${name}")
+    set(src "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/_cerberus_check_${safe_name}.cpp")
     file(WRITE "${src}" "${snippet}")
     execute_process(
         COMMAND "${CMAKE_CXX_COMPILER}" ${CMAKE_REQUIRED_FLAGS} -c "${src}" -o "${src}.o"

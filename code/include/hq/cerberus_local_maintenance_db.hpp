@@ -54,6 +54,7 @@
 #include <filesystem>
 #include <ctime>
 #include <functional>
+#include <atomic>
 
 namespace hq::cerberus::privacy {
 
@@ -294,6 +295,7 @@ private:
     std::filesystem::path db_path_;
     std::vector<std::uint8_t> db_key_;
     bool offline_mode_{false};
+    mutable std::atomic<bool> dirty_{false};   // set on any write, cleared on flush
 
     // In-memory storage (encrypted pages would be managed by LFSSL in production)
     std::map<std::string, std::map<std::string, std::string>> licenses_;
@@ -320,6 +322,7 @@ private:
     std::vector<SyncRecord> sync_queue_;
 
     void scrub_(std::vector<std::uint8_t>& buf) const noexcept;
+    void mark_dirty_() const noexcept { dirty_.store(true, std::memory_order_relaxed); }
 
     // ------------------------------------------------------------------------
     // Disk persistence (LFSSL AES-256-GCM encrypted at rest)
@@ -338,8 +341,9 @@ private:
         void*   lib{nullptr};
         int (*encrypt)(const std::uint8_t*, const std::uint8_t*, size_t, const std::uint8_t*, size_t, const std::uint8_t*, size_t, std::uint8_t*, size_t, size_t*){nullptr};
         int (*decrypt)(const std::uint8_t*, const std::uint8_t*, size_t, const std::uint8_t*, size_t, const std::uint8_t*, size_t, std::uint8_t*, size_t, size_t*){nullptr};
+        int (*random_bytes)(std::uint8_t*, size_t){nullptr}; // LFSSL CSPRNG (GetRandom/BCryptGenRandom)
         bool init();
-        bool available() const noexcept { return lib && encrypt && decrypt; }
+        bool available() const noexcept { return lib && encrypt && decrypt && random_bytes; }
     };
     static LfsslAesGcm& lfssl_();
 };

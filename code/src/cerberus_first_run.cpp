@@ -102,14 +102,25 @@ RegistrationResult FirstRun::register_new_install(
     result.node_id = generate_node_id_();
 
     // --- Step 1: Provision SMDU ---
-    // Production: LFSSL Argon2id(passphrase, 64-byte salt, t=3, m=65536, p=1)
-    // Fallback: HMAC-SHA256 chain
-    std::vector<std::uint8_t> install_salt;
+    // CRITICAL TODO: Replace HMAC fallback with LFSSL Argon2id as soon as
+    // libcerberus_lfssl.so (Linux) / cerberus_lfssl.dll (Windows) is linked.
+    // Current fallback is NOT production-safe for real user data.
+    //
+    // Production: LFSSL Argon2id(passphrase, 64-byte random salt, t=3, m=65536, p=1)
+    // Fallback (temporary only): HMAC-SHA256 chain with random salt.
+    //
+    // SAFETY: If LFSSL Argon2id is available at runtime, it MUST be used.
+    //         Do NOT ship with HMAC fallback for real user data.
+    //
+    // NOTE (Claude review, 2026-05-28): Previous code derived salt from
+    // passphrase+node_id, which adds ZERO entropy (attacker who knows
+    // passphrase also knows salt). Salt MUST be independent random.
+    std::vector<std::uint8_t> install_salt(32);
     {
-        auto salt_str = hq::cerberus::security::CryptoBridge::sha256(
-            result.node_id + std::string(passphrase));
-        install_salt.assign(salt_str.begin(), salt_str.end());
-        install_salt.resize(32);
+        std::random_device rd;
+        std::mt19937_64 gen(rd());
+        std::uniform_int_distribution<int> dist(0, 255);
+        for (auto& b : install_salt) b = static_cast<std::uint8_t>(dist(gen));
     }
 
     // Generate master secret from passphrase + salt
