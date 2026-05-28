@@ -29,6 +29,8 @@ All rights reserved.
 
 Cerberus is a **C++26 AI inference runtime** targeting heterogeneous consumer hardware across **Windows (MinGW-W64) and Ubuntu (24.04 LTS)**. The eventual deployment platforms are Windows and Linux — the two most approachable operating systems for developers and end users.
 
+We are currently adapting the **Helios library** (AMD's GPU compute middleware) to run on Windows alongside the existing ROCm/HIP paths on Ubuntu.
+
 Target hardware:
 
 - **CPU** — AMD Ryzen 9 7940HS (Zen 4)
