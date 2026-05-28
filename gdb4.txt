@@ -1,0 +1,64 @@
+[New Thread 56784.0x105c0]
+[New Thread 56784.0x1774c]
+[New Thread 56784.0xbabc]
+The requested API version [21] is not available, only API versions [1, 17] are supported in this build. Current ORT Version is: 1.17.1
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP] propup_tiered_memory passed in 1.08813 ms
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP] propup_coordinator_memory_loop passed in 0.200439 ms
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP] propup_coordinator_tier_decisions passed in 0.065918 ms
+[PROPUP] propup_compile_graph_analysis passed in 0.0593262 ms
+[PROPUP] propup_kernel_matmul passed in 0.00439453 ms
+[PROPUP] propup_kernel_elementwise passed in 0.00317383 ms
+[PROPUP] propup_kernel_fma passed in 0.00341797 ms
+[PROPUP] propup_kernel_matmul_blocked passed in 0.00830078 ms
+[PROPUP] propup_performance_matmul_vs_naive naive=43.6521 ms blocked=41.6374 ms speedup=1.04839
+[PROPUP] propup_performance_matmul_vs_naive passed in 86.8931 ms
+[PROPUP] propup_kernel_matmul_avx2 avx2=4.5107 ms max_err=1.90735e-06
+[PROPUP] propup_kernel_avx512_detect avx2=yes avx512f=no
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP] propup_end_to_end_native passed in 0.28833 ms
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP] propup_decision_engine_fusion passed in 0.254639 ms
+[PROPUP-VERBOSE] graph nodes=2 tensors=5 live_bytes=80
+[PROPUP] propup_graph_engine_verbose passed in 0.027832 ms
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP] propup_tier_pressure_demotion passed in 0.103271 ms
+[PROPUP] propup_kernel_quantized_matmul passed in 0.0107422 ms
+[PROPUP] propup_kernel_dynamic_quant_accuracy max_rel_err=1.17646%
+[PROPUP] propup_kernel_dynamic_quant_accuracy passed in 0.0385742 ms
+[PROPUP] propup_performance_int8_vs_float float=5.5861 ms quant=4.7591 ms speedup=1.17377
+[PROPUP] propup_performance_int8_vs_float passed in 10.8247 ms
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[10:14:57.634] [INFO ] npu_backend_unified.cpp:643 hq::npu::NpuBackendFactory::initialize()::<lambda()>() ÔÇö [NpuBackendFactory] Probed 3 backends:
+[10:14:57.634] [INFO ] npu_backend_unified.cpp:668 hq::npu::NpuBackendFactory::print_status()::<lambda(hq::npu::INpuBackend*)>() ÔÇö   ONNX-CPU-Fallback: available=yes, synthetic=yes, can_compile_for(intel_npu)=no, can_compile_for(cuda)=no, can_compile_for(cpu)=yes
+[10:14:57.634] [INFO ] npu_backend_unified.cpp:668 hq::npu::NpuBackendFactory::print_status()::<lambda(hq::npu::INpuBackend*)>() ÔÇö   NVIDIA-CUDA: available=no, synthetic=yes, can_compile_for(intel_npu)=no, can_compile_for(cuda)=yes, can_compile_for(cpu)=no
+[10:14:57.634] [INFO ] npu_backend_unified.cpp:668 hq::npu::NpuBackendFactory::print_status()::<lambda(hq::npu::INpuBackend*)>() ÔÇö   Intel-OpenVINO-NPU: available=no, synthetic=yes, can_compile_for(intel_npu)=yes, can_compile_for(cuda)=no, can_compile_for(cpu)=yes
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP] propup_shadow_rollback passed in 0.00732422 ms
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+
+Thread 1 received signal SIGSEGV, Segmentation fault.
+0x00007ff7383fd1f3 in construct_at<hq::ScopedTierAlloc, hq::TieredMemoryManager&, hq::TierAllocation&> (__location=0xe53f90) at C:/gcc-15.2.0/mingw64/include/c++/15.2.0/bits/stl_construct.h:110
+110		return ::new(__loc) _Tp(std::forward<_Args>(__args)...);
+#0  0x00007ff7383fd1f3 in construct_at<hq::ScopedTierAlloc, hq::TieredMemoryManager&, hq::TierAllocation&> (__location=0xe53f90) at C:/gcc-15.2.0/mingw64/include/c++/15.2.0/bits/stl_construct.h:110
+#1  0x00007ff73839bfb4 in std::allocator_traits<std::allocator<hq::ScopedTierAlloc> >::construct<hq::ScopedTierAlloc, hq::TieredMemoryManager&, hq::TierAllocation&> (__a=..., __p=0xe53f90) at C:/gcc-15.2.0/mingw64/include/c++/15.2.0/bits/alloc_traits.h:676
+#2  std::vector<hq::ScopedTierAlloc, std::allocator<hq::ScopedTierAlloc> >::emplace_back<hq::TieredMemoryManager&, hq::TierAllocation&> (this=0x5f9a30) at C:/gcc-15.2.0/mingw64/include/c++/15.2.0/bits/vector.tcc:117
+#3  0x00007ff738270592 in hq::CerberusExecutionCoordinator::run[abi:cxx11](hq::npu::INpuBackend&, hq::npu::CompiledKernel const&, std::span<std::byte const*, 18446744073709551615ull>, std::span<std::byte*, 18446744073709551615ull>, std::basic_ofstream<char, std::char_traits<char> >*) (this=0x701420, backend=..., kernel=..., user_inputs=std::span of length 3 = {...}, user_outputs=std::span of length 1 = {...}, debug_log=0x0) at C:\McMaker Projects\Projects\Cerberus - Copy\code\src\cerberus_execution_coordinator.cpp:106
+#4  0x00007ff73822daf3 in hq::cerberus::CerberusRuntime::run_graph[abi:cxx11](hq::npu::KernelGraph const&, std::span<std::byte*, 18446744073709551615ull>, std::span<std::byte const*, 18446744073709551615ull>) (this=0x5faa00, graph=..., output_buffers=std::span of length 1 = {...}, input_buffers=std::span of length 3 = {...}) at C:\McMaker Projects\Projects\Cerberus - Copy\code\src\cerberus_runtime.cpp:120
+#5  0x00007ff7381cc7e1 in hq::propup::propup_runtime_multi_step (log=0x7ff738432d60 <std::cout>) at C:\McMaker Projects\Projects\Cerberus - Copy\code\src\david_propup_engine.cpp:4251
+#6  0x00007ff738215301 in operator()<hq::propup::PropupResult (*)(std::basic_ostream<char>*)> (__closure=0x5fb140, fn=0x7ff7381cbf7d <hq::propup::propup_runtime_multi_step(std::basic_ostream<char, std::char_traits<char> >*)>, name_hint="propup_runtime_multi_step") at C:\McMaker Projects\Projects\Cerberus - Copy\code\src\david_propup_engine.cpp:8721
+#7  0x00007ff738217493 in hq::propup::run_all_propups (log=0x7ff738432d60 <std::cout>) at C:\McMaker Projects\Projects\Cerberus - Copy\code\src\david_propup_engine.cpp:8812
+#8  0x00007ff738191783 in main () at C:\McMaker Projects\Projects\Cerberus - Copy\code\src\david_propup_engine_main.cpp:11

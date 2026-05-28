@@ -1,0 +1,93 @@
+The requested API version [21] is not available, only API versions [1, 17] are supported in this build. Current ORT Version is: 1.17.1
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TRACE] START propup_tiered_memory
+[PROPUP] propup_tiered_memory passed in 0.446289 ms
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TRACE] PASS  propup_tiered_memory
+[TRACE] START propup_coordinator_memory_loop
+[PROPUP] propup_coordinator_memory_loop passed in 0.0532227 ms
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TRACE] PASS  propup_coordinator_memory_loop
+[TRACE] START propup_coordinator_tier_decisions
+[PROPUP] propup_coordinator_tier_decisions passed in 0.019043 ms
+[TRACE] PASS  propup_coordinator_tier_decisions
+[TRACE] START propup_compile_graph_analysis
+[PROPUP] propup_compile_graph_analysis passed in 0.00292969 ms
+[TRACE] PASS  propup_compile_graph_analysis
+[TRACE] START propup_kernel_matmul
+[PROPUP] propup_kernel_matmul passed in 0.00170898 ms
+[TRACE] PASS  propup_kernel_matmul
+[TRACE] START propup_kernel_elementwise
+[PROPUP] propup_kernel_elementwise passed in 0.000244141 ms
+[TRACE] PASS  propup_kernel_elementwise
+[TRACE] START propup_kernel_fma
+[PROPUP] propup_kernel_fma passed in 0.00146484 ms
+[TRACE] PASS  propup_kernel_fma
+[TRACE] START propup_kernel_matmul_blocked
+[PROPUP] propup_kernel_matmul_blocked passed in 0.00292969 ms
+[TRACE] PASS  propup_kernel_matmul_blocked
+[TRACE] START propup_performance_matmul_vs_naive
+[PROPUP] propup_performance_matmul_vs_naive naive=8.8292 ms blocked=2.3277 ms speedup=3.7931
+[PROPUP] propup_performance_matmul_vs_naive passed in 11.5051 ms
+[TRACE] PASS  propup_performance_matmul_vs_naive
+[TRACE] START propup_kernel_matmul_avx2
+[PROPUP] propup_kernel_matmul_avx2 avx2=0.1704 ms max_err=1.90735e-06
+[TRACE] PASS  propup_kernel_matmul_avx2
+[TRACE] START propup_kernel_avx512_detect
+[PROPUP] propup_kernel_avx512_detect avx2=yes avx512f=no
+[TRACE] PASS  propup_kernel_avx512_detect
+[TRACE] START propup_kernel_matmul_avx512_dispatch
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TRACE] PASS  propup_kernel_matmul_avx512_dispatch
+[TRACE] START propup_end_to_end_native
+[PROPUP] propup_end_to_end_native passed in 0.187256 ms
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TRACE] PASS  propup_end_to_end_native
+[TRACE] START propup_decision_engine_fusion
+[PROPUP] propup_decision_engine_fusion passed in 0.0686035 ms
+[TRACE] PASS  propup_decision_engine_fusion
+[TRACE] START propup_graph_engine_verbose
+[PROPUP-VERBOSE] graph nodes=2 tensors=5 live_bytes=80
+[PROPUP] propup_graph_engine_verbose passed in 0.0114746 ms
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TRACE] PASS  propup_graph_engine_verbose
+[TRACE] START propup_tier_pressure_demotion
+[PROPUP] propup_tier_pressure_demotion passed in 0.0231934 ms
+[TRACE] PASS  propup_tier_pressure_demotion
+[TRACE] START propup_kernel_quantized_matmul
+[PROPUP] propup_kernel_quantized_matmul passed in 0.00219727 ms
+[TRACE] PASS  propup_kernel_quantized_matmul
+[TRACE] START propup_kernel_dynamic_quant_accuracy
+[PROPUP] propup_kernel_dynamic_quant_accuracy max_rel_err=1.17646%
+[PROPUP] propup_kernel_dynamic_quant_accuracy passed in 0.0100098 ms
+[TRACE] PASS  propup_kernel_dynamic_quant_accuracy
+[TRACE] START propup_performance_int8_vs_float
+[PROPUP] propup_performance_int8_vs_float float=0.6657 ms quant=0.9879 ms speedup=0.673854
+[PROPUP] propup_performance_int8_vs_float passed in 1.76221 ms
+[TRACE] PASS  propup_performance_int8_vs_float
+[TRACE] START propup_quant_per_channel
+[TRACE] PASS  propup_quant_per_channel
+[TRACE] START propup_quant_per_token
+[TRACE] PASS  propup_quant_per_token
+[TRACE] START propup_quant_per_block
+[TRACE] PASS  propup_quant_per_block
+[TRACE] START propup_quant_4bit
+[TRACE] PASS  propup_quant_4bit
+[TRACE] START propup_quant_fused_bias_relu
+[TRACE] PASS  propup_quant_fused_bias_relu
+[TRACE] START propup_native_backend_matmul
+[TRACE] PASS  propup_native_backend_matmul
+[TRACE] START propup_native_backend_elementwise
+[TRACE] PASS  propup_native_backend_elementwise
+[TRACE] START propup_native_backend_fusion
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TRACE] PASS  propup_native_backend_fusion
+[TRACE] START propup_decision_backend_routing
+[TRACE] PASS  propup_decision_backend_routing
+[TRACE] START propup_graph_cycles_rejection
+[TRACE] PASS  propup_graph_cycles_rejection
+[TRACE] START propup_graph_from_kernel_graph
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TRACE] PASS  propup_graph_from_kernel_graph
+[TRACE] START propup_runtime_full_stack
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold

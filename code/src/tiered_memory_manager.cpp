@@ -9,9 +9,9 @@
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
-#include <format>
 #include <fstream>
 #include <list>
+#include <sstream>
 #if UM790_HAS_STD_PRINT
 #  include <print>
 #endif
@@ -301,12 +301,15 @@ TieredMemoryManager::TieredMemoryManager(const TieredMemoryConfig& cfg,
     }
     m.acct[static_cast<int>(MemoryTier::Cold)].available = m.cold_available;
 
-    std::print("[TieredMemory] Hot={} Warm={}{} Cool={} Cold={}\n",
-               m.hot_available ? "GPU" : "off",
-               m.warm_available ? "on" : "off",
-               cxl ? "(CXL)" : "(RAM-fallback)",
-               m.cool_available ? "on" : "off",
-               m.cold_available ? cfg.cold_spill_dir : "off");
+    // NOTE: std::format with std::string_view/char* args SEGFAULTs on MinGW GCC 15.
+    std::ostringstream oss;
+    oss << "[TieredMemory] Hot=" << (m.hot_available ? "GPU" : "off")
+        << " Warm=" << (m.warm_available ? "on" : "off")
+        << (cxl ? "(CXL)" : "(RAM-fallback)")
+        << " Cool=" << (m.cool_available ? "on" : "off")
+        << " Cold=" << (m.cold_available ? cfg.cold_spill_dir : "off")
+        << "\n";
+    std::fputs(oss.str().c_str(), stdout);
 }
 
 TieredMemoryManager::~TieredMemoryManager() noexcept {
@@ -404,9 +407,12 @@ TieredMemoryManager::allocate(std::size_t size_bytes,
         } else { // Cold
             if (!m.cold_available) continue;
             // Spill to a temp file on NVMe
+            // NOTE: std::format crashes GCC 15 with string_view/char* args.
+            char hex_buf[24] = {};
+            auto h = m.next_handle.load(std::memory_order_relaxed);
+            std::to_chars(std::begin(hex_buf), std::end(hex_buf), h, 16);
             auto path = std::filesystem::path{m.cfg.cold_spill_dir} /
-                        std::format("cerberus_{:016x}.spill",
-                                    m.next_handle.load(std::memory_order_relaxed));
+                        ("cerberus_" + std::string(hex_buf) + ".spill");
             std::ofstream f{path, std::ios::binary};
             if (f) {
                 // Reserve space with seek + write of one zero byte

@@ -1,0 +1,103 @@
+The requested API version [21] is not available, only API versions [1, 17] are supported in this build. Current ORT Version is: 1.17.1
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP] propup_tiered_memory passed in 0.660156 ms
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP] propup_coordinator_memory_loop passed in 0.149658 ms
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP] propup_coordinator_tier_decisions passed in 0.0500488 ms
+[PROPUP] propup_compile_graph_analysis passed in 0.00439453 ms
+[PROPUP] propup_kernel_matmul passed in 0.00439453 ms
+[PROPUP] propup_kernel_elementwise passed in 0.00219727 ms
+[PROPUP] propup_kernel_fma passed in 0.00390625 ms
+[PROPUP] propup_kernel_matmul_blocked passed in 0.0012207 ms
+[PROPUP] propup_performance_matmul_vs_naive naive=12.7006 ms blocked=3.2596 ms speedup=3.89637
+[PROPUP] propup_performance_matmul_vs_naive passed in 16.3376 ms
+[PROPUP] propup_kernel_matmul_avx2 avx2=0.2724 ms max_err=1.90735e-06
+[PROPUP] propup_kernel_avx512_detect avx2=yes avx512f=no
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP] propup_end_to_end_native passed in 0.248291 ms
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP] propup_decision_engine_fusion passed in 0.106201 ms
+[PROPUP-VERBOSE] graph nodes=2 tensors=5 live_bytes=80
+[PROPUP] propup_graph_engine_verbose passed in 0.0166016 ms
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP] propup_tier_pressure_demotion passed in 0.0512695 ms
+[PROPUP] propup_kernel_quantized_matmul passed in 0.00366211 ms
+[PROPUP] propup_kernel_dynamic_quant_accuracy max_rel_err=1.17646%
+[PROPUP] propup_kernel_dynamic_quant_accuracy passed in 0.0109863 ms
+[PROPUP] propup_performance_int8_vs_float float=1.0374 ms quant=1.3606 ms speedup=0.762458
+[PROPUP] propup_performance_int8_vs_float passed in 2.51343 ms
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[08:56:36.335] [INFO ] npu_backend_unified.cpp:643 hq::npu::NpuBackendFactory::initialize()::<lambda()>() ÔÇö [NpuBackendFactory] Probed 3 backends:
+[08:56:36.336] [INFO ] npu_backend_unified.cpp:668 hq::npu::NpuBackendFactory::print_status()::<lambda(hq::npu::INpuBackend*)>() ÔÇö   ONNX-CPU-Fallback: available=yes, synthetic=yes, can_compile_for(intel_npu)=no, can_compile_for(cuda)=no, can_compile_for(cpu)=yes
+[08:56:36.336] [INFO ] npu_backend_unified.cpp:668 hq::npu::NpuBackendFactory::print_status()::<lambda(hq::npu::INpuBackend*)>() ÔÇö   NVIDIA-CUDA: available=no, synthetic=yes, can_compile_for(intel_npu)=no, can_compile_for(cuda)=yes, can_compile_for(cpu)=no
+[08:56:36.336] [INFO ] npu_backend_unified.cpp:668 hq::npu::NpuBackendFactory::print_status()::<lambda(hq::npu::INpuBackend*)>() ÔÇö   Intel-OpenVINO-NPU: available=no, synthetic=yes, can_compile_for(intel_npu)=yes, can_compile_for(cuda)=no, can_compile_for(cpu)=yes
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP] propup_shadow_rollback passed in 0.00219727 ms
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[propup_glow_empty_graph passed in 0.00195312 ms]
+[propup_glow_single_node_path passed in 0.0012207 ms]
+[propup_glow_empty_catchphrase passed in 0.000488281 ms]
+[propup_glow_bond_double_reinforcement passed in 0.00585938 ms]
+[propup_kernel_softmax_stability passed]
+[propup_kernel_layernorm_zeros passed]
+[propup_kernel_gelu_negative passed]
+[propup_kernel_elementwise_shape_mismatch passed]
+[propup_kernel_conv2d_1x1_identity passed]
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PipelineHealthScore] WARNING: weights sum to 4.0000, expected 1.0

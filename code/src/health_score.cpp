@@ -38,7 +38,11 @@ PipelineHealthScore::PipelineHealthScore(const HealthWeights& weights)
 
     constexpr float epsilon = 0.001f;
     if (std::abs(sum - 1.0f) > epsilon) {
-        std::fputs(std::format("[PipelineHealthScore] WARNING: weights sum to {:.4f}, expected 1.0\n", sum).c_str(), stderr);
+        // NOTE: std::format with float args SEGFAULTs on MinGW GCC 15.
+        std::ostringstream oss;
+        oss << "[PipelineHealthScore] WARNING: weights sum to " << sum
+            << ", expected 1.0\n";
+        std::fputs(oss.str().c_str(), stderr);
         // Normalise weights to sum to 1.0 so the composite remains valid
         if (sum > 0.0f) {
             weights_.gpu_utilization    /= sum;
