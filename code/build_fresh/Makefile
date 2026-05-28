@@ -256,6 +256,19 @@ david_propup_engine/fast:
 .PHONY : david_propup_engine/fast
 
 #=============================================================================
+# Target rules for targets named cerberus_register
+
+# Build rule for target.
+cerberus_register: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\Makefile2 cerberus_register
+.PHONY : cerberus_register
+
+# fast build rule for target.
+cerberus_register/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\cerberus_register.dir\build.make CMakeFiles/cerberus_register.dir/build
+.PHONY : cerberus_register/fast
+
+#=============================================================================
 # Target rules for targets named cerberus_npu
 
 # Build rule for target.
@@ -908,6 +921,30 @@ src/cerberus_quantized_kernels.s: src/cerberus_quantized_kernels.cpp.s
 src/cerberus_quantized_kernels.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\um790_pipeline.dir\build.make CMakeFiles/um790_pipeline.dir/src/cerberus_quantized_kernels.cpp.s
 .PHONY : src/cerberus_quantized_kernels.cpp.s
+
+src/cerberus_register_main.obj: src/cerberus_register_main.cpp.obj
+.PHONY : src/cerberus_register_main.obj
+
+# target to build an object file
+src/cerberus_register_main.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\cerberus_register.dir\build.make CMakeFiles/cerberus_register.dir/src/cerberus_register_main.cpp.obj
+.PHONY : src/cerberus_register_main.cpp.obj
+
+src/cerberus_register_main.i: src/cerberus_register_main.cpp.i
+.PHONY : src/cerberus_register_main.i
+
+# target to preprocess a source file
+src/cerberus_register_main.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\cerberus_register.dir\build.make CMakeFiles/cerberus_register.dir/src/cerberus_register_main.cpp.i
+.PHONY : src/cerberus_register_main.cpp.i
+
+src/cerberus_register_main.s: src/cerberus_register_main.cpp.s
+.PHONY : src/cerberus_register_main.s
+
+# target to generate assembly for a file
+src/cerberus_register_main.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\cerberus_register.dir\build.make CMakeFiles/cerberus_register.dir/src/cerberus_register_main.cpp.s
+.PHONY : src/cerberus_register_main.cpp.s
 
 src/cerberus_runtime.obj: src/cerberus_runtime.cpp.obj
 .PHONY : src/cerberus_runtime.obj
@@ -1621,6 +1658,7 @@ help:
 	@echo ... rebuild_cache
 	@echo ... test
 	@echo ... cerberus_npu
+	@echo ... cerberus_register
 	@echo ... cerberus_server
 	@echo ... david_propup_engine
 	@echo ... gmock
@@ -1703,6 +1741,9 @@ help:
 	@echo ... src/cerberus_quantized_kernels.obj
 	@echo ... src/cerberus_quantized_kernels.i
 	@echo ... src/cerberus_quantized_kernels.s
+	@echo ... src/cerberus_register_main.obj
+	@echo ... src/cerberus_register_main.i
+	@echo ... src/cerberus_register_main.s
 	@echo ... src/cerberus_runtime.obj
 	@echo ... src/cerberus_runtime.i
 	@echo ... src/cerberus_runtime.s

@@ -569,6 +569,13 @@ target_link_libraries(david_propup_engine PRIVATE um790_pipeline um790_compile_o
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND WIN32)
     target_link_options(david_propup_engine PRIVATE -static-libgcc -static-libstdc++)
 endif()
+
+# Registration CLI — creates encrypted Local Maintenance DB
+add_executable(cerberus_register src/cerberus_register_main.cpp)
+target_link_libraries(cerberus_register PRIVATE um790_pipeline um790_compile_options um790_includes um790_link_options Threads::Threads)
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND WIN32)
+    target_link_options(cerberus_register PRIVATE -static-libgcc -static-libstdc++)
+endif()
 add_library(cerberus_npu SHARED src/cerberus_api.cpp)
 
 target_sources(cerberus_npu PRIVATE
