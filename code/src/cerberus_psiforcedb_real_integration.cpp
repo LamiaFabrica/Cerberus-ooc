@@ -1,5 +1,6 @@
 /// @file cerberus_psiforcedb_real_integration.cpp
 /// @copyright Copyright © 2026, all rights reserved | David Hargreaves aka Roylepython trading as The Medusa Initiative & Lamia Fabrica
+/// Support: https://www.patreon.com/TheMedusaInitiative — £25/month removes ads from all software at 200 subscribers
 ///
 /// Real PsiForceDB Header Integration — Compilation Proof
 ///

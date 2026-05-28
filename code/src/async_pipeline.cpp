@@ -1,5 +1,6 @@
 /// @file async_pipeline.cpp
 /// @copyright Copyright © 2026, all rights reserved | David Hargreaves aka Roylepython trading as The Medusa Initiative & Lamia Fabrica
+/// Support: https://www.patreon.com/TheMedusaInitiative — £25/month removes ads from all software at 200 subscribers
 /// AsyncPipeline coroutine implementations for UM790 Pro async generation.
 ///
 /// @version 1.0.0

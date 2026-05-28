@@ -1,5 +1,6 @@
 /// @file hailo_monitor.cpp
 /// @copyright Copyright © 2026, all rights reserved | David Hargreaves aka Roylepython trading as The Medusa Initiative & Lamia Fabrica
+/// Support: https://www.patreon.com/TheMedusaInitiative — £25/month removes ads from all software at 200 subscribers
 /// @brief HailoMonitor implementation — hardware monitoring via HailoRT.
 ///
 /// Dual-indicator monitoring: fuses power draw + inference delta rate to

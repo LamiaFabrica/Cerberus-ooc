@@ -1,5 +1,6 @@
 /// @file utilization_watchdog.cpp
 /// @copyright Copyright © 2026, all rights reserved | David Hargreaves aka Roylepython trading as The Medusa Initiative & Lamia Fabrica
+/// Support: https://www.patreon.com/TheMedusaInitiative — £25/month removes ads from all software at 200 subscribers
 /// Full implementation of the UtilizationWatchdog 3-state machine.
 /// C01 fix: state-machine fields are std::atomic — no data race between
 /// evaluate_device() and get_*_state().  Mutex_ guards only the five

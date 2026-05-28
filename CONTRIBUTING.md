@@ -63,10 +63,14 @@ By contributing, you agree that your contributions will be licensed under the
 
 ---
 
-## Code of Conduct
+## About the Author
 
-Be respectful. Be honest. Be patient. I am a solo developer doing this in my spare time.
-I will review PRs as quickly as I can, but sometimes real life gets in the way.
+I am a **systems analyst, network engineer, programmer, and web developer** who moved to passion projects after leaving paid corporate employment. After years working in systems architecture, infrastructure, and full-stack development, I am now building these projects independently while navigating physical disability and limited capacity for traditional full-time work.
 
-If you are frustrated that something is "only 65% done" — that's because it genuinely is only
-65% done, not because I'm lazy. Help me get to 100%.
+Cerberus is built by one person in their spare time, heavily constrained by health. Every hour of development is hard-won. If you find this project valuable and want to see it reach production quality — real CXL memory tiering, proper Thunderbolt 5 clustering, broader hardware support, and post-quantum security — support is welcome.
+
+**Patreon**: [https://www.patreon.com/TheMedusaInitiative](https://www.patreon.com/TheMedusaInitiative) — £25/month removes ads from all software at 200 subscribers
+
+Every contribution, code or financial, directly funds continued development and keeps the hardware running.
+
+— David Hargreaves (Roylepython), May 2026

@@ -1,5 +1,6 @@
 /// @file test_all.cpp
 /// @copyright Copyright © 2026, all rights reserved | David Hargreaves aka Roylepython trading as The Medusa Initiative & Lamia Fabrica
+/// Support: https://www.patreon.com/TheMedusaInitiative — £25/month removes ads from all software at 200 subscribers
 /// Comprehensive test suite for UM790 Pro heterogeneous inference pipeline.
 ///
 /// Test inventory:

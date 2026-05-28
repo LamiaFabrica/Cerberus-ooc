@@ -1,5 +1,6 @@
 /// @file benchmark_logger.hpp
 /// @copyright Copyright © 2026, all rights reserved | David Hargreaves aka Roylepython trading as The Medusa Initiative & Lamia Fabrica
+/// Support: https://www.patreon.com/TheMedusaInitiative — £25/month removes ads from all software at 200 subscribers
 ///
 /// PROPRIETARY AND CONFIDENTIAL
 /// This file contains trade secrets of LamiaFabrica / D Hargreaves.

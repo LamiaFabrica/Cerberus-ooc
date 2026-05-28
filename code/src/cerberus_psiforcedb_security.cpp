@@ -1,5 +1,6 @@
 /// @file cerberus_psiforcedb_security.cpp
 /// @copyright Copyright © 2026, all rights reserved | David Hargreaves aka Roylepython trading as The Medusa Initiative & Lamia Fabrica
+/// Support: https://www.patreon.com/TheMedusaInitiative — £25/month removes ads from all software at 200 subscribers
 ///
 /// Thin LFSSL_Native_Crypto bridge — SHA256/HMAC/PBKDF2 inline-safe.
 /// AES-256-GCM, Kyber, Dilithium backed by cerberus_lfssl.dll when present;

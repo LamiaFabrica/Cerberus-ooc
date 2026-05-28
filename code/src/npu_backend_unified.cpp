@@ -1,5 +1,6 @@
 /// @file npu_backend_unified.cpp
 /// @copyright Copyright © 2026, all rights reserved | David Hargreaves aka Roylepython trading as The Medusa Initiative & Lamia Fabrica
+/// Support: https://www.patreon.com/TheMedusaInitiative — £25/month removes ads from all software at 200 subscribers
 /// Cerberus Compiler Runtime — backend implementations.
 ///
 /// @version 3.1.0

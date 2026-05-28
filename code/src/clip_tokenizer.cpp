@@ -1,5 +1,6 @@
 /// @file clip_tokenizer.cpp
 /// @copyright Copyright © 2026, all rights reserved | David Hargreaves aka Roylepython trading as The Medusa Initiative & Lamia Fabrica
+/// Support: https://www.patreon.com/TheMedusaInitiative — £25/month removes ads from all software at 200 subscribers
 /// Simplified CLIP BPE tokenizer implementation.
 ///
 /// Provides a self-contained tokenization pipeline that converts English

@@ -1,5 +1,6 @@
 /// @file deis_scheduler.cpp
 /// @copyright Copyright © 2026, all rights reserved | David Hargreaves aka Roylepython trading as The Medusa Initiative & Lamia Fabrica
+/// Support: https://www.patreon.com/TheMedusaInitiative — £25/month removes ads from all software at 200 subscribers
 /// DEIS scheduler implementation with AVX-512 precomputation.
 ///
 /// @version 1.0.0

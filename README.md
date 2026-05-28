@@ -27,8 +27,9 @@ All rights reserved.
 
 ## What is Cerberus?
 
-Cerberus is an **experiment** in building a C++26-based AI inference runtime
-that targets heterogeneous consumer hardware:
+Cerberus is a **C++26 AI inference runtime** targeting heterogeneous consumer hardware across **Windows (MinGW-W64) and Ubuntu (24.04 LTS)**. The eventual deployment platforms are Windows and Linux — the two most approachable operating systems for developers and end users.
+
+Target hardware:
 
 - **CPU** — AMD Ryzen 9 7940HS (Zen 4)
 - **GPU** — AMD Radeon 780M (RDNA 3)
@@ -189,9 +190,7 @@ Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines
 - Bambu Lab
 - Microsoft / ONNX Runtime
 
-This is a **personal hobbyist project** written by a single developer (me, David) to explore
-what consumer hardware is capable of when pushed with modern C++. No company has endorsed,
-sponsored, or reviewed this project.
+This is an **independent engineering project** run as a professional commitment to build open infrastructure for local AI inference. It is not a side project. It is written and maintained by a single developer (me, David) committed to pushing consumer hardware to its limits with modern C++.
 
 **I am not impersonating, representing, or acting on behalf of any company.**
 
@@ -203,12 +202,13 @@ attributed in the source.
 
 ## About the Author
 
-I am a self-taught C++ developer working on this project in my spare time.
-I have no CS degree, no corporate backing, and no team.
-What exists here has been built through obsessive iteration, honest self-review,
-and a refusal to ship empty stubs.
+I am a **systems analyst, network engineer, programmer, and web developer** committed to building open infrastructure for local AI inference. This is not a spare-time project. It is a strategic commitment of all available resources toward building an A-Team of neurodiverse developers plus AI, to overcome physical and mental limitations and produce production-quality results.
 
-If you find value in this project and want to see real GPU/NPU acceleration working,
-consider contributing code, hardware, or expertise. That is worth more than money to me.
+I do not leave my house. I do not have a social network. The workday is solitary. It is a deliberate choice to redirect all available capacity into this infrastructure. Every hour of development is hard-won. If you find this project valuable and want to see it reach production quality — real CXL memory tiering, proper Thunderbolt 5 clustering, broader hardware support, and post-quantum security — support is welcome.
+
+Every contribution, code or financial, directly funds continued development and keeps the hardware running.
+
+- **Code & design help**: Open a PR or issue — expertise is worth more than money
+- **Patreon**: [https://www.patreon.com/TheMedusaInitiative](https://www.patreon.com/TheMedusaInitiative) — £25/month removes ads from all software at 200 subscribers
 
 — David Hargreaves (Roylepython), May 2026
