@@ -70,10 +70,12 @@ std::string read_hidden_line() {
 }
 
 void clear_screen() {
+    // Cross-platform screen clear — avoids std::system() warnings on WSL
 #ifdef _WIN32
-    std::system("cls");
+    std::cout << std::string(50, '\n');
 #else
-    std::system("clear");
+    // POSIX terminals support ANSI escape; Windows cmd does not
+    std::cout << "\033[2J\033[H";
 #endif
 }
 
