@@ -1,5 +1,5 @@
 /// @file npu_encoder.cpp
-/// @copyright Copyright (c) 2026 D Hargreaves (AKA Roylepython). LamiaFabrica. All rights reserved.
+/// @copyright Copyright © 2026, all rights reserved | David Hargreaves aka Roylepython trading as The Medusa Initiative & Lamia Fabrica
 /// NPU Encoder abstraction layer — implementation.
 ///
 /// Houses the concrete encoder implementations and the factory that

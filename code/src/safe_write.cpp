@@ -1,5 +1,5 @@
 /// @file safe_write.cpp
-/// @copyright Copyright (c) 2026 D Hargreaves (AKA Roylepython). LamiaFabrica. All rights reserved.
+/// @copyright Copyright © 2026, all rights reserved | David Hargreaves aka Roylepython trading as The Medusa Initiative & Lamia Fabrica
 /// Windows-safe console output — avoids MinGW CRT fputs/_write crash on pipe redirect.
 ///
 /// MinGW-W64's console layer dereferences a null handle when stdout is piped,

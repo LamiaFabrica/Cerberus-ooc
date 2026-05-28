@@ -1,5 +1,5 @@
 /// @file hailo_monitor.cpp
-/// @copyright Copyright (c) 2026 D Hargreaves (AKA Roylepython). LamiaFabrica. All rights reserved.
+/// @copyright Copyright © 2026, all rights reserved | David Hargreaves aka Roylepython trading as The Medusa Initiative & Lamia Fabrica
 /// @brief HailoMonitor implementation — hardware monitoring via HailoRT.
 ///
 /// Dual-indicator monitoring: fuses power draw + inference delta rate to

@@ -1,5 +1,5 @@
 /// @file cerberus_execution_coordinator.cpp
-/// @copyright Copyright (c) 2026 D Hargreaves (AKA Roylepython). LamiaFabrica. All rights reserved.
+/// @copyright Copyright © 2026, all rights reserved | David Hargreaves aka Roylepython trading as The Medusa Initiative & Lamia Fabrica
 /// Cerberus Execution Coordinator — ties tiered memory management to NPU backend dispatch.
 ///
 /// @version 2.0.0 — inputs and outputs now staged through TieredMemoryManager.

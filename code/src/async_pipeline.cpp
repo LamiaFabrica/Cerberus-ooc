@@ -1,5 +1,5 @@
 /// @file async_pipeline.cpp
-/// @copyright Copyright (c) 2026 D Hargreaves (AKA Roylepython). LamiaFabrica. All rights reserved.
+/// @copyright Copyright © 2026, all rights reserved | David Hargreaves aka Roylepython trading as The Medusa Initiative & Lamia Fabrica
 /// AsyncPipeline coroutine implementations for UM790 Pro async generation.
 ///
 /// @version 1.0.0

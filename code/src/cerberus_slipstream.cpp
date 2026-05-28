@@ -1,5 +1,5 @@
 /// @file cerberus_slipstream.cpp
-/// @copyright Copyright (c) 2026 D Hargreaves. All rights reserved.
+/// @copyright Copyright © 2026, all rights reserved | David Hargreaves aka Roylepython trading as The Medusa Initiative & Lamia Fabrica
 ///
 /// Cerberus Slipstream — depot-based parallel execution bus.
 /// Ported from PsiForceDB ai_slipstream_core.cpp.

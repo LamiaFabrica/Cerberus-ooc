@@ -1,5 +1,5 @@
 /// @file staging_manager.cpp
-/// @copyright Copyright (c) 2026 D Hargreaves (AKA Roylepython). LamiaFabrica. All rights reserved.
+/// @copyright Copyright © 2026, all rights reserved | David Hargreaves aka Roylepython trading as The Medusa Initiative & Lamia Fabrica
 /// EmbeddingStagingManager implementation — pinned buffer pool management.
 
 #include "hq/staging_manager.hpp"

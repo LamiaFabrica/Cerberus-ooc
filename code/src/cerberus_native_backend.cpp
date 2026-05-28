@@ -1,5 +1,5 @@
 /// @file cerberus_native_backend.cpp
-/// @copyright Copyright (c) 2026 D Hargreaves. All rights reserved.
+/// @copyright Copyright © 2026, all rights reserved | David Hargreaves aka Roylepython trading as The Medusa Initiative & Lamia Fabrica
 ///
 /// CerberusNativeBackend — lowers Cerberus graph nodes to native kernels.
 ///

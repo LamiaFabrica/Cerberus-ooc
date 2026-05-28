@@ -1,5 +1,5 @@
 /// @file david_propup_engine_main.cpp
-/// @copyright Copyright (c) 2026 D Hargreaves. All rights reserved.
+/// @copyright Copyright © 2026, all rights reserved | David Hargreaves aka Roylepython trading as The Medusa Initiative & Lamia Fabrica
 ///
 /// Entry point for the David Propup Engine — run all validators and
 /// print the aggregate report.

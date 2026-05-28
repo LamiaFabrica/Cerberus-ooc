@@ -1,5 +1,5 @@
 
-// Copyright (C) 2018-2026 Intel Corporation
+/// @copyright Copyright © 2026, all rights reserved | David Hargreaves aka Roylepython trading as The Medusa Initiative & Lamia Fabrica
 // SPDX-License-Identifier: Apache-2.0
 //
 

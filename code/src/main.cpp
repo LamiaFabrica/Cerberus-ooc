@@ -1,5 +1,5 @@
 /// @file main.cpp
-/// @copyright Copyright (c) 2026 D Hargreaves (AKA Roylepython). LamiaFabrica. All rights reserved.
+/// @copyright Copyright © 2026, all rights reserved | David Hargreaves aka Roylepython trading as The Medusa Initiative & Lamia Fabrica
 /// um790_run — Comprehensive CLI for the UM790 Pro image generation pipeline.
 ///
 /// Commands:

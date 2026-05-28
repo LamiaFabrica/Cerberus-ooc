@@ -1,5 +1,5 @@
 /// @file pipeline_integration.cpp
-/// @copyright Copyright (c) 2026 D Hargreaves (AKA Roylepython). LamiaFabrica. All rights reserved.
+/// @copyright Copyright © 2026, all rights reserved | David Hargreaves aka Roylepython trading as The Medusa Initiative & Lamia Fabrica
 /// Pipeline implementation: watchdog integration, staging, denoising loop,
 /// recovery logic, and ONNX Runtime orchestration.
 ///

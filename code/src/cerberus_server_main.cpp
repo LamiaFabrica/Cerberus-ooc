@@ -1,5 +1,5 @@
 /// @file cerberus_server_main.cpp
-/// @copyright Copyright (c) 2026 D Hargreaves (AKA Roylepython). LamiaFabrica. All rights reserved.
+/// @copyright Copyright © 2026, all rights reserved | David Hargreaves aka Roylepython trading as The Medusa Initiative & Lamia Fabrica
 /// Entry point for the Cerberus Inference Server.
 ///
 /// Parses command-line arguments, registers POSIX signal handlers,

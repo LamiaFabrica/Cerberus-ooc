@@ -1,5 +1,5 @@
 /// @file cluster_transport.cpp
-/// @copyright Copyright (c) 2026 D Hargreaves (AKA Roylepython). LamiaFabrica. All rights reserved.
+/// @copyright Copyright © 2026, all rights reserved | David Hargreaves aka Roylepython trading as The Medusa Initiative & Lamia Fabrica
 /// Multi-node clustering transport — implementation.
 ///
 /// Socket layer: POSIX TCP (AF_INET) or AF_UNIX for loopback.

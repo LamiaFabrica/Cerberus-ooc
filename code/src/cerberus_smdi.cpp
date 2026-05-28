@@ -1,5 +1,5 @@
 /// @file cerberus_smdi.cpp
-/// @copyright Copyright (c) 2026 D Hargreaves. All rights reserved.
+/// @copyright Copyright © 2026, all rights reserved | David Hargreaves aka Roylepython trading as The Medusa Initiative & Lamia Fabrica
 ///
 /// SMDU implementation — orchestrates LFSSL delegation, never implements primitives.
 ///

@@ -1,5 +1,5 @@
 /// @file cerberus_graph_engine.cpp
-/// @copyright Copyright (c) 2026 D Hargreaves. All rights reserved.
+/// @copyright Copyright © 2026, all rights reserved | David Hargreaves aka Roylepython trading as The Medusa Initiative & Lamia Fabrica
 ///
 /// CerberusGraph engine — graph queries, topological sort, live-memory analysis.
 ///

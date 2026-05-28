@@ -1,5 +1,5 @@
 /// @file cerberus_psiforcedb_graph_bridge.cpp
-/// @copyright Copyright (c) 2026 D Hargreaves. All rights reserved.
+/// @copyright Copyright © 2026, all rights reserved | David Hargreaves aka Roylepython trading as The Medusa Initiative & Lamia Fabrica
 ///
 /// ModelTopologyMapper implementation — synthetic bridge between Cerberus
 /// and PsiForceDB graph store.  No real file dependencies.

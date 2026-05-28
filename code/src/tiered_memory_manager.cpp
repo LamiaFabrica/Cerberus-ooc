@@ -1,5 +1,5 @@
 /// @file tiered_memory_manager.cpp
-/// @copyright Copyright (c) 2026 D Hargreaves (AKA Roylepython). LamiaFabrica. All rights reserved.
+/// @copyright Copyright © 2026, all rights reserved | David Hargreaves aka Roylepython trading as The Medusa Initiative & Lamia Fabrica
 /// Four-tier heterogeneous memory manager — implementation.
 
 #include "hq/tiered_memory_manager.hpp"
