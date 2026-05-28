@@ -9,7 +9,7 @@
 ///   1. Passphrase entry (hidden input)
 ///   2. Memorable word entry (8–40 chars)
 ///   3. Generates system PIN + hardware anchor
-///   4. Derives AES-256-GCM key via Argon2id (or HMAC-SHA256 fallback)
+///   4. Derives AES-256-GCM key via Argon2id (MANDATORY — HMAC fallback removed)
 ///   5. Creates encrypted Local Maintenance DB
 ///   6. Displays confirmation + recovery warnings
 ///
@@ -151,7 +151,7 @@ int main(int argc, char** argv) {
         std::cout << "Step 2/3 — Enter a memorable word (8–40 chars, e.g. 'RedFox2026'): ";
         std::getline(std::cin, memorable_word);
         // Note: MemorableWord is in hq::cerberus::security namespace
-        auto err = hq::cerberus::security::MemorableWord::validate(memorable_word);
+        auto err = hq::cerberus::privacy::MemorableWord::validate(memorable_word);
         if (err.empty()) break;
         std::cout << "   Invalid: " << err << "\n";
     }
@@ -168,7 +168,8 @@ int main(int argc, char** argv) {
         std::cout << "❌ Registration FAILED: " << result.diagnostic << "\n";
         std::cout << "\nPossible causes:\n";
         std::cout << "  • LFSSL library not found (cerberus_lfssl.dll / libcerberus_lfssl.so)\n";
-        std::cout << "  • Argon2id unavailable and HMAC fallback disabled\n";
+        std::cout << "  • LFSSL found but Argon2id export is missing (incomplete build)\n";
+        std::cout << "  • Memory allocation failure (Argon2id m_cost=65536 requires ~64MB)\n";
         std::cout << "  • Disk write permissions denied\n";
         return 1;
     }
@@ -181,11 +182,7 @@ int main(int argc, char** argv) {
     std::cout << "  PIN (system):    " << result.issued_pin << "\n";
     std::cout << "  Database path:   " << db_path.string() << "\n";
     std::cout << "  Encryption:      AES-256-GCM (LFSSL)\n";
-    std::cout << "  Key derivation:  ";
-    if (result.diagnostic.find("Argon2id") != std::string::npos)
-        std::cout << "Argon2id (memory-hard, production-safe)\n";
-    else
-        std::cout << "HMAC-SHA256 (fallback — NOT for production)\n";
+    std::cout << "  Key derivation:  Argon2id (memory-hard, OWASP 2023 recommended)\n";
     std::cout << "  Trust policy:    server_isolated, no recovery, rebuild only\n";
     std::cout << "  RBPC:            3 failed PIN attempts = permanent burn\n\n";
 

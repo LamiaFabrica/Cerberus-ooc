@@ -40,8 +40,8 @@ namespace hq::cerberus::privacy {
 std::string FirstRun::unavailable_reason() noexcept {
     return "FirstRun initiation protocol provisions the Local Maintenance DB from "
            "PsiForceDB master administrator. Offline mode supported via local-only "
-           "declaration. LFSSL.dll is required for Argon2id, Kyber, and AES-GCM. "
-           "Current build uses HMAC-SHA256 fallback until LFSSL.dll is linked. "
+           "declaration. LFSSL.dll/.so is REQUIRED for Argon2id (memory-hard key "
+           "derivation), Kyber, and AES-GCM. Without LFSSL, registration is REFUSED. "
            "Works offline and online identically.";
 }
 
@@ -85,6 +85,16 @@ RegistrationResult FirstRun::register_new_install(
 
     RegistrationResult result;
 
+    // --- Argon2id is MANDATORY for production-safe key derivation ---
+    if (!hq::cerberus::security::LfsslSentinel::argon2id_available()) {
+        result.diagnostic =
+            "Argon2id is required for registration but LFSSL library is not "
+            "available. Please ensure cerberus_lfssl.dll (Windows) or "
+            "libcerberus_lfssl.so (Linux) is in the working directory."
+            " | " + hq::cerberus::security::LfsslSentinel::argon2id_unavailable_reason();
+        return result;
+    }
+
     // --- Structural validation of inputs ---
     if (passphrase.empty()) {
         result.diagnostic = "passphrase empty";
@@ -101,20 +111,9 @@ RegistrationResult FirstRun::register_new_install(
     // --- Generate node_id ---
     result.node_id = generate_node_id_();
 
-    // --- Step 1: Provision SMDU ---
-    // CRITICAL TODO: Replace HMAC fallback with LFSSL Argon2id as soon as
-    // libcerberus_lfssl.so (Linux) / cerberus_lfssl.dll (Windows) is linked.
-    // Current fallback is NOT production-safe for real user data.
-    //
-    // Production: LFSSL Argon2id(passphrase, 64-byte random salt, t=3, m=65536, p=1)
-    // Fallback (temporary only): HMAC-SHA256 chain with random salt.
-    //
-    // SAFETY: If LFSSL Argon2id is available at runtime, it MUST be used.
-    //         Do NOT ship with HMAC fallback for real user data.
-    //
-    // NOTE (Claude review, 2026-05-28): Previous code derived salt from
-    // passphrase+node_id, which adds ZERO entropy (attacker who knows
-    // passphrase also knows salt). Salt MUST be independent random.
+    // --- Step 1: Provision master secret via LFSSL Argon2id (MANDATORY) ---
+    // t_cost=3, m_cost=65536, parallelism=1 per OWASP 2023 recommendation.
+    // Salt is 32-byte independent random (NOT derived from passphrase or node_id).
     std::vector<std::uint8_t> install_salt(32);
     {
         std::random_device rd;
@@ -123,12 +122,15 @@ RegistrationResult FirstRun::register_new_install(
         for (auto& b : install_salt) b = static_cast<std::uint8_t>(dist(gen));
     }
 
-    // Generate master secret from passphrase + salt
-    std::string passphrase_str(passphrase);
-    std::vector<std::uint8_t> hmac_key(passphrase_str.begin(), passphrase_str.end());
-    hmac_key.insert(hmac_key.end(), install_salt.begin(), install_salt.end());
-    auto master_secret_b = hq::cerberus::security::CryptoBridge::hmac_sha256(
-        hmac_key, "cerberus_smdi_mpi");
+    auto master_secret_b = hq::cerberus::security::CryptoBridge::argon2id(
+        passphrase, install_salt, 32, 3, 65536, 1);
+    if (master_secret_b.empty()) {
+        result.diagnostic = "LFSSL Argon2id key derivation failed — "
+            "library loaded but hash computation returned error. "
+            "Possible causes: memory allocation failure (m_cost=65536 requires ~64MB), "
+            "or Argon2id export is missing from the LFSSL build.";
+        return result;
+    }
     std::vector<std::uint8_t> master_secret(master_secret_b.begin(), master_secret_b.end());
 
     // --- Step 2: User Security (PIN + Word) ---
@@ -212,8 +214,8 @@ RegistrationResult FirstRun::register_new_install(
     result.success = true;
     result.provisional = !psi_reachable;
     result.diagnostic = psi_reachable
-        ? "Registration successful — PsiForceDB master validated"
-        : "Registration successful — Local-only authority, queued for validation";
+        ? "Registration successful — Argon2id key derivation complete, PsiForceDB master validated"
+        : "Registration successful — Argon2id key derivation complete, local-only authority, queued for validation";
 
     return result;
 }
@@ -236,10 +238,10 @@ RegistrationResult FirstRun::unlock_existing(
     }
 
     // Re-derive master secret (same algorithm as registration)
-    // In production: read node_id from DB, re-derive salt, re-run Argon2id.
-    result.diagnostic = "Unlock existing: DB re-derivation requires LFSSL Argon2id. "
-                        "Current build host uses fallback path; this path is for "
-                        "production once LFSSL.dll/YAML is linked.";
+    // In production: read node_id from DB, re-derive salt, re-run LFSSL Argon2id.
+    result.diagnostic = "Unlock existing: LFSSL Argon2id required. Current build host uses "
+                        "production path; ensure cerberus_lfssl.dll / libcerberus_lfssl.so "
+                        "is present and Argon2id export resolves.";
     return result;
 }
 

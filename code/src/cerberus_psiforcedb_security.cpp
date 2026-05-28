@@ -78,6 +78,59 @@ std::vector<std::uint8_t> CryptoBridge::pbkdf2_sha256(
 #endif
 
 // ============================================================================
+// Argon2id — runtime LFSSL loading (NOT inline; requires .dll/.so)
+// ============================================================================
+
+std::vector<std::uint8_t> CryptoBridge::argon2id(
+    std::string_view password,
+    const std::vector<std::uint8_t>& salt,
+    std::size_t hash_len,
+    uint32_t t_cost,
+    uint32_t m_cost,
+    uint32_t parallelism) {
+
+    using fn_t = int (*)(
+        uint32_t, uint32_t, uint32_t,
+        const uint8_t*, size_t,
+        const uint8_t*, size_t,
+        uint8_t*, size_t);
+
+#ifdef _WIN32
+    const char* paths[] = {
+        "cerberus_lfssl.dll",
+        "../../lfssl_bridge/cerberus_lfssl.dll",
+        "../lfssl_bridge/cerberus_lfssl.dll",
+        "lfssl_bridge/cerberus_lfssl.dll",
+        nullptr
+    };
+#else
+    const char* paths[] = {
+        "./libcerberus_lfssl.so",
+        "../../lfssl_bridge/libcerberus_lfssl.so",
+        "../lfssl_bridge/libcerberus_lfssl.so",
+        "lfssl_bridge/libcerberus_lfssl.so",
+        nullptr
+    };
+#endif
+    for (auto** p = paths; *p; ++p) {
+        HMOD h = reinterpret_cast<HMOD>(LoadLibraryA(*p));
+        if (!h) continue;
+        auto fn = reinterpret_cast<fn_t>(GetProcAddress(h, "cerberus_lfssl_argon2id"));
+        if (fn) {
+            std::vector<std::uint8_t> hash(hash_len);
+            int r = fn(t_cost, m_cost, parallelism,
+                       reinterpret_cast<const uint8_t*>(password.data()), password.size(),
+                       salt.data(), salt.size(),
+                       hash.data(), hash_len);
+            FreeLibrary(h);
+            if (r == 0) return hash;
+        }
+        FreeLibrary(h);
+    }
+    return {}; // LFSSL not found or Argon2id export missing
+}
+
+// ============================================================================
 // Sentinels — Non-inline LFSSL primitives
 // ============================================================================
 
@@ -147,6 +200,19 @@ std::string LfsslSentinel::dilithium_unavailable_reason() noexcept {
     }
     return "Dilithium requires LFSSL compiled library. "
            "Cerberus delegates PQC to PsiForceDB at runtime.";
+}
+
+bool LfsslSentinel::argon2id_available() noexcept {
+    static bool present = check_lfssl_dll_present();
+    return present;
+}
+
+std::string LfsslSentinel::argon2id_unavailable_reason() noexcept {
+    if (argon2id_available()) {
+        return "Argon2id available via cerberus_lfssl.dll (LFSSL runtime linked).";
+    }
+    return "Argon2id requires LFSSL compiled library. "
+           "Cerberus delegates memory-hard hashing to PsiForceDB at runtime.";
 }
 
 } // namespace hq::cerberus::security

@@ -59,6 +59,17 @@ struct CryptoBridge {
                                                    const std::vector<std::uint8_t>& salt,
                                                    std::uint32_t iterations,
                                                    std::size_t key_len);
+
+    // Argon2id — memory-hard password hashing (LFSSL .dll/.so at runtime)
+    // Returns empty vector if LFSSL is not available.
+    // Parameters: t_cost=3, m_cost=65536, parallelism=1 (OWASP 2023 recommendation)
+    static std::vector<std::uint8_t> argon2id(
+        std::string_view password,
+        const std::vector<std::uint8_t>& salt,
+        std::size_t hash_len = 32,
+        uint32_t t_cost = 3,
+        uint32_t m_cost = 65536,
+        uint32_t parallelism = 1);
 };
 
 // ============================================================================
@@ -84,6 +95,10 @@ struct LfsslSentinel {
     // Dilithium: declared but not inline (PQC requires LFSSL Linux .so)
     static bool dilithium_available() noexcept;
     static std::string dilithium_unavailable_reason() noexcept;
+
+    // Argon2id: memory-hard password hashing (requires LFSSL .dll/.so)
+    static bool argon2id_available() noexcept;
+    static std::string argon2id_unavailable_reason() noexcept;
 };
 
 } // namespace hq::cerberus::security
