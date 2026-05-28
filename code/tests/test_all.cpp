@@ -4799,6 +4799,274 @@ TEST_F(Round19EvidenceTest, BlendNoiseCfg_RealisticLatentSize_Succeeds) {
     std::print("[TEST] PASSED\n");
 }
 
+// ===========================================================================
+// SECTION 24: LocalMaintenanceDB Persistence Tests (13 tests)
+// ===========================================================================
+
+#include "hq/cerberus_local_maintenance_db.hpp"
+
+using hq::cerberus::privacy::LocalMaintenanceDB;
+using hq::cerberus::privacy::RBPCState;
+using hq::cerberus::privacy::TrustPolicy;
+
+class LcmdPersistenceTest : public ::testing::Test {
+protected:
+    std::filesystem::path db_path_;
+    std::vector<std::uint8_t> db_key_;
+
+    void SetUp() override {
+        db_path_ = std::filesystem::temp_directory_path() / "cerberus_lcmd_test.db";
+        std::filesystem::remove(db_path_);
+        db_key_.assign(32, 0xAB);
+    }
+    void TearDown() override {
+        std::filesystem::remove(db_path_);
+    }
+};
+
+TEST_F(LcmdPersistenceTest, RoundTrip_Preference) {
+    {
+        LocalMaintenanceDB db;
+        ASSERT_TRUE(db.initialize(db_path_, db_key_));
+        EXPECT_TRUE(db.store_preference("theme", "dark"));
+        EXPECT_TRUE(db.store_preference("lang", "en_GB"));
+        db.shutdown();
+    }
+    {
+        LocalMaintenanceDB db;
+        ASSERT_TRUE(db.initialize(db_path_, db_key_));
+        EXPECT_EQ(db.load_preference("theme"), "dark");
+        EXPECT_EQ(db.load_preference("lang"), "en_GB");
+        db.shutdown();
+    }
+}
+
+TEST_F(LcmdPersistenceTest, RoundTrip_License) {
+    {
+        LocalMaintenanceDB db;
+        ASSERT_TRUE(db.initialize(db_path_, db_key_));
+        auto now = std::chrono::system_clock::now();
+        EXPECT_TRUE(db.store_license("ext123", "lic_hash", "user_1", "premium", now, {{"region","UK"}}));
+        db.shutdown();
+    }
+    {
+        LocalMaintenanceDB db;
+        ASSERT_TRUE(db.initialize(db_path_, db_key_));
+        auto lic = db.load_license("ext123", "user_1");
+        EXPECT_EQ(lic["license_key_hash"], "lic_hash");
+        EXPECT_EQ(lic["license_type"], "premium");
+        db.shutdown();
+    }
+}
+
+TEST_F(LcmdPersistenceTest, RoundTrip_RBPC_BurnPolicy) {
+    {
+        LocalMaintenanceDB db;
+        ASSERT_TRUE(db.initialize(db_path_, db_key_));
+        RBPCState st;
+        st.node_id = "node-42";
+        st.pin_hash = "argon2id_hash";
+        st.salt = "random_salt";
+        EXPECT_TRUE(db.save_rbpc_state(st));
+        db.shutdown();
+    }
+    {
+        LocalMaintenanceDB db;
+        ASSERT_TRUE(db.initialize(db_path_, db_key_));
+        auto st = db.load_rbpc_state("node-42");
+        ASSERT_TRUE(st.has_value());
+        EXPECT_EQ(st->node_id, "node-42");
+        EXPECT_TRUE(db.increment_rbpc_failed_attempts("node-42"));
+        EXPECT_TRUE(db.increment_rbpc_failed_attempts("node-42"));
+        EXPECT_TRUE(db.increment_rbpc_failed_attempts("node-42")); // 3rd = burn
+        st = db.load_rbpc_state("node-42");
+        ASSERT_TRUE(st.has_value());
+        EXPECT_TRUE(st->burned);
+        EXPECT_FALSE(st->is_active());
+        db.shutdown();
+    }
+}
+
+TEST_F(LcmdPersistenceTest, RoundTrip_TrustPolicy) {
+    {
+        LocalMaintenanceDB db;
+        ASSERT_TRUE(db.initialize(db_path_, db_key_));
+        TrustPolicy tp;
+        tp.policy_id = "test_policy_v1";
+        tp.plaintext_storage = "forbidden";
+        tp.psmdb_recovery = "forbidden";
+        EXPECT_TRUE(db.store_trust_policy(tp));
+        db.shutdown();
+    }
+    {
+        LocalMaintenanceDB db;
+        ASSERT_TRUE(db.initialize(db_path_, db_key_));
+        auto tp = db.load_trust_policy();
+        EXPECT_EQ(tp.policy_id, "test_policy_v1");
+        EXPECT_TRUE(tp.keeps_local_authority());
+        db.shutdown();
+    }
+}
+
+TEST_F(LcmdPersistenceTest, RoundTrip_AuditEvents) {
+    {
+        LocalMaintenanceDB db;
+        ASSERT_TRUE(db.initialize(db_path_, db_key_));
+        EXPECT_TRUE(db.store_audit_event({{"event_id","evt-1"},{"action","login"}}));
+        EXPECT_TRUE(db.store_audit_event({{"event_id","evt-2"},{"action","logout"}}));
+        db.shutdown();
+    }
+    {
+        LocalMaintenanceDB db;
+        ASSERT_TRUE(db.initialize(db_path_, db_key_));
+        auto evts = db.load_audit_events("", "", 10);
+        EXPECT_EQ(evts.size(), 2u);
+        db.shutdown();
+    }
+}
+
+TEST_F(LcmdPersistenceTest, OfflineMode_SyncQueue) {
+    {
+        LocalMaintenanceDB db;
+        ASSERT_TRUE(db.initialize(db_path_, db_key_));
+        db.set_offline_mode(true);
+        EXPECT_TRUE(db.store_preference("offline_key", "offline_value"));
+        EXPECT_EQ(db.pending_sync_count(), 1u);
+        db.shutdown();
+    }
+    {
+        LocalMaintenanceDB db;
+        ASSERT_TRUE(db.initialize(db_path_, db_key_));
+        db.set_offline_mode(true);
+        std::size_t replayed = db.replay_sync_queue(
+            [](const std::string&, const std::string&,
+               const std::map<std::string,std::string>&) { return true; }, 0);
+        EXPECT_EQ(replayed, 1u);
+        EXPECT_EQ(db.pending_sync_count(), 0u);
+        db.shutdown();
+    }
+}
+
+TEST_F(LcmdPersistenceTest, Disk_IsEncrypted) {
+    {
+        LocalMaintenanceDB db;
+        ASSERT_TRUE(db.initialize(db_path_, db_key_));
+        EXPECT_TRUE(db.store_preference("secret", "hidden_value_12345"));
+        db.shutdown();
+    }
+    std::ifstream ifs(db_path_, std::ios::binary);
+    ASSERT_TRUE(ifs);
+    std::string raw((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
+    EXPECT_EQ(raw.find("hidden_value_12345"), std::string::npos);
+    EXPECT_GT(raw.size(), 64u);
+}
+
+TEST_F(LcmdPersistenceTest, WrongKey_Fails) {
+    {
+        LocalMaintenanceDB db;
+        ASSERT_TRUE(db.initialize(db_path_, db_key_));
+        EXPECT_TRUE(db.store_preference("key", "value"));
+        db.shutdown();
+    }
+    {
+        std::vector<std::uint8_t> wrong_key(32, 0x00);
+        LocalMaintenanceDB db;
+        ASSERT_TRUE(db.initialize(db_path_, wrong_key));
+        EXPECT_TRUE(db.load_preference("key").empty());
+        db.shutdown();
+    }
+}
+
+TEST_F(LcmdPersistenceTest, DirtyFlag_CoalescesWrites) {
+    {
+        LocalMaintenanceDB db;
+        ASSERT_TRUE(db.initialize(db_path_, db_key_));
+        for (int i = 0; i < 100; ++i) {
+            EXPECT_TRUE(db.store_preference("key_" + std::to_string(i),
+                                            "val_" + std::to_string(i)));
+        }
+        db.shutdown();
+    }
+    {
+        LocalMaintenanceDB db;
+        ASSERT_TRUE(db.initialize(db_path_, db_key_));
+        for (int i = 0; i < 100; ++i) {
+            EXPECT_EQ(db.load_preference("key_" + std::to_string(i)),
+                      "val_" + std::to_string(i));
+        }
+        db.shutdown();
+    }
+}
+
+TEST_F(LcmdPersistenceTest, RoundTrip_OnboardingGrant) {
+    {
+        LocalMaintenanceDB db;
+        ASSERT_TRUE(db.initialize(db_path_, db_key_));
+        EXPECT_TRUE(db.store_onboarding_grant(
+            {{"grant_id","grant-1"},{"status","active"},{"code","TEMP123"}}));
+        db.shutdown();
+    }
+    {
+        LocalMaintenanceDB db;
+        ASSERT_TRUE(db.initialize(db_path_, db_key_));
+        auto g = db.load_onboarding_grant("grant-1");
+        EXPECT_EQ(g["status"], "active");
+        EXPECT_TRUE(db.consume_onboarding_grant("grant-1", "user_x", "first_login"));
+        g = db.load_onboarding_grant("grant-1");
+        EXPECT_EQ(g["status"], "consumed");
+        db.shutdown();
+    }
+}
+
+TEST_F(LcmdPersistenceTest, RoundTrip_CredentialRecord) {
+    {
+        LocalMaintenanceDB db;
+        ASSERT_TRUE(db.initialize(db_path_, db_key_));
+        EXPECT_TRUE(db.store_credential_record(
+            {{"user_id","user_1"},{"argon2id_commitment","placeholder"}}));
+        db.shutdown();
+    }
+    {
+        LocalMaintenanceDB db;
+        ASSERT_TRUE(db.initialize(db_path_, db_key_));
+        auto rec = db.load_credential_record("user_1", "");
+        EXPECT_EQ(rec["argon2id_commitment"], "placeholder");
+        db.shutdown();
+    }
+}
+
+TEST_F(LcmdPersistenceTest, RoundTrip_VIPKey) {
+    {
+        LocalMaintenanceDB db;
+        ASSERT_TRUE(db.initialize(db_path_, db_key_));
+        EXPECT_TRUE(db.store_vip_key("vip_hash_1", "enc_meta", "enc_key", std::time(nullptr) + 3600));
+        db.shutdown();
+    }
+    {
+        LocalMaintenanceDB db;
+        ASSERT_TRUE(db.initialize(db_path_, db_key_));
+        auto vip = db.load_vip_key("vip_hash_1");
+        EXPECT_EQ(vip["encrypted_metadata"], "enc_meta");
+        db.shutdown();
+    }
+}
+
+TEST_F(LcmdPersistenceTest, RoundTrip_RevokeLicense) {
+    {
+        LocalMaintenanceDB db;
+        ASSERT_TRUE(db.initialize(db_path_, db_key_));
+        EXPECT_TRUE(db.revoke_license("revoked_hash_1", "non_payment"));
+        db.shutdown();
+    }
+    {
+        LocalMaintenanceDB db;
+        ASSERT_TRUE(db.initialize(db_path_, db_key_));
+        EXPECT_TRUE(db.is_license_revoked("revoked_hash_1"));
+        EXPECT_FALSE(db.is_license_revoked("valid_hash_1"));
+        db.shutdown();
+    }
+}
+
 // MAIN
 // ===========================================================================
 int main(int argc, char** argv) {
