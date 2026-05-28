@@ -37,6 +37,13 @@ __pycache__/
 *:Zone.Identifier
 *Zone.Identifier
 
+# Development docs — internal only, not for public repo
+Development docs/
+
+# LFSSL bridge build artifacts
+lfssl_bridge/obj/
+lfssl_bridge/tests/*.exe
+
 # Temporary / scratch directories
 New folder/
 doc/

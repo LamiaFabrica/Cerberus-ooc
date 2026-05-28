@@ -1,9 +1,0 @@
-[08:14:04.947] [INFO ] npu_backend_unified.cpp:640 static void hq::npu::NpuBackendFactory::initialize()() ÔÇö [NpuBackendFactory] Probed 3 backends:
-[08:14:04.947] [INFO ] npu_backend_unified.cpp:664 hq::npu::NpuBackendFactory::print_status()::<lambda(hq::npu::INpuBackend*)>() ÔÇö   ONNX-CPU-Fallback: available=yes, synthetic=yes, can_compile_for(intel_npu)=no, can_compile_for(cuda)=no, can_compile_for(cpu)=yes
-[08:14:04.947] [INFO ] npu_backend_unified.cpp:664 hq::npu::NpuBackendFactory::print_status()::<lambda(hq::npu::INpuBackend*)>() ÔÇö   NVIDIA-CUDA: available=no, synthetic=yes, can_compile_for(intel_npu)=no, can_compile_for(cuda)=yes, can_compile_for(cpu)=no
-[08:14:04.947] [INFO ] npu_backend_unified.cpp:664 hq::npu::NpuBackendFactory::print_status()::<lambda(hq::npu::INpuBackend*)>() ÔÇö   Intel-OpenVINO-NPU: available=no, synthetic=yes, can_compile_for(intel_npu)=yes, can_compile_for(cuda)=no, can_compile_for(cpu)=yes
-[08:14:05.059] [INFO ] npu_backend_unified.cpp:640 static void hq::npu::NpuBackendFactory::initialize()() ÔÇö [NpuBackendFactory] Probed 3 backends:
-[08:14:05.059] [INFO ] npu_backend_unified.cpp:664 hq::npu::NpuBackendFactory::print_status()::<lambda(hq::npu::INpuBackend*)>() ÔÇö   ONNX-CPU-Fallback: available=yes, synthetic=yes, can_compile_for(intel_npu)=no, can_compile_for(cuda)=no, can_compile_for(cpu)=yes
-[08:14:05.059] [INFO ] npu_backend_unified.cpp:664 hq::npu::NpuBackendFactory::print_status()::<lambda(hq::npu::INpuBackend*)>() ÔÇö   NVIDIA-CUDA: available=no, synthetic=yes, can_compile_for(intel_npu)=no, can_compile_for(cuda)=yes, can_compile_for(cpu)=no
-[08:14:05.060] [INFO ] npu_backend_unified.cpp:664 hq::npu::NpuBackendFactory::print_status()::<lambda(hq::npu::INpuBackend*)>() ÔÇö   Intel-OpenVINO-NPU: available=no, synthetic=yes, can_compile_for(intel_npu)=yes, can_compile_for(cuda)=no, can_compile_for(cpu)=yes
-[JWT DEBUG] body='"càrberus","psëfoÆcedb"'

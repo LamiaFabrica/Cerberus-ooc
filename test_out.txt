@@ -1,2 +1,0 @@
-C++ cout: hello
-C printf: hello

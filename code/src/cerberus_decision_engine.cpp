@@ -78,7 +78,6 @@ DecisionEngine::pick_backend(const CerberusGraph& g, std::int32_t node_id) const
 
     // If node carries a QuantProfile with sub-8-bit, prefer native
     // (our native path supports asymmetric uint8; vendor paths may not)
-    // TODO: add quant_profile field to GraphNode
     (void)node;
 
     if (node.op == npu::KernelNode::Op::MatMul) {

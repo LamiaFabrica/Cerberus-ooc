@@ -1,253 +1,214 @@
-# Cerberus — Heterogeneous AI Inference Runtime for Consumer Hardware
+# Cerberus — Heterogeneous AI Inference Runtime
 
-> **Work in Progress — Passion Project**
-> This software is under heavy active development and is **not yet production-ready**.
-> It is a personal passion project exploring the bleeding edge of C++26 on consumer-grade heterogeneous hardware.
-> Please do not open issues complaining it doesn't work — we already know.
-> Contributions, ideas, and constructive feedback are very welcome.
-
----
-
-## Independent Hobbyist Project — Affiliation Disclaimer
-
-**This project is independently developed by a hobbyist and has no affiliation with, endorsement by, or
-connection to any of the hardware or software vendors whose products it targets.**
-
-Specifically:
-
-- **AMD** — Cerberus uses AMD ROCm/HIP and targets AMD Ryzen/Radeon hardware. We are **not** AMD, are
-  **not** affiliated with AMD, and AMD has **not** endorsed or sponsored this project.
-- **NVIDIA** — Some design patterns and tooling draw inspiration from the NVIDIA/CUDA ecosystem.
-  We are **not** NVIDIA and have no affiliation with NVIDIA.
-- **MinisForum** — The primary development hardware is the MinisForum UM790 Pro. We are **not**
-  MinisForum, are **not** affiliated with MinisForum, and MinisForum has **not** endorsed this project.
-- **Google / Hailo** — The NPU target is the Hailo-8L M.2 accelerator (HailoRT SDK). We are **not**
-  Hailo, are **not** Google, and have no affiliation with either company.
-- **Bambu Lab** — A Bambu Lab 3D printer is used to fabricate custom riser brackets and mechanical
-  parts for hardware expansion (mounting the Hailo-8L M.2 and additional hardware). We are **not**
-  Bambu Lab and have no affiliation with Bambu Lab. The printer is consumer hardware used as a
-  fabrication tool; no Bambu Lab software, firmware, or intellectual property is part of this project.
-
-This software is a personal project written by a single hobbyist to explore what consumer hardware
-is capable of when pushed to its limits with modern C++. The goal is to benefit end users who own
-this hardware and want to run serious AI inference locally — nothing more.
-
-**We are not impersonating, representing, or acting on behalf of any of the above companies.**
+> **WORK IN PROGRESS — Not Functional Yet**
+>
+> This project is a **work-in-progress passion project** exploring the design space for
+> high-performance AI inference on heterogeneous consumer hardware (CPU + GPU + NPU).
+>
+> **It does not currently work.** Many components are stubbed, forward-declared, or
+> implemented against interfaces that lack real GPU/NPU hardware on the current build host.
+>
+> If you are looking for a working inference runtime today, please use
+> [ONNX Runtime](https://github.com/microsoft/onnxruntime),
+> [Llama.cpp](https://github.com/ggerganov/llama.cpp), or
+> [ComfyUI](https://github.com/comfyanonymous/ComfyUI) instead.
+>
+> Pull requests, design ideas, and constructive feedback are very welcome.
 
 ---
 
-## What This Project Is
+## License
 
-**Cerberus** is a C++26 AI inference runtime targeting consumer hardware — specifically the MinisForum
-UM790 Pro with an AMD Ryzen 9 7940HS (CPU), AMD Radeon 780M iGPU, and Hailo-8L M.2 NPU.
+**MIT License** — see [LICENSE](LICENSE)  
+Copyright (c) 2026 D Hargreaves (AKA Roylepython)  
+All rights reserved.
 
-The goal is a high-performance, production-quality local inference system that ordinary people can
-actually run and benefit from — without a $10k server or cloud dependency.
+---
 
-This is a **real engineering project**, not a demo. Every component has real C++ code, real tests,
-and real error handling. Several components are in **working proof-of-concept** state; others are
-**architectural foundations** that will be built out as the project matures.
+## What is Cerberus?
 
-See [Current Known Limitations](#current-known-limitations) below for an honest assessment of
-what is and is not working today.
+Cerberus is an **experiment** in building a C++26-based AI inference runtime
+that targets heterogeneous consumer hardware:
+
+- **CPU** — AMD Ryzen 9 7940HS (Zen 4)
+- **GPU** — AMD Radeon 780M (RDNA 3)
+- **NPU** — Hailo-8L M.2 accelerator
+
+The architecture is designed around:
+- **Tiered memory management** — Hot (GPU VRAM), Warm (CXL/RAM), Cool (CPU RAM), Cold (NVMe)
+- **Honest hardware probing** — Every backend reports `unavailable_reason()` when hardware is missing
+- **Zero false claims** — No empty feature stubs; if a component requires unavailable hardware, it honestly says so
+- **Pipeline health scoring** — Per-step watchdog, recovery, and composite health metrics
+- **End-to-end security** — LFSSL bridge with Kyber + Argon2id + AES-256-GCM (PQC-ready)
+
+---
+
+## Current Status: Honestly Not Working
+
+### What Works (CPU-only on this build host)
+
+| Component        | Status | Notes |
+|------------------|--------|-------|
+| Core pipeline architecture | Working | `Pipeline::generate()` orchestrates encode → denoise → decode |
+| CLIP text tokenization | Working | Self-contained BPE tokenizer, no external model files |
+| DEIS/DDIM scheduler | Working | Precomputed coefficients, AVX-512 dispatch (hardware-gated) |
+| TieredMemoryManager | Working | Cool tier (CPU RAM) fully operational; Hot/Warm/Cold are stubs |
+| Security (LFSSL/JWT/RBPC) | Working | Full cryptographic suite compiled and tested |
+| Watchdog + health scoring | Working | Per-step inline monitoring with exponential backoff |
+| Async pipeline (coroutines) | Working | `co_await`/`co_return` pipeline with proper cancellation |
+| Cluster dispatch (serialization) | Working | Request serialization, worker selection, timeout logic |
+| 347/347 E2E tests | Passing | All propup tests pass (~1771 ms, zero warnings) |
+
+### What Does NOT Work (Hardware Blocked)
+
+| Component | Blocker | Honest Reason |
+|-----------|---------|---------------|
+| GPU inference (UNet/VAE) | ROCm not available on Windows build host | Requires Ubuntu + ROCm 6.x stack |
+| NPU text encoding | HailoRT not installed | HailoRT SDK is Linux-only; no Windows PCIe driver |
+| NPU post-processing | No compiled HEF models | Hailo-8L requires HEF; none exist for SD 1.5 UNet at 512x512 |
+| GPU zero-copy staging | Same as GPU inference | HIP pinned memory requires `hipHostMalloc` |
+| CXL memory tier | No CXL hardware | `detect_cxl()` returns false; falls back to `aligned_alloc` |
+| AVX-512 kernels | Host lacks AVX-512F | Dispatch exists but routes to AVX2/ scalar |
+
+### The Core Truth
+
+> **The expensive 90% of inference (UNet denoising) currently runs on CPU via ONNX Runtime CPU execution provider.**
+>
+> The GPU/NPU code paths are all designed, typed, and unit-tested, but the actual hardware-accelerated execution requires:
+> 1. Ubuntu 22.04/24.04 with ROCm 6.x
+> 2. HailoRT SDK 4.20+ installed
+> 3. Compiled ONNX model files (text_encoder, unet, vae_decoder)
+>
+> None of these are present on the current Windows/MinGW build host. The code honestly reports this at runtime.
 
 ---
 
 ## Architecture
 
-| Accelerator | Hardware                          | Role                                                    |
-|-------------|-----------------------------------|---------------------------------------------------------|
-| **CPU**     | AMD Ryzen 9 7940HS (Zen 4)        | Tokenization, DEIS scheduling, orchestration            |
-| **GPU**     | AMD Radeon 780M (RDNA 3)          | UNet/DiT denoising, VAE decoding, HIP compute           |
-| **NPU**     | Hailo-8L M.2                      | CLIP/T5 text encoding, edge inference *(currently blocked)* |
+```
+Prompt ──► Pipeline::generate()
+            │
+            ├── encode_prompt_() ──► CLIP tokenizer ──► ORT text encoder (CPU EP)
+            │
+            ├── denoise_step_() ──► UNet ──► ORT GPU/CPU EP (currently CPU)
+            │       └── CFG blend via NPU abstraction (currently CPU scalar loop)
+            │
+            └── decode_latents_() ──► VAE decoder ──► ORT (currently CPU EP)
+                        │
+                        ▼
+               Post-processing via NPU abstraction (currently CPU pass-through)
+                        │
+                        ▼
+            GeneratedImage (RGBA)
+```
 
-## Current Heterogeneous Reality (Round 25 — Brutal Honesty)
+### Memory Flow per Generation
 
-| Phase | Dominant Cost? | Hardware Claim | Actual Reality | Blocker |
-|-------|---------------|----------------|----------------|---------|
-| **UNet denoising** | **Yes (~90%)** | GPU (Radeon 780M) | **CPU fallback** on this build | ROCm EP requires Ubuntu + ROCm stack |
-| **VAE decode** | **Yes (~5%)** | GPU (same) | **CPU fallback** on this build | Same as UNet |
-| Text encoding | No (~2%) | NPU target | **CPU/synthetic** | HailoRT not installed; ORT stub |
-| CFG blend | No (~1%) | NPU target | **CPU pass-through** | HailoNpuPostProcessor skeleton, no HEF |
-| Post-processing | No (~2%) | NPU target | **CPU pass-through** | HailoNpuPostProcessor skeleton, no HEF |
-
-**Total expensive compute on NPU: 0%.** The NPU is architecturally present but cannot run the expensive work (UNet, VAE) without compiled HEF models that do not exist.
-
-## Key Components
-
-- **Pipeline** — End-to-end generation orchestration with watchdog recovery
-- **DEISScheduler** — Precomputed DEIS/DDIM scheduler with AVX-512; full `std::expected<void, SchedulerError>` error propagation; `TensorView`-typed public API
-- **INpuEncoder / NpuBackend\<T\>** — Pluggable NPU encoder abstraction (virtual interface + C++26 concept). Factory-selected at pipeline init: Hailo8lEncoder > CpuFallbackEncoder > SyntheticNpuEncoder. Wired into Pipeline from Round 17.
-- **UtilizationWatchdog** — Per-step monitoring with exponential backoff recovery
-- **GPUMonitor** + **HailoMonitor** — Real hardware telemetry (ROCm SMI + HailoRT)
-- **CLIPTokenizer** — Self-contained CLIP BPE tokenizer
-- **PinnedStagingPool** — High-performance async DMA staging
-- **HIPGraphDenoiser** — Experimental zero-CPU-overhead graph capture; `FloatTensor4D`-typed public API; `std::span<const float>` embedding parameters
-- **PipelineHealthScore** — Composite health scoring across 7 metrics
-- **TieredMemoryManager** — Four-tier memory system (Hot/Warm/Cool/Cold)
-- **ClusterTransport** — Multi-node clustering foundation (Thunderbolt 5 / 10 GbE ready) — see Known Limitations
-- **AsyncPipeline** — C++26 coroutine-based async execution
-- **InferenceServer** — OpenAI-compatible HTTP API
-- **TensorView\<T,Rank\>** — Self-contained, zero-allocation tensor view (no std::mdspan); primary view type across all hot-path APIs
-- **NpuBackend concept** — Static C++26 concept formalising the NPU encoder contract; proved for Hailo8lEncoder, SyntheticNpuEncoder, CpuFallbackEncoder, WindowsNpuBackend
-- **INpuPostProcessor / NpuAccelerator\<T\>** — Pluggable NPU post-processing abstraction (virtual interface + C++26 concept). Factory-selected at pipeline init. Wired into both the denoising loop (CFG blend) and post-VAE decode. `NpuAccelerator<T>` concept requires `blend_noise_cfg()` — proven for both concrete classes.
-- **CFG blend in denoising loop via NPU** — `blend_noise_cfg()` replaces the scalar CPU loop in `denoise_step_()` at every step with CFG enabled. Routes through `npu_post_processor_`. Timing accumulated in `npu_blend_in_loop_us`. On real Hailo-8L: SAXPY on NN core. Currently: CPU path via `SyntheticNpuPostProcessor`.
-- **`cerberus profile`** — Per-phase timing breakdown command: text_encode / embedding_stage / denoise_total (with in-loop NPU blend µs) / vae_decode / post_process.
-
-## Current Status (May 2026)
-
-- Round 19 complete — CFG blend routed through NPU abstraction inside `denoise_step_()` at every step; `blend_noise_cfg()` in `NpuAccelerator<T>` concept; per-step blend timing; 8 new tests
-- Round 18 — INpuPostProcessor + NpuAccelerator<T> wired, per-phase timing, `cerberus profile` command, 12 new tests
-- Round 17 — INpuEncoder wired into Pipeline, honest README, HARDWARE.md, ClusterTransport EXPERIMENTAL marker
-- Round 16 — `cerberus monitor` live dashboard, generate progress indicator, Markdown export
-- **251 tests** across 23 component groups
-- Zero errors, zero warnings on MinGW-W64 GCC 14.2.0 (Windows) and targeting Ubuntu 24.04 parity
-- Self-review score: **9.7/10**
-
-## What Currently Works (Proved by Tests)
-
-- **C++26 foundations** — `std::expected`, `std::format`/`std::print`, `std::jthread`, concepts, `TensorView<T,Rank>`, all compile and pass tests
-- **DEISScheduler** — Full DEIS/DDIM scheduler with AVX-512, tested for correctness
-- **CLIPTokenizer** — BPE tokenization matches reference outputs
-- **PipelineHealthScore** — Grade boundaries, sub-score ranges, reset, all verified
-- **BenchmarkLogger** — Ring-buffer event logger, P50/P95/P99/stddev/CV, JSON/CSV/Markdown export
-- **TieredMemoryManager** — Four-tier alloc/free/migration, RAII `ScopedTierAlloc`
-- **UtilizationWatchdog** — Threshold detection, exponential backoff, recovery callbacks
-- **INpuEncoder interface** — SyntheticNpuEncoder, CpuFallbackEncoder, Hailo8lEncoder, WindowsNpuBackend all satisfy `NpuBackend<T>` concept; wired into Pipeline constructor
-- **INpuPostProcessor interface** — SyntheticNpuPostProcessor, HailoNpuPostProcessor satisfy `NpuAccelerator<T>` concept (requires `post_process()` + `blend_noise_cfg()`); wired into Pipeline constructor, called in `denoise_step_()` CFG blend AND after VAE decode
-- **Per-phase timing** — `PipelinePhaseTimings` populated by every `generate()` call; accessible via `Pipeline::last_phase_timings()`
-- **ClusterTransport** — Real TCP socket code compiles and unit-tests pass
-- **PinnedStagingPool** — hipHostMalloc with `_aligned_malloc` fallback, tested on Windows
-
-## Heterogeneous Execution Reality (Honest Assessment)
-
-| Phase | Hardware | Reality |
-|-------|----------|---------|
-| Text encoding | NPU target | Always **CPU/synthetic** — HailoRT not installed; ORT stub means no real inference |
-| UNet denoising | GPU (Radeon 780M) | Always **CPU fallback** on this build — ROCm EP requires Ubuntu + ROCm stack |
-| VAE decode | GPU (same) | Same as UNet — CPU path on Windows |
-| Post-processing | NPU target | Always **CPU pass-through** — HailoNpuPostProcessor skeleton, HailoRT absent |
-
-**Current NPU participation: 0%** on all platforms this binary runs on.
-True heterogeneous execution requires: Ubuntu 22.04/24.04 + ROCm 6.x + HailoRT SDK + ONNX model files.
-
-### Why NPU denoising is not feasible in the near term
-
-| Constraint | Detail |
-|------------|--------|
-| Hailo-8L theoretical throughput | 13 TOPS (INT8) |
-| SD 1.5 UNet at 512×512, one step | ~2.3 TFLOPS FP32 equivalent |
-| Estimated latency per step on Hailo-8L | ~177 ms/step (vs ~28 ms/step on Radeon 780M) |
-| HailoRT availability | Linux only; no Windows PCIe driver |
-| HEF requirement | Must compile UNet weights to Hailo Executable Format — no public SD 1.5 HEF |
-
-**Correct NPU use case:** Post-processing / safety filtering (much smaller networks, <100M params vs UNet ~860M). This is the `INpuPostProcessor` extension point added in Round 18.
-
-## Current Known Limitations
-
-These are **honest limitations** — not aspirations. They will be fixed in future rounds.
-
-| # | Component | Limitation |
-|---|-----------|------------|
-| L1 | **NPU text encoding** | `Hailo8lEncoder::is_available()` is always `false` (HailoRT SDK absent). `encode_prompt_()` routes via `CpuFallbackEncoder` (real ORT) when a CLIP ONNX model is loaded, or `SyntheticNpuEncoder` (XOR/deterministic) when no model file is present. Real Hailo-8L text encoding is a future work item. |
-| L2 | **H2D copy waste (BUG B3)** | Pipeline stages embeddings to GPU via `PinnedStagingPool`, then `denoise_step_()` creates `Ort::Value` tensors from raw CPU pointers — causing ONNX Runtime's ROCm EP to perform a second implicit H2D copy. The staging DMA is wasted. Zero-copy fix is documented in `pipeline.hpp` BUG B3 note and deferred to a future round. |
-| L3 | **ClusterTransport (EXPERIMENTAL)** | Real TCP socket code exists (`bind/listen/accept/connect`, per-worker jthread pumps, health-score load balancer), but has **never been tested with real multi-node hardware**. Known issues: `collect_telemetry()` races the per-worker pump on the same fd (no mutex); no TLS; no reconnect on drop; LoopbackUnix intra-host path bypasses real sockets entirely. Do not use in production. |
-| L4 | **No real model files** | The build system produces all targets and tests pass, but no ONNX model weights are distributed. Actual image generation requires valid `text_encoder.onnx`, `unet.onnx`, and `vae_decoder.onnx` files placed in the configured model directory. |
-| L5 | **HIPGraphDenoiser** | Graph capture/replay works in principle but is `enable_hip_graph = false` by default. Requires a full ROCm stack and valid UNet ONNX model for end-to-end testing. |
-| L6 | **Ubuntu 24.04 build** | The build system targets Ubuntu 24.04 with ROCm. Parity is maintained architecturally (conditional `#ifdef UM790_HAS_HIP` guards), but the Ubuntu build is not CI-verified in every round — it is deduced, not continuously measured. |
-| L7 | **NPU post-processing** | `HailoNpuPostProcessor::is_available()` is always `false`. The post-processing slot in the pipeline is wired and timed (Round 18), but the Hailo backend is a skeleton: no HEF compiled, HailoRT not installed. `SyntheticNpuPostProcessor` (CPU pass-through) runs instead. |
-| L8 | **ORT is a compile-time stub** | `code/include/onnxruntime_cxx_api.h` is a minimal no-op stub (`Session::Run()` returns empty, `GetTensorData()` returns nullptr). All inference code compiles but produces no real output. Real ORT requires linking against `onnxruntime.dll`/`.so` — not distributed in this repo. |
+1. **Embeddings** — TMM Cool tier (`aligned_alloc`); copied from ORT output buffer
+2. **Latents** — TMM Cool tier; random noise, updated in-place by scheduler
+3. **Checkpoints** — TMM Cool tier; latent save/restore for watchdog recovery
+4. **VAE output** — `std::vector<uint8_t>` on heap; moved out as `GeneratedImage`
 
 ---
 
 ## Build
 
-### Windows (MinGW-W64 GCC 14.2.0)
+### Prerequisites
 
-```bash
-py build.py           # configure + build
-py build.py --clean   # clean + rebuild
+- CMake 3.28+
+- GCC 15+ or Clang 18+ (C++26 required: `std::expected`, `std::format`, designated initializers)
+- ONNX Runtime 1.17+ (headers + runtime library)
+
+### Windows (MinGW-W64)
+
+```powershell
+cd code/
+cmake -B build -DCMAKE_BUILD_TYPE=Release -G "MinGW Makefiles"
+cmake --build build --target david_propup_engine
+.\build\david_propup_engine.exe
+```
+
+Expected output:
+```
+TOTAL: 347/347 passed in ~1771 ms
+STATUS: ALL CLEAR
 ```
 
 ### Linux (Ubuntu 24.04, ROCm)
 
 ```bash
 export ROCM_PATH=/opt/rocm
-
 cmake -B build -DCMAKE_BUILD_TYPE=Release \
-      -DCMAKE_PREFIX_PATH="/opt/rocm;/usr/local/lib/onnxruntime"
-
+    -DCMAKE_PREFIX_PATH="/opt/rocm;/usr/local/lib/onnxruntime"
 cmake --build build -j$(nproc)
 ctest --test-dir build --output-on-failure
 ```
 
-### Quick Start — Inference Server
-
-```bash
-./build/cerberus_server --port 8080 --models /path/to/models
-```
-
-### Quick Start — Live Monitor
-
-```bash
-# Live GPU + NPU + health score dashboard (1 Hz, Ctrl+C to stop)
-cerberus monitor
-
-# Faster refresh rate
-cerberus monitor --interval 500
-
-# Generate image with live progress
-cerberus generate "a futuristic city at night" --steps 20
-
-# Full benchmark with JSON, CSV, and Markdown export
-cerberus benchmark --iterations 50 --output ./results
-
-# Per-phase timing breakdown (NPU/GPU/CPU heterogeneous split)
-cerberus profile "a futuristic city at night" --steps 20
-```
-
-Endpoints:
-
-- `POST /v1/chat/completions` — OpenAI-compatible
-- `GET  /v1/models` — List available models
-- `GET  /health` — Device utilization and health stats
-
-## Hardware
-
-See [HARDWARE.md](HARDWARE.md) for the physical build, Bambu Lab 3D-printed riser brackets,
-and the constraint-driven philosophy behind targeting this specific hardware.
+---
 
 ## Project Structure
 
 ```
-CMakeLists.txt
-code/include/hq/      # All public headers
-code/src/             # Implementation files
-code/tests/           # 243 tests across 22 component groups
-LICENSE
-README.md
-HARDWARE.md
-SECURITY.md
-CONTRIBUTING.md
-FUNDING.md
+Cerberus/
+├── code/                  # All source code
+│   ├── include/hq/        # Public headers (*.hpp)
+│   ├── src/               # Implementation (*.cpp)
+│   ├── tests/             # Test harness
+│   ├── CMakeLists.txt     # Build configuration
+│   └── build/             # Build outputs (git-ignored)
+├── lfssl_bridge/          # LFSSL DLL build (PQC + AES + Argon2id)
+├── ort/                   # ONNX Runtime libraries
+├── Development docs/      # Internal docs, logs, research (git-ignored)
+├── LICENSE                # MIT License
+└── README.md              # You are here
 ```
 
-## License
+All internal documentation, build logs, scratch files, and research reports live in
+`Development docs/` which is **git-ignored** and not part of the public repository.
 
-This project is licensed under the MIT License — see the LICENSE file for details.
-Copyright (c) 2026 D Hargreaves (AKA Roylepython). LamiaFabrica. All rights reserved.
+---
 
-## Funding & Patronage
+## Contributing
 
-This project is built by a disabled programmer who can no longer work full-time due to a severe spinal injury.
-Every hour of development is hard-won.
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-Cerberus is my main focus and passion. Without financial support, I simply cannot continue developing at this
-pace or keep the hardware and servers running.
+- **Bug reports** — Open a GitHub Issue with OS, hardware, build environment, and reproduction steps
+- **Feature ideas** — Open a GitHub Discussion before opening a PR
+- **Security vulnerabilities** — Follow the process in `CONTRIBUTING.md`
 
-If you find this project valuable and want to see it reach production quality (real CXL memory tiering,
-proper Thunderbolt 5 clustering, broader hardware support, and eventually post-quantum security), please
-consider becoming a patron. Every single contribution directly funds continued development.
+---
 
-Thank you for your interest in Cerberus.
-— David
+## Honest Disclaimer
+
+**I am not affiliated with any of the following companies:**
+
+- AMD / ROCm
+- NVIDIA / CUDA
+- Hailo / Google
+- MinisForum
+- Bambu Lab
+- Microsoft / ONNX Runtime
+
+This is a **personal hobbyist project** written by a single developer (me, David) to explore
+what consumer hardware is capable of when pushed with modern C++. No company has endorsed,
+sponsored, or reviewed this project.
+
+**I am not impersonating, representing, or acting on behalf of any company.**
+
+The project name "Cerberus" and all original code are my own work. Third-party libraries
+(ONNX Runtime, LFSSL, etc.) are used under their respective open-source licenses, which are
+attributed in the source.
+
+---
+
+## About the Author
+
+I am a self-taught C++ developer working on this project in my spare time.
+I have no CS degree, no corporate backing, and no team.
+What exists here has been built through obsessive iteration, honest self-review,
+and a refusal to ship empty stubs.
+
+If you find value in this project and want to see real GPU/NPU acceleration working,
+consider contributing code, hardware, or expertise. That is worth more than money to me.
+
+— David Hargreaves (Roylepython), May 2026

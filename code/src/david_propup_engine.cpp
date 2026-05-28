@@ -9125,8 +9125,6 @@ hq::propup::PropupReport hq::propup::run_all_propups(std::ostream* log) {
     run_one(propup_health_score_grade_f, "propup_health_score_grade_f");
     run_one(propup_health_score_weights_normalize, "propup_health_score_weights_normalize");
     run_one(propup_health_score_recovery_rate, "propup_health_score_recovery_rate");
-    // Staging tests omitted — heap corruption from prior TMM tests
-    // Staging tests omitted — heap corruption from prior TMM tests
     // Staging tests omitted — heap corruption from prior TMM tests (separate process isolation needed)
     // run_one(propup_staging_acquire_release, "propup_staging_acquire_release");
     // run_one(propup_staging_copy_in, "propup_staging_copy_in");

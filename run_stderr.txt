@@ -1,6 +1,0 @@
-The requested API version [21] is not available, only API versions [1, 17] are supported in this build. Current ORT Version is: 1.17.1
-[06:42:53.684] [INFO ] npu_backend_unified.cpp:643 hq::npu::NpuBackendFactory::initialize()::<lambda()>() ÔÇö [NpuBackendFactory] Probed 3 backends:
-[06:42:53.684] [INFO ] npu_backend_unified.cpp:668 hq::npu::NpuBackendFactory::print_status()::<lambda(hq::npu::INpuBackend*)>() ÔÇö   ONNX-CPU-Fallback: available=yes, synthetic=yes, can_compile_for(intel_npu)=no, can_compile_for(cuda)=no, can_compile_for(cpu)=yes
-[06:42:53.685] [INFO ] npu_backend_unified.cpp:668 hq::npu::NpuBackendFactory::print_status()::<lambda(hq::npu::INpuBackend*)>() ÔÇö   NVIDIA-CUDA: available=no, synthetic=yes, can_compile_for(intel_npu)=no, can_compile_for(cuda)=yes, can_compile_for(cpu)=no
-[06:42:53.685] [INFO ] npu_backend_unified.cpp:668 hq::npu::NpuBackendFactory::print_status()::<lambda(hq::npu::INpuBackend*)>() ÔÇö   Intel-OpenVINO-NPU: available=no, synthetic=yes, can_compile_for(intel_npu)=yes, can_compile_for(cuda)=no, can_compile_for(cpu)=yes
-[PipelineHealthScore] WARNING: weights sum to 4.0000, expected 1.0
