@@ -61,19 +61,79 @@ std::vector<std::uint8_t> CryptoBridge::pbkdf2_sha256(
 }
 #else
 // Fallback: when LFSSL_Native_Crypto.hpp is unavailable (Linux/WSL without LFSSL)
-// the inline primitives are unreachable. Propup tests load the LFSSL DLL/.so
-// directly, so the bridge is only needed when the header is present.
-std::vector<std::uint8_t> CryptoBridge::sha256(const std::string&) {
-    return {}; // Delegated to LFSSL DLL at runtime
+// the inline primitives are unreachable. We load them from the LFSSL .dll/.so at runtime.
+// ============================================================================
+// LFSSL Runtime Loader Helper (shared by sha256, hmac_sha256, pbkdf2_sha256)
+// ============================================================================
+static HMOD load_lfssl_once() {
+    static HMOD h = []() -> HMOD {
+#ifdef _WIN32
+        const char* paths[] = {
+            "cerberus_lfssl.dll",
+            "../../lfssl_bridge/cerberus_lfssl.dll",
+            "../lfssl_bridge/cerberus_lfssl.dll",
+            "lfssl_bridge/cerberus_lfssl.dll",
+            nullptr
+        };
+#else
+        const char* paths[] = {
+            "./libcerberus_lfssl.so",
+            "../../lfssl_bridge/libcerberus_lfssl.so",
+            "../lfssl_bridge/libcerberus_lfssl.so",
+            "lfssl_bridge/libcerberus_lfssl.so",
+            nullptr
+        };
+#endif
+        for (auto** p = paths; *p; ++p) {
+            HMOD lib = reinterpret_cast<HMOD>(LoadLibraryA(*p));
+            if (lib) return lib;
+        }
+        return nullptr;
+    }();
+    return h;
 }
+
+std::vector<std::uint8_t> CryptoBridge::sha256(const std::string& data) {
+    HMOD h = load_lfssl_once();
+    if (!h) return {};
+    using fn_t = void (*)(const uint8_t*, size_t, uint8_t[32]);
+    auto fn = reinterpret_cast<fn_t>(GetProcAddress(h, "cerberus_lfssl_sha256"));
+    if (!fn) return {};
+    std::vector<std::uint8_t> out(32);
+    fn(reinterpret_cast<const uint8_t*>(data.data()), data.size(), out.data());
+    return out;
+}
+
 std::vector<std::uint8_t> CryptoBridge::hmac_sha256(
-    const std::vector<std::uint8_t>&, const std::string&) {
-    return {}; // Delegated to LFSSL DLL at runtime
+    const std::vector<std::uint8_t>& key,
+    const std::string& message) {
+    HMOD h = load_lfssl_once();
+    if (!h) return {};
+    using fn_t = void (*)(const uint8_t*, size_t, const uint8_t*, size_t, uint8_t[32]);
+    auto fn = reinterpret_cast<fn_t>(GetProcAddress(h, "cerberus_lfssl_hmac_sha256"));
+    if (!fn) return {};
+    std::vector<std::uint8_t> out(32);
+    fn(key.data(), key.size(),
+       reinterpret_cast<const uint8_t*>(message.data()), message.size(),
+       out.data());
+    return out;
 }
+
 std::vector<std::uint8_t> CryptoBridge::pbkdf2_sha256(
-    const std::string&, const std::vector<std::uint8_t>&,
-    std::uint32_t, std::size_t) {
-    return {}; // Delegated to LFSSL DLL at runtime
+    const std::string& password,
+    const std::vector<std::uint8_t>& salt,
+    std::uint32_t iterations,
+    std::size_t key_len) {
+    HMOD h = load_lfssl_once();
+    if (!h) return {};
+    using fn_t = int (*)(const uint8_t*, size_t, const uint8_t*, size_t, int, size_t, uint8_t*);
+    auto fn = reinterpret_cast<fn_t>(GetProcAddress(h, "cerberus_lfssl_pbkdf2_sha256"));
+    if (!fn) return {};
+    std::vector<std::uint8_t> out(key_len);
+    int rc = fn(reinterpret_cast<const uint8_t*>(password.data()), password.size(),
+                salt.data(), salt.size(), static_cast<int>(iterations), key_len, out.data());
+    if (rc != 0) return {};
+    return out;
 }
 #endif
 

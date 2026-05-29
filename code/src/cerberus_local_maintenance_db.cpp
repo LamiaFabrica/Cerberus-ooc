@@ -384,9 +384,16 @@ bool LocalMaintenanceDB::initialize(const std::filesystem::path& db_path,
     db_path_ = db_path;
     db_key_ = db_key;
 
-    // Try to load persisted state from disk (encrypted page — LFSSL decrypt)
-    // If LFSSL is unavailable or file doesn't exist, start empty.
-    (void) load_from_disk_();
+    if (std::filesystem::exists(db_path_)) {
+        // File exists — MUST decrypt successfully, or it's the wrong key
+        if (!load_from_disk_()) {
+            // Wrong key or corrupt file — do NOT initialize
+            db_path_.clear();
+            db_key_.clear();
+            return false;
+        }
+    }
+    // File doesn't exist — start empty, will be created on first flush
 
     initialized_ = true;
     return true;

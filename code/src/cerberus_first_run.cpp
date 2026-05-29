@@ -95,6 +95,15 @@ RegistrationResult FirstRun::register_new_install(
         return result;
     }
 
+    // --- Prevent overwriting an existing database ---
+    if (std::filesystem::exists(db_path)) {
+        result.diagnostic =
+            "A database already exists at " + db_path.string() +
+            ". Registration refused to prevent data loss. "
+            "Delete the existing database first if you want to re-register.";
+        return result;
+    }
+
     // --- Structural validation of inputs ---
     if (passphrase.empty()) {
         result.diagnostic = "passphrase empty";

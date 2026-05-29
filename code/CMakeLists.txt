@@ -576,6 +576,13 @@ target_link_libraries(cerberus_register PRIVATE um790_pipeline um790_compile_opt
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND WIN32)
     target_link_options(cerberus_register PRIVATE -static-libgcc -static-libstdc++)
 endif()
+
+# Standalone LCMD end-to-end validation (no ONNX Runtime dependency)
+add_executable(test_lcmd_e2e tests/test_lcmd_e2e.cpp)
+target_link_libraries(test_lcmd_e2e PRIVATE um790_pipeline um790_compile_options um790_includes um790_link_options Threads::Threads)
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND WIN32)
+    target_link_options(test_lcmd_e2e PRIVATE -static-libgcc -static-libstdc++)
+endif()
 add_library(cerberus_npu SHARED src/cerberus_api.cpp)
 
 target_sources(cerberus_npu PRIVATE
