@@ -20,6 +20,7 @@
 #include "hq/deis_scheduler.hpp"
 #include "hq/hip_graph_denoiser.hpp"
 #include "hq/health_score.hpp"
+#include "hq/cerberus_local_maintenance_db.hpp"
 
 #include <cstdint>
 #if UM790_HAS_STD_EXPECTED
@@ -128,6 +129,11 @@ struct HardwareAccelerationReport {
     /// @brief True when the selected post-processor is a fallback (synthetic_mode() == true).
     bool post_processor_is_fallback{false};
 
+    // --- Round 20: Safety filter extension (NpuTaskType::SafetyFilter) ---
+    bool safety_filter_used_npu{false};      ///< True only if real NPU safety classifier ran
+    bool safety_filter_is_fallback{false};   ///< True when CPU heuristic used (current Windows reality)
+    float safety_filter_score{0.0f};         ///< Last safety_filter safety_score (or -1 if not run)
+
     std::string encoder_name;                ///< npu_encoder_->name() — "Hailo-8L", "ONNX-CPU", "none"
     std::string post_processor_name;          ///< npu_post_processor_->name()
     std::string gpu_backend_name;            ///< "NVML", "ROCM_SMI", "None"
@@ -158,6 +164,7 @@ struct PipelinePhaseTimings {
     double   npu_blend_in_loop_us{0.0}; ///< total npu_post_processor_->blend_noise_cfg() time (all steps, µs)
     double   vae_decode_ms{0.0};        ///< decode_latents_() time
     double   post_process_ms{0.0};      ///< npu_post_processor_->post_process() time
+    double   safety_filter_ms{0.0};     ///< npu_post_processor_->safety_filter() time (Round 20)
     uint32_t num_denoise_steps{0};      ///< actual steps executed
     std::string encoder_name;           ///< npu_encoder_->name() selected at init
     std::string post_processor_name;    ///< npu_post_processor_->name() selected at init
@@ -217,6 +224,11 @@ struct PipelineConfig {
 
     // --- Clustering (nullopt = local-only mode) ---
     std::optional<cluster::TransportConfig> cluster_config;
+
+    // --- LCMD bootup core (inference history persistence) ---
+    std::filesystem::path lcmd_db_path;
+    std::vector<std::uint8_t> lcmd_db_key;  // 32-byte AES key
+    bool enable_inference_history{true};    // record every generate() call
 };
 
 // ---------------------------------------------------------------------------
@@ -274,6 +286,12 @@ public:
     /// @brief Graceful shutdown -- releases all resources.
     /// After shutdown, generate() will return ShutdownInProgress.
     void shutdown() noexcept;
+
+    /// @brief Access the LCMD inference history database (read-only ops).
+    /// Returns nullptr if inference history is disabled.
+    [[nodiscard]] hq::cerberus::privacy::LocalMaintenanceDB* get_lcmd() const noexcept {
+        return lcmd_db_.get();
+    }
 
 private:
     /// @brief Initialize ONNX Runtime sessions.
@@ -351,6 +369,14 @@ private:
     /// @brief Convert PipelineError to human-readable string.
     [[nodiscard]] static std::string error_string_(PipelineError e);
 
+    /// @brief Centralized LCMD inference record storage (success + failure paths).
+    /// Ensures complete audit trail for production use of the heterogeneous runtime.
+    void store_inference_record_(const GenerationRequest& req,
+                                 const std::string& status,
+                                 std::uint32_t width = 0,
+                                 std::uint32_t height = 0,
+                                 double generation_time_ms = 0.0);
+
     // --- Configuration ---
     PipelineConfig cfg_;
 
@@ -396,6 +422,10 @@ private:
 
     // --- Current latents reference for watchdog recovery callback ---
     hq::tensor::FloatTensor4D current_latents_{};
+
+    // --- LCMD bootup core (inference history persistence) ---
+    std::unique_ptr<hq::cerberus::privacy::LocalMaintenanceDB> lcmd_db_;
+    std::uint64_t inference_counter_{0};  // monotonic id for each generate()
 
     // --- Lifecycle ---
     bool shutdown_{false};

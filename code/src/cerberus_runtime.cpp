@@ -10,6 +10,8 @@
 #include "hq/cerberus_native_backend.hpp"
 #include "hq/cerberus_command_executor.hpp"
 #include "hq/cerberus_glow_engine.hpp"
+#include "hq/tiered_memory_manager.hpp"
+#include "hq/cerberus_execution_coordinator.hpp"
 
 #include <string>
 #include <sstream>
@@ -170,3 +172,20 @@ std::string CerberusRuntime::execute_command(const std::string& raw_command) {
 }
 
 } // namespace hq::cerberus
+
+// Diagnostic accessors implementation (for npu:athenea-probe and similar tools)
+TieredMemoryManager* CerberusRuntime::getMemoryManagerForDiagnostics() const {
+    return mem_mgr_.get();
+}
+
+CerberusExecutionCoordinator* CerberusRuntime::getExecutionCoordinatorForDiagnostics() const {
+    return coordinator_.get();
+}
+
+hq::cerberus::privacy::LocalMaintenanceDB* CerberusRuntime::getLcmdForDiagnostics() const {
+    return lcmd_diagnostic_.get();
+}
+
+void CerberusRuntime::setLcmdForDiagnostics(std::shared_ptr<hq::cerberus::privacy::LocalMaintenanceDB> lcmd) {
+    lcmd_diagnostic_ = std::move(lcmd);
+}

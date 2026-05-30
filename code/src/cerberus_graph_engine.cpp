@@ -25,6 +25,12 @@ std::size_t GraphTensor::size_bytes() const noexcept {
         case npu::TensorDesc::DataType::I32: dtype_sz = 4; break;
         case npu::TensorDesc::DataType::I8:
         case npu::TensorDesc::DataType::U8:  dtype_sz = 1; break;
+        // Ground-up: honest packed sizes for real GGUF block quants (matches TensorDesc + probe driver logic).
+        // 4-bit per weight → ~elems/2 bytes (conservative; actual GGUF IQ4_NL is 16 bytes per 32 weights + scales).
+        case npu::TensorDesc::DataType::IQ4_NL_Block:
+        case npu::TensorDesc::DataType::Q4_K_Block:
+            dtype_sz = 1; // treat as packed u8 stream; caller (driver / future lowering) uses exact compressed bytes
+            return (elems + 1) / 2; // packed 4-bit approximation (prevents F32 over-allocation in TMM)
     }
     return elems * dtype_sz;
 }
@@ -133,6 +139,7 @@ CerberusGraph CerberusGraph::from_kernel_graph(const npu::KernelGraph& kg) {
         gn.inputs  = kn.inputs;
         gn.outputs = kn.outputs;
         gn.constant_data = kn.float_attrs;
+        gn.quant_profile = kn.quant_profile;   // Ground-up fix: propagate real quant metadata (IQ4_NL_Block PerBlock etc.) from KernelGraph
         g.nodes.push_back(std::move(gn));
     }
 
@@ -159,11 +166,14 @@ CerberusGraph CerberusGraph::from_kernel_graph(const npu::KernelGraph& kg) {
         g.tensors.push_back(std::move(gt));
     }
 
-    // Simplified shape population: map by position in graph_inputs / graph_outputs
-    // (TensorDesc has no name field, so we map by tensor index)
+    // Ground-up quant propagation: carry shape + dtype from KernelGraph graph_inputs (TensorDesc).
+    // This is the bridge that lets real IQ4_NL_Block / Q4_K_Block weights (when supplied in a KG)
+    // survive into CerberusGraph for DecisionEngine routing and honest TMM sizing.
     for (std::size_t i = 0; i < kg.graph_inputs.size() && i < g.tensors.size(); ++i) {
         if (!kg.graph_inputs[i].shape.empty())
             g.tensors[i].shape = kg.graph_inputs[i].shape;
+        // Propagate the actual dtype (F32 / IQ4_NL_Block etc.) instead of leaving the F32 default
+        g.tensors[i].dtype = kg.graph_inputs[i].dtype;
     }
 
     (void)g.topo_sort();

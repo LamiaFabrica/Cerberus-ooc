@@ -25,6 +25,13 @@
 #include "hq/gpu_monitor.hpp"
 #include "hq/hailo_monitor.hpp"
 
+// Optional production privacy / audit integration (LCMD + RBPC).
+// When provided, inference history/export/clear/stats become fully functional
+// with encrypted audit trail and dual-factor RBPC confirmation on destructive ops.
+// Caller retains ownership/lifetime responsibility.
+#include "hq/cerberus_local_maintenance_db.hpp"
+#include "hq/cerberus_user_security.hpp"
+
 #include <array>
 #include <atomic>
 #include <chrono>
@@ -61,6 +68,9 @@
 
 // Forward: ONNX Runtime
 namespace Ort { class Env; class Session; class SessionOptions; class MemoryInfo; }
+
+// Forward: UserSecurity (RBPC gate)
+namespace hq::cerberus::privacy { class UserSecurity; }
 
 namespace hq {
 
@@ -114,6 +124,13 @@ struct ServerConfig {
     std::uint32_t  client_timeout_ms{30'000};   ///< idle client socket timeout
     bool           enable_cors{true};           ///< add CORS headers
     bool           verbose_logging{false};      ///< log every request/response
+
+    // --- Production privacy surface (LCMD + RBPC) ---
+    // When both are non-null, /v1/inference/* endpoints are fully wired.
+    // RBPC node_id is used for verify_confirmation on export/clear.
+    std::shared_ptr<hq::cerberus::LocalMaintenanceDB> lcmd;
+    std::shared_ptr<hq::cerberus::UserSecurity>       user_security;
+    std::string                                       rbpc_node_id{"local"};
 };
 
 // ===========================================================================
@@ -338,6 +355,13 @@ struct ServerStats {
     std::atomic<std::uint64_t> health_checks{0};
     std::atomic<std::uint64_t> model_lists{0};
     std::atomic<std::uint64_t> errors{0};
+
+    // Inference audit surface counters (populated when LCMD+RBPC wired)
+    std::atomic<std::uint64_t> inference_history_requests{0};
+    std::atomic<std::uint64_t> inference_export_requests{0};
+    std::atomic<std::uint64_t> inference_clear_requests{0};
+    std::atomic<std::uint64_t> inference_stats_requests{0};
+
     std::chrono::steady_clock::time_point start_time{}; ///< epoch until server starts
 };
 
@@ -445,6 +469,12 @@ private:
     [[nodiscard]] HttpResponse handle_health_(const HttpRequest& req);
     [[nodiscard]] HttpResponse handle_options_(const HttpRequest& req);
 
+    // Inference history endpoints (LCMD bootup core)
+    [[nodiscard]] HttpResponse handle_inference_history_(const HttpRequest& req);
+    [[nodiscard]] HttpResponse handle_inference_export_(const HttpRequest& req);
+    [[nodiscard]] HttpResponse handle_inference_clear_(const HttpRequest& req);
+    [[nodiscard]] HttpResponse handle_inference_stats_(const HttpRequest& req);
+
     /// Route dispatcher: maps path -> handler.
     [[nodiscard]] HttpResponse dispatch_(const HttpRequest& req);
 
@@ -465,6 +495,9 @@ private:
         std::atomic<bool> shutdown_flag{false};
     };
     std::unique_ptr<ThreadPool> thread_pool_;
+
+    // RBPC gate for inference export/clear (optional — set by owner)
+    hq::cerberus::privacy::UserSecurity* user_security_{nullptr};
 
     static thread_local std::string tl_last_error_;
 };

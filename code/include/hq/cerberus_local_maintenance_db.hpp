@@ -121,6 +121,68 @@ struct TrustPolicy {
 };
 
 // ============================================================================
+// InferenceRecord — per-generation audit trail (bootup core for Pipeline)
+// ============================================================================
+struct InferenceRecord {
+    std::string inference_id;           // uint64_t as string
+    std::string session_id;           // MetroSession token or "local"
+    std::string prompt;
+    std::string result_summary;       // truncated result or "ok"/"fail"
+    std::string status;               // "success", "failed", "cluster_dispatched"
+    std::string timestamp;            // epoch seconds
+    std::string generation_time_ms;
+    std::string width;
+    std::string height;
+    std::string num_steps;
+    std::string guidance_scale;
+    std::string encoder_name;
+    std::string post_processor_name;
+    std::string gpu_backend_name;
+    std::string text_encode_used_npu;     // "true"/"false"
+    std::string denoise_used_gpu;         // "true"/"false"
+    std::string vae_decode_used_gpu;      // "true"/"false"
+    std::string post_process_used_npu;    // "true"/"false"
+    std::string unet_denoise_used_npu;    // "true"/"false"
+    std::string npu_cheap_ops_percent;
+    std::string recovery_attempts;
+    std::string node_id;              // cluster node id or "local"
+
+    /// Serialize to flat map (for storage/encryption)
+    [[nodiscard]] std::map<std::string, std::string> to_map() const noexcept;
+
+    /// Deserialize from flat map (after decryption)
+    static InferenceRecord from_map(const std::map<std::string, std::string>& m);
+};
+
+// ============================================================================
+// FileVaultRecord — encrypted file vault metadata (project/folder indexing)
+// ============================================================================
+struct FileVaultRecord {
+    std::string file_id;            // UUID
+    std::string project_name;
+    std::string folder_path;        // project-relative folder
+    std::string original_name;
+    std::string encrypted_disk_path; // absolute path to .enc blob
+    std::string size_bytes;
+    std::string mime_type;
+    std::string thumbnail_base64;   // inline preview for Web UI
+    std::string created_at;           // epoch seconds
+    std::string last_accessed;
+    std::string jwt_audience;         // "cerberus-file-vault"
+    std::string permission_level;     // "read", "write", "delete", "admin"
+    std::string encryption_iv;        // hex-encoded 12-byte nonce
+    std::string encryption_tag;       // hex-encoded 16-byte GCM tag
+    std::string status;               // "active", "quarantined", "deleted"
+    std::string node_id;              // "local" or cluster node
+
+    /// Serialize to flat map (for storage/encryption)
+    [[nodiscard]] std::map<std::string, std::string> to_map() const noexcept;
+
+    /// Deserialize from flat map (after decryption)
+    static FileVaultRecord from_map(const std::map<std::string, std::string>& m);
+};
+
+// ============================================================================
 // Local Maintenance Database
 // ============================================================================
 class LocalMaintenanceDB {
@@ -286,8 +348,38 @@ public:
     std::size_t replay_sync_queue(SyncReplayCallback callback,
                                    std::size_t max_records = 0);
 
+    // ------------------------------------------------------------------------
+    // Inference history (bootup core — query, export, clear, stats)
+    // ------------------------------------------------------------------------
+    bool store_inference_record(const InferenceRecord& record);
+    [[nodiscard]] std::optional<InferenceRecord> load_inference_record(
+        const std::string& inference_id) const;
+    [[nodiscard]] std::vector<InferenceRecord> query_inference_records(
+        std::time_t since, std::time_t until, std::size_t limit = 100) const;
+    [[nodiscard]] bool export_inference_json(const std::filesystem::path& path) const;
+    [[nodiscard]] bool export_inference_csv(const std::filesystem::path& path) const;
+    [[nodiscard]] bool export_inference_markdown(const std::filesystem::path& path) const;
+    bool clear_inference_records();
+    [[nodiscard]] std::map<std::string, std::string> inference_stats() const;
+
     // MANDATORY unavailable_reason per AGENTS.md
     [[nodiscard]] static std::string unavailable_reason() noexcept;
+
+    // ------------------------------------------------------------------------
+    // Encrypted file vault (project/folder indexing + metadata)
+    // ------------------------------------------------------------------------
+    bool store_file_record(const FileVaultRecord& record);
+    [[nodiscard]] std::optional<FileVaultRecord> load_file_record(
+        const std::string& file_id) const;
+    bool delete_file_record(const std::string& file_id);  // marks "deleted", not erased
+    bool update_file_accessed(const std::string& file_id);
+    bool update_file_status(const std::string& file_id, const std::string& status);
+    [[nodiscard]] std::vector<FileVaultRecord> query_files_by_project(
+        const std::string& project_name,
+        const std::string& folder_path = "",
+        const std::string& status_filter = "active") const;
+    [[nodiscard]] std::vector<std::string> list_projects() const;
+    [[nodiscard]] std::map<std::string, std::string> file_vault_stats() const;
 
 private:
     mutable std::mutex mutex_;
@@ -311,6 +403,8 @@ private:
     std::map<std::string, std::string> preferences_;
     std::map<std::string, std::string> revoked_hashes_;
     std::optional<TrustPolicy> trust_policy_;
+    std::map<std::string, std::map<std::string, std::string>> inference_records_;
+    std::map<std::string, std::map<std::string, std::string>> file_vault_records_;
 
     // Sync queue
     struct SyncRecord {

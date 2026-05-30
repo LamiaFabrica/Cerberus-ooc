@@ -28,9 +28,8 @@ struct NpuFrontendIngest {
         out.entry_point = path.stem().string();
         out.format = KernelGraph::SourceFormat::ONNX;
 
-        // TODO(Round-30): replace with real ONNX protobuf parse
-        // For now we only set metadata so backends still call ov_core_read_model
-        // with the file path, but the data structure is Cerberus-owned.
+        // Round-30: replace with real ONNX protobuf parse when full ingest lands.
+        // Current path: only set metadata so backends can call ov_core_read_model with the file; structure remains Cerberus-owned.
         return true;
     }
 };

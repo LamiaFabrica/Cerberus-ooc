@@ -84,4 +84,16 @@ void dequantize_per_channel(const float* src, float* dst,
 dequantize_u8_to_f32(const std::uint8_t* src, float* dst, std::size_t n,
                      float scale, std::int32_t zero_point);
 
+// ===========================================================================
+// Real low-precision block kernel (IQ4_NL / Q4_K_M) — ground-up next phase after
+// owning AtheneaProbeReport + 4-node KernelGraph + TMM+coordinator requirement.
+// The weight bytes passed are the *real compressed block bytes* that flowed
+// through TMM Hot (no F32 reinterpret in fill path). Stub deblocks on-the-fly
+// for ref correctness; future fuses to NPU low-prec ISA / dedicated kernels.
+// ===========================================================================
+
+[[nodiscard]] std::expected<void, std::string> kernel_matmul_iq4_nl_block(
+    const float* A, const std::uint8_t* B_block, float* C_out,
+    std::size_t M, std::size_t N, std::size_t K);
+
 } // namespace hq::cerberus::native

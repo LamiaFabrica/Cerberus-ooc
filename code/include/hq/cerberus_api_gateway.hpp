@@ -21,6 +21,11 @@
 #include <optional>
 #include <expected>
 
+// Optional production privacy/audit injection (LCMD + RBPC) for the four inference opcodes.
+// Mirrors the pattern used in InferenceServer for full symmetry. Caller owns lifetime.
+#include "hq/cerberus_local_maintenance_db.hpp"
+#include "hq/cerberus_user_security.hpp"
+
 namespace hq::cerberus::gateway {
 
 // ===========================================================================
@@ -136,6 +141,11 @@ enum class CerberusOpcode : uint16_t {
     SLIPSTREAM_FLUSH = 0x2001,
     SLIPSTREAM_STATUS = 0x2002,
 
+    INFERENCE_QUERY  = 0x3000,
+    INFERENCE_EXPORT = 0x3001,
+    INFERENCE_CLEAR  = 0x3002,
+    INFERENCE_STATS  = 0x3003,
+
     HANDSHAKE_INIT  = 0xF000,
     HANDSHAKE_COMP  = 0xF001,
     SESSION_AUTH    = 0xF002,
@@ -233,11 +243,22 @@ public:
                                                     CerberusOpcode error_opcode,
                                                     const std::string& message);
 
+    // Production privacy injection for inference opcodes (LCMD + RBPC).
+    // Call before handling traffic if you want real audit + RBPC on EXPORT/CLEAR.
+    void setPrivacyContext(std::shared_ptr<hq::cerberus::LocalMaintenanceDB> lcmd,
+                           std::shared_ptr<hq::cerberus::UserSecurity> us,
+                           std::string node_id = "local");
+
 private:
     bool initialized_{false};
     uint16_t next_session_token_{1};
     std::unordered_map<uint16_t, GatewaySession> sessions_;
     mutable std::mutex sessions_mutex_;
+
+    // Privacy surface (optional)
+    std::shared_ptr<hq::cerberus::LocalMaintenanceDB> lcmd_;
+    std::shared_ptr<hq::cerberus::UserSecurity> user_security_;
+    std::string rbpc_node_id_{"local"};
 };
 
 } // namespace hq::cerberus::gateway

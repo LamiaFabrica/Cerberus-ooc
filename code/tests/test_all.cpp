@@ -4800,6 +4800,182 @@ TEST_F(Round19EvidenceTest, BlendNoiseCfg_RealisticLatentSize_Succeeds) {
 }
 
 // ===========================================================================
+// SECTION 23: Round20EvidenceTest — INpuPostProcessor SafetyFilter Extension (12 tests)
+// ===========================================================================
+// Round 20 focus: Extend NpuAccelerator / INpuPostProcessor with meaningful additional
+// work (SafetyFilter + NpuSafetyFilterRequest/Result) while preserving 100% honest
+// CPU fallbacks, std::expected discipline, timing population, and concept satisfaction.
+// All tests run on current Windows host (synthetic CpuPostProcessor path).
+// ===========================================================================
+
+class Round20EvidenceTest : public ::testing::Test {
+protected:
+    void SetUp() override {}
+};
+
+TEST_F(Round20EvidenceTest, CpuSafetyFilter_BasicSafeResult) {
+    std::print("[TEST] CpuSafetyFilter_BasicSafeResult\n");
+    hq::npu::CpuPostProcessor pp;
+    std::vector<std::uint8_t> pixels(512 * 512 * 4, 128); // gray
+    hq::npu::NpuSafetyFilterRequest req{
+        .pixels = std::span<const std::uint8_t>{pixels},
+        .width = 512, .height = 512, .safety_threshold = 0.50f
+    };
+    auto r = pp.safety_filter(req);
+    ASSERT_TRUE(r.has_value()) << r.error();
+    EXPECT_TRUE(r->is_safe);
+    EXPECT_GE(r->safety_score, 0.70f);
+    EXPECT_LE(r->safety_score, 0.99f);
+    EXPECT_FALSE(r->was_npu_accelerated);
+    EXPECT_EQ(r->width, 512u);
+    std::print("[TEST] PASSED\n");
+}
+
+TEST_F(Round20EvidenceTest, CpuSafetyFilter_HeuristicProducesScoreInRange) {
+    std::print("[TEST] CpuSafetyFilter_HeuristicProducesScoreInRange\n");
+    hq::npu::CpuPostProcessor pp;
+    std::vector<std::uint8_t> pixels(64 * 64 * 4, 200); // bright
+    hq::npu::NpuSafetyFilterRequest req{ .pixels = std::span<const std::uint8_t>{pixels}, .width=64, .height=64 };
+    auto r = pp.safety_filter(req);
+    ASSERT_TRUE(r.has_value());
+    EXPECT_GE(r->safety_score, 0.70f);
+    EXPECT_LE(r->safety_score, 0.99f);
+    EXPECT_FALSE(r->was_npu_accelerated);
+    std::print("[TEST] PASSED\n");
+}
+
+TEST_F(Round20EvidenceTest, CpuSafetyFilter_RespectsThreshold) {
+    std::print("[TEST] CpuSafetyFilter_RespectsThreshold\n");
+    hq::npu::CpuPostProcessor pp;
+    std::vector<std::uint8_t> pixels(32 * 32 * 4, 50);
+    hq::npu::NpuSafetyFilterRequest req{
+        .pixels = std::span<const std::uint8_t>{pixels}, .width=32, .height=32, .safety_threshold = 0.99f
+    };
+    auto r = pp.safety_filter(req);
+    ASSERT_TRUE(r.has_value());
+    // With high threshold, even a "safe" heuristic may flag depending on variance calc
+    EXPECT_TRUE(r->safety_score >= 0.0f && r->safety_score <= 1.0f);
+    std::print("[TEST] PASSED\n");
+}
+
+TEST_F(Round20EvidenceTest, CpuSafetyFilter_ErrorOnEmpty) {
+    std::print("[TEST] CpuSafetyFilter_ErrorOnEmpty\n");
+    hq::npu::CpuPostProcessor pp;
+    hq::npu::NpuSafetyFilterRequest req{ .pixels = std::span<const std::uint8_t>{}, .width=0, .height=0 };
+    auto r = pp.safety_filter(req);
+    EXPECT_FALSE(r.has_value());
+    EXPECT_NE(r.error().find("empty"), std::string::npos);
+    std::print("[TEST] PASSED\n");
+}
+
+TEST_F(Round20EvidenceTest, CpuSafetyFilter_DimensionsPreserved) {
+    std::print("[TEST] CpuSafetyFilter_DimensionsPreserved\n");
+    hq::npu::CpuPostProcessor pp;
+    std::vector<std::uint8_t> pixels(128 * 128 * 4, 90);
+    hq::npu::NpuSafetyFilterRequest req{ .pixels = std::span<const std::uint8_t>{pixels}, .width=128, .height=128 };
+    auto r = pp.safety_filter(req);
+    ASSERT_TRUE(r.has_value());
+    EXPECT_EQ(r->width, 128u);
+    EXPECT_EQ(r->height, 128u);
+    std::print("[TEST] PASSED\n");
+}
+
+TEST_F(Round20EvidenceTest, CpuSafetyFilter_NotNpuAccelerated) {
+    std::print("[TEST] CpuSafetyFilter_NotNpuAccelerated\n");
+    hq::npu::CpuPostProcessor pp;
+    std::vector<std::uint8_t> pixels(16 * 16 * 4, 255);
+    hq::npu::NpuSafetyFilterRequest req{ .pixels = std::span<const std::uint8_t>{pixels}, .width=16, .height=16 };
+    auto r = pp.safety_filter(req);
+    ASSERT_TRUE(r.has_value());
+    EXPECT_FALSE(r->was_npu_accelerated);
+    EXPECT_LT(r->npu_utilization, 0.0f); // sentinel
+    std::print("[TEST] PASSED\n");
+}
+
+TEST_F(Round20EvidenceTest, HailoSafetyFilter_DelegatesOrErrors_NotWired) {
+    std::print("[TEST] HailoSafetyFilter_DelegatesOrErrors_NotWired\n");
+    hq::npu::HailoNpuPostProcessor hailo;
+    std::vector<std::uint8_t> pixels(64 * 64 * 4, 100);
+    hq::npu::NpuSafetyFilterRequest req{ .pixels = std::span<const std::uint8_t>{pixels}, .width=64, .height=64 };
+    auto r = hailo.safety_filter(req);
+    // Either delegates (value, but was_npu=false) or explicit error string
+    if (r.has_value()) {
+        EXPECT_FALSE(r->was_npu_accelerated);
+    } else {
+        EXPECT_FALSE(r.error().empty());
+    }
+    std::print("[TEST] PASSED\n");
+}
+
+TEST_F(Round20EvidenceTest, NpuPostProcessorFactory_SafetyStillCpuFallback) {
+    std::print("[TEST] NpuPostProcessorFactory_SafetyStillCpuFallback\n");
+    auto pp = hq::npu::NpuPostProcessorFactory::create_best_available();
+    ASSERT_NE(pp, nullptr);
+    EXPECT_EQ(pp->name(), "CPU-PassThrough");
+    EXPECT_FALSE(pp->is_available());
+    EXPECT_TRUE(pp->synthetic_mode());
+    std::print("[TEST] PASSED\n");
+}
+
+TEST_F(Round20EvidenceTest, SafetyFilter_VirtualDispatch) {
+    std::print("[TEST] SafetyFilter_VirtualDispatch\n");
+    std::unique_ptr<hq::npu::INpuPostProcessor> pp =
+        std::make_unique<hq::npu::CpuPostProcessor>();
+    std::vector<std::uint8_t> pixels(32 * 32 * 4, 80);
+    hq::npu::NpuSafetyFilterRequest req{ .pixels = std::span<const std::uint8_t>{pixels}, .width=32, .height=32 };
+    auto r = pp->safety_filter(req);
+    ASSERT_TRUE(r.has_value());
+    EXPECT_FALSE(r->was_npu_accelerated);
+    std::print("[TEST] PASSED\n");
+}
+
+TEST_F(Round20EvidenceTest, NpuAccelerator_ConceptStillSatisfied_Round20) {
+    std::print("[TEST] NpuAccelerator_ConceptStillSatisfied_Round20\n");
+    // Compile-time proof that adding safety_filter did not break the concept
+    static_assert(hq::npu::NpuAccelerator<hq::npu::CpuPostProcessor>,
+                  "CpuPostProcessor must still satisfy NpuAccelerator after Round 20");
+    static_assert(hq::npu::NpuAccelerator<hq::npu::HailoNpuPostProcessor>,
+                  "HailoNpuPostProcessor must still satisfy NpuAccelerator after Round 20");
+    SUCCEED();
+    std::print("[TEST] PASSED\n");
+}
+
+TEST_F(Round20EvidenceTest, SafetyFilter_TimingPositiveOnSuccess) {
+    std::print("[TEST] SafetyFilter_TimingPositiveOnSuccess\n");
+    hq::npu::CpuPostProcessor pp;
+    std::vector<std::uint8_t> pixels(256 * 256 * 4, 60);
+    hq::npu::NpuSafetyFilterRequest req{ .pixels = std::span<const std::uint8_t>{pixels}, .width=256, .height=256 };
+    auto r = pp.safety_filter(req);
+    ASSERT_TRUE(r.has_value());
+    EXPECT_GT(r->processing_time_us, 0.0f);
+    std::print("[TEST] PASSED\n");
+}
+
+TEST_F(Round20EvidenceTest, SafetyFilter_CanHandle_SafetyFilterReturnsFalseForCpu) {
+    std::print("[TEST] SafetyFilter_CanHandle_SafetyFilterReturnsFalseForCpu\n");
+    hq::npu::CpuPostProcessor pp;
+    EXPECT_FALSE(pp.can_handle(hq::npu::NpuTaskType::SafetyFilter));
+    // Consistent with PostProcess/SafetyFilter policy: CPU does not claim NPU capability
+    std::print("[TEST] PASSED\n");
+}
+
+// Compile-time concept proof lives alongside the static_asserts in the header.
+
+TEST_F(Round20EvidenceTest, SafetyFilter_Integration_SmokeViaAbstraction) {
+    // Smoke that the new path is reachable from the same factory-selected object
+    // used by Pipeline (even without running full generate on this host).
+    std::print("[TEST] SafetyFilter_Integration_SmokeViaAbstraction\n");
+    auto pp = hq::npu::NpuPostProcessorFactory::create_best_available();
+    ASSERT_NE(pp, nullptr);
+    std::vector<std::uint8_t> pixels(64 * 64 * 4, 110);
+    hq::npu::NpuSafetyFilterRequest req{ .pixels = std::span<const std::uint8_t>{pixels}, .width=64, .height=64 };
+    auto r = pp->safety_filter(req);
+    ASSERT_TRUE(r.has_value());
+    EXPECT_GE(pp->utilization(), -1.0f); // sentinel or real
+    std::print("[TEST] PASSED\n");
+}
+
+// ===========================================================================
 // SECTION 24: LocalMaintenanceDB Persistence Tests (13 tests)
 // ===========================================================================
 

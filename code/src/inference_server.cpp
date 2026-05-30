@@ -62,6 +62,11 @@ struct InferenceServer::Impl {
     std::atomic<bool> running{false};
     ServerStats stats;
 
+    // Privacy surface (optional but required for full inference history feature)
+    std::shared_ptr<hq::cerberus::LocalMaintenanceDB> lcmd;
+    std::shared_ptr<hq::cerberus::UserSecurity>       user_security;
+    std::string                                       rbpc_node_id{"local"};
+
     void close_listen() noexcept {
         int fd = listen_fd;
         listen_fd = -1;
@@ -516,6 +521,12 @@ InferenceServer::InferenceServer(ServerConfig cfg)
     , impl_(std::make_unique<Impl>())
 {
     impl_->stats.start_time = std::chrono::steady_clock::now();
+
+    // Capture optional privacy surface (LCMD + RBPC) for inference audit endpoints.
+    // These may be null — handlers degrade gracefully or return clear errors.
+    impl_->lcmd           = cfg_.lcmd;
+    impl_->user_security  = cfg_.user_security;
+    impl_->rbpc_node_id   = cfg_.rbpc_node_id.empty() ? "local" : cfg_.rbpc_node_id;
 }
 
 InferenceServer::~InferenceServer() noexcept {
@@ -740,11 +751,157 @@ HttpResponse InferenceServer::dispatch_(const HttpRequest& req) {
         return handle_list_models_(req);
     if (req.method == HttpMethod::POST && req.path == "/v1/chat/completions")
         return handle_chat_completions_(req);
+    if (req.method == HttpMethod::POST && req.path == "/v1/inference/history")
+        return handle_inference_history_(req);
+    if (req.method == HttpMethod::POST && req.path == "/v1/inference/export")
+        return handle_inference_export_(req);
+    if (req.method == HttpMethod::POST && req.path == "/v1/inference/clear")
+        return handle_inference_clear_(req);
+    if (req.method == HttpMethod::GET && req.path == "/v1/inference/stats")
+        return handle_inference_stats_(req);
     if (req.method == HttpMethod::OPTIONS)
         return handle_options_(req);
 
-    return HttpResponse{404, "application/json",
-                        R"({"error":"not_found"})", true};
+    return HttpResponse{404, "application/json", R"({"error":"not_found"})", true};
+}
+
+HttpResponse InferenceServer::handle_inference_history_(const HttpRequest& req) {
+    impl_->stats.inference_history_requests.fetch_add(1, std::memory_order_relaxed);
+
+    if (!impl_->lcmd) {
+        return HttpResponse{503, "application/json",
+            R"({"error":"inference_audit_unavailable","reason":"no LocalMaintenanceDB configured on this server instance"})", true};
+    }
+
+    // Query last 100 records (since epoch 0, until now + margin)
+    auto now = static_cast<std::time_t>(std::chrono::system_clock::to_time_t(std::chrono::system_clock::now())) + 86400;
+    auto records = impl_->lcmd->query_inference_records(0, now, 100);
+
+    std::string body = "[\n";
+    for (size_t i = 0; i < records.size(); ++i) {
+        const auto& r = records[i];
+        if (i > 0) body += ",\n";
+        body += "  {\"inference_id\":\"" + r.inference_id +
+                "\",\"timestamp\":\"" + r.timestamp +
+                "\",\"status\":\"" + r.status +
+                "\",\"generation_time_ms\":\"" + r.generation_time_ms +
+                "\",\"prompt\":\"" + r.prompt.substr(0, 120) + "\"}";
+    }
+    body += "\n]";
+
+    return HttpResponse{200, "application/json", std::move(body), true};
+}
+
+HttpResponse InferenceServer::handle_inference_export_(const HttpRequest& req) {
+    impl_->stats.inference_export_requests.fetch_add(1, std::memory_order_relaxed);
+
+    if (!impl_->lcmd) {
+        return HttpResponse{503, "application/json",
+            R"({"error":"inference_audit_unavailable","reason":"no LocalMaintenanceDB configured"})", true};
+    }
+
+    // RBPC gate (if UserSecurity is wired)
+    if (impl_->user_security) {
+        std::string pin = std::string(json_get_str(req.body, "pin"));
+        std::string word = std::string(json_get_str(req.body, "word"));
+
+        if (pin.empty() || word.empty()) {
+            return HttpResponse{400, "application/json",
+                R"({"error":"rbpc_required","detail":"POST JSON body must contain \"pin\" and \"word\" for destructive export"})", true};
+        }
+
+        std::string result = impl_->user_security->verify_confirmation(impl_->rbpc_node_id, pin, word);
+        if (!result.empty()) {
+            bool burned = result.find("burned") != std::string::npos || result.find("LOCKED") != std::string::npos;
+            std::string body = "{\"error\":\"rbpc_failed\",\"detail\":\"" + result + "\"";
+            if (burned) body += ",\"burned\":true";
+            body += "}";
+            return HttpResponse{403, "application/json", std::move(body), true};
+        }
+    }
+
+    // Perform export to a safe temp location
+    auto ts = std::chrono::duration_cast<std::chrono::seconds>(
+        std::chrono::steady_clock::now().time_since_epoch()).count();
+    std::filesystem::path out_path = std::filesystem::temp_directory_path() /
+        ("cerberus_inference_export_" + std::to_string(ts) + ".json");
+
+    bool ok = impl_->lcmd->export_inference_json(out_path);
+    if (!ok) {
+        return HttpResponse{500, "application/json",
+            R"({"error":"export_failed","reason":"filesystem write error"})", true};
+    }
+
+    std::string body = "{\"exported\":true,\"format\":\"json\",\"path\":\"" +
+                       out_path.string() + "\",\"rbpc_enforced\":" +
+                       (impl_->user_security ? "true" : "false") + "}";
+    return HttpResponse{200, "application/json", std::move(body), true};
+}
+
+HttpResponse InferenceServer::handle_inference_clear_(const HttpRequest& req) {
+    impl_->stats.inference_clear_requests.fetch_add(1, std::memory_order_relaxed);
+
+    if (!impl_->lcmd) {
+        return HttpResponse{503, "application/json",
+            R"({"error":"inference_audit_unavailable"})", true};
+    }
+
+    // RBPC gate (mandatory for clear)
+    if (impl_->user_security) {
+        std::string pin = std::string(json_get_str(req.body, "pin"));
+        std::string word = std::string(json_get_str(req.body, "word"));
+
+        if (pin.empty() || word.empty()) {
+            return HttpResponse{400, "application/json",
+                R"({"error":"rbpc_required","detail":"both pin and word required for clear"})", true};
+        }
+
+        std::string result = impl_->user_security->verify_confirmation(impl_->rbpc_node_id, pin, word);
+        if (!result.empty()) {
+            bool burned = result.find("burned") != std::string::npos || result.find("LOCKED") != std::string::npos;
+            std::string body = "{\"error\":\"rbpc_failed\",\"detail\":\"" + result + "\"";
+            if (burned) body += ",\"burned\":true";
+            body += "}";
+            return HttpResponse{403, "application/json", std::move(body), true};
+        }
+    } else {
+        // No RBPC configured — still allow in dev but mark it
+    }
+
+    size_t before = 0;
+    // Best-effort count before clear
+    auto stats_map = impl_->lcmd->inference_stats();
+    auto itc = stats_map.find("count");
+    if (itc != stats_map.end()) {
+        try { before = static_cast<size_t>(std::stoull(itc->second)); } catch (...) {}
+    }
+
+    bool cleared = impl_->lcmd->clear_inference_records();
+
+    std::string body = "{\"cleared\":" + std::string(cleared ? "true" : "false") +
+                       ",\"records_before\":" + std::to_string(before) + "}";
+    return HttpResponse{200, "application/json", std::move(body), true};
+}
+
+HttpResponse InferenceServer::handle_inference_stats_(const HttpRequest& req) {
+    impl_->stats.inference_stats_requests.fetch_add(1, std::memory_order_relaxed);
+
+    if (!impl_->lcmd) {
+        return HttpResponse{503, "application/json",
+            R"({"error":"inference_audit_unavailable"})", true};
+    }
+
+    auto m = impl_->lcmd->inference_stats();
+
+    std::string body = "{";
+    size_t i = 0;
+    for (const auto& [k, v] : m) {
+        if (i++ > 0) body += ",";
+        body += "\"" + k + "\":\"" + v + "\"";
+    }
+    body += ",\"rbpc_configured\":" + std::string(impl_->user_security ? "true" : "false") + "}";
+
+    return HttpResponse{200, "application/json", std::move(body), true};
 }
 
 HttpResponse InferenceServer::handle_health_(const HttpRequest&) {

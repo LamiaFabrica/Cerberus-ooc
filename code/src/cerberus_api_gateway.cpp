@@ -13,6 +13,9 @@
 #include <random>
 #include <limits>
 #include <cstring>
+#include <filesystem>
+#include <chrono>
+#include <ctime>
 
 namespace hq::cerberus::gateway {
 
@@ -148,6 +151,10 @@ const char* ProtocolHelper::opcodeToString(CerberusOpcode opcode) {
         case CerberusOpcode::SLIPSTREAM_WRITE: return "SLIPSTREAM_WRITE";
         case CerberusOpcode::SLIPSTREAM_FLUSH: return "SLIPSTREAM_FLUSH";
         case CerberusOpcode::SLIPSTREAM_STATUS: return "SLIPSTREAM_STATUS";
+        case CerberusOpcode::INFERENCE_QUERY:   return "INFERENCE_QUERY";
+        case CerberusOpcode::INFERENCE_EXPORT:  return "INFERENCE_EXPORT";
+        case CerberusOpcode::INFERENCE_CLEAR:   return "INFERENCE_CLEAR";
+        case CerberusOpcode::INFERENCE_STATS:   return "INFERENCE_STATS";
         case CerberusOpcode::HANDSHAKE_INIT:  return "HANDSHAKE_INIT";
         case CerberusOpcode::HANDSHAKE_COMP:  return "HANDSHAKE_COMP";
         case CerberusOpcode::SESSION_AUTH:    return "SESSION_AUTH";
@@ -362,6 +369,12 @@ std::vector<uint8_t> CerberusApiGateway::handleRequest(const uint8_t* data, std:
         case CerberusOpcode::SLIPSTREAM_WRITE:
         case CerberusOpcode::SLIPSTREAM_FLUSH:
             required = PermissionMode::EXECUTE; break;
+        case CerberusOpcode::INFERENCE_QUERY:
+        case CerberusOpcode::INFERENCE_STATS:
+            required = PermissionMode::ACT; break;
+        case CerberusOpcode::INFERENCE_EXPORT:
+        case CerberusOpcode::INFERENCE_CLEAR:
+            required = PermissionMode::EXECUTE; break;
         case CerberusOpcode::SYS_SHUTDOWN:
             required = PermissionMode::AGENTIC; break;
         default:
@@ -378,14 +391,109 @@ std::vector<uint8_t> CerberusApiGateway::handleRequest(const uint8_t* data, std:
                            std::to_string(sess ? static_cast<int>(sess->mode) : -1));
     }
 
-    // Dispatch to runtime command layer
+    // =======================================================================
+    // Real inference audit opcode handling (LCMD + RBPC)
+    // No echo stubs. Full symmetry with the HTTP surface.
+    // =======================================================================
+    if (opcode == CerberusOpcode::INFERENCE_QUERY || opcode == CerberusOpcode::INFERENCE_STATS) {
+        if (!lcmd_) {
+            return encodeError(opcode, header.sequence_id, header.session_token,
+                               CerberusOpcode::ERROR_INTERNAL, "inference audit not configured");
+        }
+        if (opcode == CerberusOpcode::INFERENCE_STATS) {
+            auto m = lcmd_->inference_stats();
+            std::string s = "{";
+            size_t i = 0;
+            for (const auto& [k, v] : m) {
+                if (i++) s += ",";
+                s += "\"" + k + "\":\"" + v + "\"";
+            }
+            s += "}";
+            std::vector<uint8_t> pl(s.begin(), s.end());
+            return encodeResponse(opcode, header.session_token, header.sequence_id, pl);
+        } else {
+            // QUERY: return simple count + last few (binary: 4-byte count + JSON-ish records)
+            auto recs = lcmd_->query_inference_records(0, time(nullptr) + 86400, 5);
+            std::string s = "[";
+            for (size_t i = 0; i < recs.size(); ++i) {
+                if (i) s += ",";
+                s += "{\"id\":\"" + recs[i].inference_id + "\",\"status\":\"" + recs[i].status + "\"}";
+            }
+            s += "]";
+            std::vector<uint8_t> pl(s.begin(), s.end());
+            return encodeResponse(opcode, header.session_token, header.sequence_id, pl);
+        }
+    }
+
+    if (opcode == CerberusOpcode::INFERENCE_EXPORT || opcode == CerberusOpcode::INFERENCE_CLEAR) {
+        if (!lcmd_) {
+            return encodeError(opcode, header.sequence_id, header.session_token,
+                               CerberusOpcode::ERROR_INTERNAL, "inference audit not configured");
+        }
+
+        // Minimal binary payload: [u16 pin_len][pin][u16 word_len][word]
+        // (production callers use the same format on both HTTP JSON and ANBP)
+        auto parse_len_str = [](const uint8_t* p, size_t& off, size_t total) -> std::pair<std::string, bool> {
+            if (off + 2 > total) return {{}, false};
+            uint16_t len = 0;
+            memcpy(&len, p + off, 2); off += 2;
+            if (off + len > total) return {{}, false};
+            std::string str(reinterpret_cast<const char*>(p + off), len);
+            off += len;
+            return {str, true};
+        };
+
+        size_t off = 0;
+        auto [pin, pin_ok] = parse_len_str(payload, off, payload_len);
+        auto [word, word_ok] = parse_len_str(payload, off, payload_len);
+
+        if (user_security_) {
+            if (!pin_ok || !word_ok || pin.empty() || word.empty()) {
+                return encodeError(opcode, header.sequence_id, header.session_token,
+                                   CerberusOpcode::ERROR_PERMISSION, "RBPC pin+word required (binary len+data)");
+            }
+            std::string rbpc_res = user_security_->verify_confirmation(rbpc_node_id_, pin, word);
+            if (!rbpc_res.empty()) {
+                bool burned = rbpc_res.find("burned") != std::string::npos || rbpc_res.find("LOCKED") != std::string::npos;
+                std::string msg = rbpc_res + (burned ? " [BURNED]" : "");
+                return encodeError(opcode, header.sequence_id, header.session_token,
+                                   CerberusOpcode::ERROR_PERMISSION, msg);
+            }
+        }
+
+        if (opcode == CerberusOpcode::INFERENCE_EXPORT) {
+            auto ts = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+            std::filesystem::path p = std::filesystem::temp_directory_path() / ("cerberus_anbp_export_" + std::to_string(ts) + ".json");
+            bool ok = lcmd_->export_inference_json(p);
+            std::string resp = ok ? ("{\"exported\":true,\"path\":\"" + p.string() + "\"}") : "{\"exported\":false}";
+            std::vector<uint8_t> pl(resp.begin(), resp.end());
+            return encodeResponse(opcode, header.session_token, header.sequence_id, pl);
+        } else {
+            size_t before = 0;
+            auto sm = lcmd_->inference_stats();
+            if (auto it = sm.find("count"); it != sm.end()) { try { before = std::stoull(it->second); } catch (...) {} }
+            bool cleared = lcmd_->clear_inference_records();
+            std::string resp = "{\"cleared\":" + std::string(cleared ? "true" : "false") + ",\"before\":" + std::to_string(before) + "}";
+            std::vector<uint8_t> pl(resp.begin(), resp.end());
+            return encodeResponse(opcode, header.session_token, header.sequence_id, pl);
+        }
+    }
+
+    // Fallback for all other opcodes (existing behavior for compile/run_graph etc.)
     std::string command_text(reinterpret_cast<const char*>(payload), payload_len);
-    // For now, return OK with echo back the command
     std::vector<uint8_t> response_payload;
     response_payload.resize(payload_len);
     std::memcpy(response_payload.data(), payload, payload_len);
 
     return encodeResponse(opcode, header.session_token, header.sequence_id, response_payload);
+}
+
+void CerberusApiGateway::setPrivacyContext(std::shared_ptr<hq::cerberus::LocalMaintenanceDB> lcmd,
+                                           std::shared_ptr<hq::cerberus::UserSecurity> us,
+                                           std::string node_id) {
+    lcmd_ = std::move(lcmd);
+    user_security_ = std::move(us);
+    rbpc_node_id_ = node_id.empty() ? "local" : std::move(node_id);
 }
 
 } // namespace hq::cerberus::gateway

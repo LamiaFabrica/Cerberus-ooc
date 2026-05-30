@@ -8,6 +8,7 @@
 
 #include "hq/cerberus_native_backend.hpp"
 #include "hq/cerberus_native_kernels.hpp"
+#include "hq/cerberus_quantized_kernels.hpp"  // for kernel_matmul_iq4_nl_block (real low-prec block path)
 
 #include <map>
 #include <expected>
@@ -102,7 +103,7 @@ CerberusNativeBackend::compile(const npu::KernelGraph& graph,
         k.outputs.push_back(npu::TensorDesc{{4}, npu::TensorDesc::DataType::F32});
     }
 
-    // For now, single-input/single-output placeholder descriptors
+    // Single-input/single-output descriptors (native backend path for PerBlock/quant routing)
     // Real shape inference will come when nodes carry shape info
     k.estimated_working_set_bytes = graph.graph_inputs.empty() ? 0 :
         graph.graph_inputs[0].size_bytes();
@@ -183,8 +184,16 @@ CerberusNativeBackend::execute(const npu::CompiledKernel& kernel,
             std::size_t M = node.int_attrs.size() > 0 ? static_cast<std::size_t>(node.int_attrs[0]) : 1;
             std::size_t N = node.int_attrs.size() > 1 ? static_cast<std::size_t>(node.int_attrs[1]) : 1;
             std::size_t K = node.int_attrs.size() > 2 ? static_cast<std::size_t>(node.int_attrs[2]) : 1;
-            auto r = native::kernel_matmul(in_ptrs[0], in_ptrs[1], out_ptr, M, N, K);
-            if (!r) return r;
+            if (node.quant_profile.weight_bits == 4 || node.quant_profile.weight_granularity == npu::QuantGranularity::PerBlock) {
+                // Actual low-prec kernel dispatch (ground-up): B is the real IQ4_NL block bytes that flowed
+                // through TMM Hot + Pinned + coordinator (no F32 reinterpret in the owning probe path).
+                const std::uint8_t* w_block = reinterpret_cast<const std::uint8_t*>(in_ptrs[1]);
+                auto r = native::kernel_matmul_iq4_nl_block(in_ptrs[0], w_block, out_ptr, M, N, K);
+                if (!r) return r;
+            } else {
+                auto r = native::kernel_matmul(in_ptrs[0], in_ptrs[1], out_ptr, M, N, K);
+                if (!r) return r;
+            }
         } else if (node.op == npu::KernelNode::Op::Add) {
             std::size_t n = node.int_attrs.empty() ? 4 : static_cast<std::size_t>(node.int_attrs[0]);
             if (in_ptrs.size() == 1 && !node.float_attrs.empty()) {

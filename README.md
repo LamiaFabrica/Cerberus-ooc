@@ -61,6 +61,8 @@ The architecture is designed around:
 | Async pipeline (coroutines) | Working | `co_await`/`co_return` pipeline with proper cancellation |
 | Cluster dispatch (serialization) | Working | Request serialization, worker selection, timeout logic |
 | 347/347 E2E tests | Passing | All propup tests pass (~1771 ms, zero warnings) |
+| BUG B3 embedding staging (Round 20) | Improved | Unnecessary host memcpy for embeddings before ONNX input eliminated (direct vector data to Ort::Value); TMM only for latents. Zero/min-copy path for CPU→ORT (ORT still does H2D if GPU EP). |
+| Round 20: NpuAccelerator / INpuPostProcessor SafetyFilter extension | Complete | Added NpuSafetyFilterRequest/Result + safety_filter() virtual to the abstraction (NpuTaskType::SafetyFilter). Honest CPU luminance/variance heuristic (always functional, synthetic_mode=true, was_npu=false). Wired post-VAE in Pipeline generate with dedicated PipelinePhaseTimings.safety_filter_ms + HardwareAccelerationReport safety_* fields (now 4 cheap components in npu_cheap_ops_percent). +12 evidence tests in dedicated Round20EvidenceTest Section 23 (honesty, heuristic, virtual dispatch, concept, error paths, timing, factory). Multiple pre-existing -Werror debt items fixed during iteration for hygiene. Full clean test run blocked on this host by remaining legacy surface (see Known Limitations). |
 
 ### What Does NOT Work (Hardware Blocked)
 

@@ -12,6 +12,7 @@
 
 #include "hq/cxx26_features.hpp"
 #include "hq/tensor_view.hpp"
+#include "hq/intel_npu_telemetry.hpp"
 
 #include <cstdint>
 #include <expected>
@@ -25,12 +26,12 @@
 namespace hq::npu {
 
 // ===========================================================================
-// Tensor descriptor — minimal, no heavy abstractions
+// Tensor descriptor — lightweight description for NPU execution (no heavy abstractions)
 // ===========================================================================
 
 struct TensorDesc {
     std::vector<std::int64_t> shape;
-    enum class DataType : std::uint8_t { F32 = 0, F16, I64, I32, I8, U8 };
+    enum class DataType : std::uint8_t { F32 = 0, F16, I64, I32, I8, U8, IQ4_NL_Block, Q4_K_Block };
     DataType dtype{DataType::F32};
     std::size_t size_bytes() const noexcept;
 };
@@ -50,6 +51,7 @@ enum class QuantGranularity : std::uint8_t {
     PerTensor,   ///< Single scale for entire tensor
     PerChannel,  ///< Per-output-channel (weights)
     PerToken,    ///< Per-row (activations in LLMs)
+    PerBlock,    ///< Per-block (GGUF IQ4_NL / Q4_K style for real low-prec NPU paths)
 };
 
 struct QuantProfile {
@@ -309,6 +311,10 @@ public:
 
     /// @brief NPU temperature °C (-1.0f when not available).
     [[nodiscard]] virtual float temperature() const = 0;
+
+    /// @brief Returns true if the most recent execute used a real NPU device (not synthetic/CPU fallback).
+    /// Default implementation returns false for backends that do not track this.
+    [[nodiscard]] virtual bool last_execute_used_real_npu() const noexcept { return false; }
 };
 
 // ===========================================================================
@@ -341,6 +347,9 @@ public:
     [[nodiscard]] float utilization() const override;
     [[nodiscard]] float temperature() const override;
 
+    // Returns true if the most recent execute used a real Intel NPU (not synthetic/CPU fallback)
+    [[nodiscard]] bool last_execute_used_real_npu() const noexcept override;
+
 private:
     class Impl;
     std::unique_ptr<Impl> impl_;
@@ -369,6 +378,7 @@ public:
     [[nodiscard]] std::string unavailable_reason() const override { return {}; }
     [[nodiscard]] float utilization() const override { return -1.0f; }
     [[nodiscard]] float temperature() const override { return -1.0f; }
+    [[nodiscard]] bool last_execute_used_real_npu() const noexcept override { return false; }
 };
 
 // ===========================================================================

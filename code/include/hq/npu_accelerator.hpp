@@ -75,6 +75,32 @@ struct NpuPostProcessResult {
 };
 
 // ===========================================================================
+// NpuSafetyFilterRequest / NpuSafetyFilterResult — Round 20 extension
+// ===========================================================================
+
+/// @brief Input to a safety / content filter pass on the NPU (or CPU fallback).
+///        Enables future real NSFW / toxicity classifiers on Hailo-8L while
+///        providing an honest, always-functional CPU heuristic today.
+struct NpuSafetyFilterRequest {
+    std::span<const std::uint8_t> pixels;  ///< RGBA8 pixel data (caller-owned)
+    std::uint32_t width{512};
+    std::uint32_t height{512};
+    float         safety_threshold{0.50f}; ///< Below this score → is_safe=false
+};
+
+/// @brief Output from a safety filter pass.
+struct NpuSafetyFilterResult {
+    bool          is_safe{true};           ///< Final decision (heuristic or NPU)
+    float         safety_score{0.95f};     ///< [0.0, 1.0] higher = safer
+    std::uint32_t width{0};
+    std::uint32_t height{0};
+    float         processing_time_us{0.0f};
+    float         npu_utilization{-1.0f};
+    bool          was_npu_accelerated{false};
+    std::string   reason{"CPU heuristic: default safe (synthetic)"};
+};
+
+// ===========================================================================
 // INpuPostProcessor — pure virtual post-processing interface
 // ===========================================================================
 
@@ -108,6 +134,14 @@ public:
     blend_noise_cfg(std::span<float>       noise_out,
                     std::span<const float> noise_uncond,
                     float                  guidance_scale) noexcept = 0;
+
+    /// @brief Run a safety / content filter on decoded pixels (Round 20).
+    ///
+    /// CPU fallback (CpuPostProcessor): simple luminance + variance heuristic.
+    /// Always returns a valid result with honest was_npu_accelerated=false and
+    /// synthetic_mode()=true. Real Hailo path will use a compiled classifier HEF.
+    [[nodiscard]] virtual std::expected<NpuSafetyFilterResult, std::string>
+    safety_filter(const NpuSafetyFilterRequest& req) = 0;
 
     /// @brief Returns true if this backend can run the given task type.
     [[nodiscard]] virtual bool can_handle(NpuTaskType task) const = 0;
@@ -155,6 +189,9 @@ public:
                     std::span<const float> noise_uncond,
                     float                  guidance_scale) noexcept override;
 
+    [[nodiscard]] std::expected<NpuSafetyFilterResult, std::string>
+    safety_filter(const NpuSafetyFilterRequest& req) override;
+
     [[nodiscard]] bool can_handle(NpuTaskType task) const override;
     [[nodiscard]] bool is_available() const override { return false; }
     [[nodiscard]] std::string name() const override { return "CPU-PassThrough"; }
@@ -191,6 +228,9 @@ public:
     blend_noise_cfg(std::span<float>       noise_out,
                     std::span<const float> noise_uncond,
                     float                  guidance_scale) noexcept override;
+
+    [[nodiscard]] std::expected<NpuSafetyFilterResult, std::string>
+    safety_filter(const NpuSafetyFilterRequest& req) override;
 
     [[nodiscard]] bool can_handle(NpuTaskType task) const override;
     [[nodiscard]] bool is_available() const override;
@@ -246,11 +286,13 @@ template<typename T>
 concept NpuAccelerator =
     requires(T& a, const NpuPostProcessRequest& req, NpuTaskType task,
              std::span<float> noise_out, std::span<const float> noise_uncond,
-             float scale) {
+             float scale, const NpuSafetyFilterRequest& sf_req) {
         { a.post_process(req) }
             -> std::same_as<std::expected<NpuPostProcessResult, std::string>>;
         { a.blend_noise_cfg(noise_out, noise_uncond, scale) }
             -> std::same_as<std::expected<void, std::string>>;
+        { a.safety_filter(sf_req) }
+            -> std::same_as<std::expected<NpuSafetyFilterResult, std::string>>;
         { a.can_handle(task) } -> std::same_as<bool>;
         { a.name()           } -> std::convertible_to<std::string>;
         { a.is_available()   } -> std::same_as<bool>;

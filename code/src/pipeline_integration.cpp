@@ -15,6 +15,7 @@
 #include "hq/npu_accelerator.hpp"
 #include "hq/npu_encoder.hpp"
 #include "hq/tiered_memory_manager.hpp"
+#include "hq/npu_backend_unified.hpp"
 
 #include <algorithm>
 #include <array>
@@ -368,6 +369,20 @@ Pipeline::Pipeline(const PipelineConfig& cfg)
 
         HQ_LOG_INFO("Initialization complete");
 
+    // --- LCMD bootup core: initialize inference history database ---
+    if (cfg_.enable_inference_history && !cfg_.lcmd_db_path.empty() && cfg_.lcmd_db_key.size() == 32) {
+        lcmd_db_ = std::make_unique<hq::cerberus::privacy::LocalMaintenanceDB>();
+        if (lcmd_db_->initialize(cfg_.lcmd_db_path, cfg_.lcmd_db_key)) {
+            HQ_LOG_INFO("LCMD bootup core initialized (inference_records={})",
+                        lcmd_db_->inference_stats().at("count"));
+        } else {
+            HQ_LOG_WARN("LCMD bootup core initialization failed (wrong key or corrupt DB)");
+            lcmd_db_.reset();
+        }
+    } else if (cfg_.enable_inference_history) {
+        HQ_LOG_INFO("LCMD bootup core skipped: no db_path or key provided");
+    }
+
 }
 
 Pipeline::~Pipeline() {
@@ -439,24 +454,28 @@ Pipeline::generate(const GenerationRequest& req) {
                 HQ_LOG_WARN("generate() called after shutdow");
 
         stats_.generations_failed++;
+        store_inference_record_(req, "failed", req.width, req.height, 0.0);
         return std::unexpected{PipelineError::ShutdownInProgress};
     }
     if (req.width == 0 || req.height == 0 || req.width > 2048 || req.height > 2048) {
                 HQ_LOG_WARN("Invalid dimensions: {}x{}", req.width, req.height);
 
         stats_.generations_failed++;
+        store_inference_record_(req, "failed", req.width, req.height, 0.0);
         return std::unexpected{PipelineError::InvalidRequest};
     }
     if ((req.width % 8U) != 0U || (req.height % 8U) != 0U) {
                 HQ_LOG_INFO("Invalid dimensions: {}x{} (must be multiples of 8 for VAE latent scale)", req.width, req.height);
 
         stats_.generations_failed++;
+        store_inference_record_(req, "failed", req.width, req.height, 0.0);
         return std::unexpected{PipelineError::InvalidRequest};
     }
     if (req.num_steps == 0 || req.num_steps > 150) {
                 HQ_LOG_WARN("Invalid step count: {}", req.num_steps);
 
         stats_.generations_failed++;
+        store_inference_record_(req, "failed", req.width, req.height, 0.0);
         return std::unexpected{PipelineError::InvalidRequest};
     }
 
@@ -491,61 +510,41 @@ Pipeline::generate(const GenerationRequest& req) {
         stats_.generations_failed++;
         return std::unexpected{emb_result.error()};
     }
-    // emb_floats/emb_ptr: owned by emb_scope (TMM Cool tier).
-    // The staging vector is scoped to die immediately after memcpy.
-    std::size_t emb_floats = 0;
-    ScopedTierAlloc emb_scope;
-    float* emb_ptr = nullptr;
-    {
-        // ORT returns embeddings via its own internal buffer; copy before output_tensors
-        // destructor frees it. This vector is purely a staging intermediate.
-        std::vector<float> emb_staging = std::move(*emb_result);
-        emb_floats = emb_staging.size();
-        HQ_LOG_INFO("Embeddings: {} floats", emb_floats);
-        auto emb_alloc_r = memory_manager_->allocate(emb_floats * sizeof(float), MemoryTier::Cool);
-        if (!emb_alloc_r) [[unlikely]] {
-            HQ_LOG_ERROR("TMM: cond emb alloc failed ({} B): {}", emb_floats * sizeof(float), to_string(emb_alloc_r.error()));
-            stats_.generations_failed++;
-            return std::unexpected{PipelineError::StagingPoolExhausted};
-        }
-        emb_scope = ScopedTierAlloc(*memory_manager_, *emb_alloc_r);
-        emb_ptr = static_cast<float*>(emb_scope.ptr());
-        std::memcpy(emb_ptr, emb_staging.data(), emb_floats * sizeof(float));
-        HQ_LOG_DEBUG("TMM: cond emb {} floats -> {} tier", emb_floats, to_string(emb_scope.tier()));
-    } // emb_staging freed here — TMM emb_scope is the sole owner from this point
+    // BUG B3 fix (Round 20): Keep the embeddings in the vector returned by encode_prompt_
+    // (no unnecessary host memcpy to TMM Cool tier for ONNX input path).
+    // The vector lives for the duration of generate(). ORT (GPU EP) will perform its
+    // own H2D if needed; we avoid the extra CPU-side staging copy that was previously
+    // performed before creating the input tensor from CPU memory_info.
+    // TMM ownership remains only for latents (mutated in-place by scheduler + checkpoints).
+    std::vector<float> cond_embeddings = std::move(*emb_result);
+    std::size_t emb_floats = cond_embeddings.size();
+    const float* emb_ptr = cond_embeddings.data();
+    HQ_LOG_INFO("Embeddings: {} floats (BUG B3: direct from encode, no TMM staging copy)", emb_floats);
 
     // --- 1b. Encode unconditional prompt for Classifier-Free Guidance ---
-    // uncond_floats/uncond_emb_ptr: owned by uncond_emb_scope (TMM Cool tier) when CFG active.
+    // BUG B3 fix (Round 20): Keep unconditional embeddings in the vector from encode_prompt_
+    // (no TMM staging copy). Vector lives for generate() duration. Direct data passed to
+    // denoise_step_ / Ort::Value creation. Eliminates extra host memcpy before ORT's H2D (if GPU EP).
+    std::vector<float> uncond_embeddings;
     std::size_t uncond_floats = 0;
-    ScopedTierAlloc uncond_emb_scope;
-    float* uncond_emb_ptr = nullptr;
+    const float* uncond_emb_ptr = nullptr;
     if (req.guidance_scale > 1.0f) {
-        std::vector<float> uncond_staging;
         auto uncond_result = encode_prompt_("");
         if (uncond_result) {
-            uncond_staging = std::move(*uncond_result);
-            HQ_LOG_INFO("Unconditional embeddings: {} floats (CFG active, scale={:.1f})",
-                        uncond_staging.size(), req.guidance_scale);
+            uncond_embeddings = std::move(*uncond_result);
+            HQ_LOG_INFO("Unconditional embeddings: {} floats (CFG active, scale={:.1f}, BUG B3: direct from encode)",
+                        uncond_embeddings.size(), req.guidance_scale);
         } else {
-            uncond_staging.resize(emb_floats, 0.0f);
+            uncond_embeddings.resize(emb_floats, 0.0f);
             health_score_.update_recovery(false);
             HQ_LOG_WARN("unconditional encode failed ({}), using zero embeddings fallback (CFG scale={:.1f})",
                         to_string(uncond_result.error()), req.guidance_scale);
         }
-        uncond_floats = uncond_staging.size();
-        auto uncond_alloc_r = memory_manager_->allocate(uncond_floats * sizeof(float), MemoryTier::Cool);
-        if (!uncond_alloc_r) [[unlikely]] {
-            HQ_LOG_ERROR("TMM: uncond emb alloc failed: {}", to_string(uncond_alloc_r.error()));
-            stats_.generations_failed++;
-            return std::unexpected{PipelineError::StagingPoolExhausted};
-        }
-        uncond_emb_scope = ScopedTierAlloc(*memory_manager_, *uncond_alloc_r);
-        uncond_emb_ptr = static_cast<float*>(uncond_emb_scope.ptr());
-        std::memcpy(uncond_emb_ptr, uncond_staging.data(), uncond_floats * sizeof(float));
+        uncond_floats = uncond_embeddings.size();
+        uncond_emb_ptr = uncond_embeddings.data();
     } else {
         HQ_LOG_INFO("CFG disabled (guidance_scale={:.1f} <= 1.0)", req.guidance_scale);
     }
-    // uncond_staging freed here — TMM uncond_emb_scope is the sole owner when CFG active
 
     const auto t_phase_stage_start = Clock::now();
 
@@ -596,6 +595,7 @@ Pipeline::generate(const GenerationRequest& req) {
     if (!lat_alloc_r) [[unlikely]] {
         HQ_LOG_ERROR("TMM: latents alloc failed ({} B): {}", latent_size * sizeof(float), to_string(lat_alloc_r.error()));
         stats_.generations_failed++;
+        store_inference_record_(req, "failed", req.width, req.height, 0.0);
         return std::unexpected{PipelineError::GPUOutOfMemory};
     }
     ScopedTierAlloc lat_scope(*memory_manager_, *lat_alloc_r);
@@ -676,18 +676,21 @@ Pipeline::generate(const GenerationRequest& req) {
         const std::size_t uncond_hidden = (uncond_floats > 0) ? uncond_floats / 77 : 0;
         std::optional<tv::EmbeddingTensor<float>> uncond_view;
         if (uncond_emb_ptr != nullptr && uncond_hidden > 0) {
-            uncond_view.emplace(uncond_emb_ptr, 1, 77, uncond_hidden);
+            // BUG B3 zero-copy path: embeddings are read-only for this call (denoise_step_
+            // and scheduler do not mutate them). const_cast is safe; vector owns the data.
+            uncond_view.emplace(const_cast<float*>(uncond_emb_ptr), 1, 77, uncond_hidden);
         }
         auto denoise_result = denoise_step_(
             step,
             tv::FloatTensor4D{latents_ptr, 1, 4, latent_h, latent_w},
-            tv::EmbeddingTensor<float>{emb_ptr, 1, 77, emb_hidden_dim},
+            tv::EmbeddingTensor<float>{const_cast<float*>(emb_ptr), 1, 77, emb_hidden_dim},
             std::move(uncond_view),
             req.guidance_scale);
         if (!denoise_result) [[unlikely]] {
             HQ_LOG_ERROR("Denoise step {} failed: {}", step, to_string(denoise_result.error()));
 
             stats_.generations_failed++;
+            store_inference_record_(req, "failed", 0, 0, 0.0);
             return std::unexpected{denoise_result.error()};
         }
 
@@ -776,6 +779,7 @@ Pipeline::generate(const GenerationRequest& req) {
                     HQ_LOG_INFO("Max recovery attempts ({}) exceeded", cfg_.max_recovery_attempts);
 
                     stats_.generations_failed++;
+                    store_inference_record_(req, "failed", 0, 0, 0.0);
                     return std::unexpected{PipelineError::RecoveryTooManyAttempts};
                 }
 
@@ -784,6 +788,7 @@ Pipeline::generate(const GenerationRequest& req) {
                     HQ_LOG_INFO("Watchdog reported fatal recovery actio");
 
                     stats_.generations_failed++;
+                    store_inference_record_(req, "failed", req.width, req.height, 0.0);
                     return std::unexpected{PipelineError::WatchdogRecoveryFailed};
                 }
 
@@ -825,6 +830,7 @@ Pipeline::generate(const GenerationRequest& req) {
                 HQ_LOG_ERROR("VAE decode failed: {}", to_string(decode_result.error()));
 
         stats_.generations_failed++;
+        store_inference_record_(req, "failed", req.width, req.height, 0.0);
         return std::unexpected{decode_result.error()};
     }
 
@@ -856,6 +862,36 @@ Pipeline::generate(const GenerationRequest& req) {
         }
     }
 
+    // --- 7b. Round 20: Safety filter via INpuPostProcessor (post-VAE content safety) ---
+    // Extends the NpuAccelerator path with meaningful additional work (SafetyFilter task).
+    // CPU heuristic (luminance/variance) always provides a decision + timing on current host.
+    // Real path (future): Hailo classifier HEF → is_available()=true, was_npu_accelerated=true.
+    // Uses std::expected, honest synthetic_mode(), and populates dedicated timing + report fields.
+    float safety_score_for_report = -1.0f;
+    if (npu_post_processor_) {
+        npu::NpuSafetyFilterRequest sf_req{
+            .pixels = std::span<const std::uint8_t>{
+                decode_result->pixels.data(), decode_result->pixels.size()},
+            .width  = decode_result->width,
+            .height = decode_result->height,
+            .safety_threshold = 0.50f,
+        };
+        auto sf_result = npu_post_processor_->safety_filter(sf_req);
+        if (sf_result) {
+            last_phase_timings_.safety_filter_ms = sf_result->processing_time_us / 1000.0;
+            safety_score_for_report = sf_result->safety_score;
+            HQ_LOG_INFO("Safety filter via {} (score={:.3f}, safe={}, npu_accel={})",
+                        npu_post_processor_->name(),
+                        sf_result->safety_score,
+                        sf_result->is_safe ? "yes" : "no",
+                        sf_result->was_npu_accelerated ? "yes" : "no");
+        } else {
+            HQ_LOG_WARN("Safety filter failed: {} — continuing without filter decision",
+                        sf_result.error());
+            last_phase_timings_.safety_filter_ms = 0.0;
+        }
+    }
+
     const auto t1 = Clock::now();
     const double total_ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
 
@@ -871,6 +907,8 @@ Pipeline::generate(const GenerationRequest& req) {
         t_phase_post_start - t_phase_vae_start).count();
     last_phase_timings_.post_process_ms     = std::chrono::duration<double, std::milli>(
         t1 - t_phase_post_start).count();
+    // safety_filter_ms already set from precise impl timer inside the call (Round 20);
+    // do not overwrite with outer window here.
     last_phase_timings_.num_denoise_steps   = req.num_steps;
     last_phase_timings_.encoder_name        = npu_encoder_ ? npu_encoder_->name() : "none";
     last_phase_timings_.post_processor_name =
@@ -901,28 +939,44 @@ Pipeline::generate(const GenerationRequest& req) {
     accel.post_processor_is_fallback =
         npu_post_processor_ && npu_post_processor_->synthetic_mode();
 
+    // Round 20: Safety filter flags (NpuTaskType::SafetyFilter via same abstraction)
+    accel.safety_filter_used_npu =
+        npu_post_processor_ && npu_post_processor_->is_available() && !npu_post_processor_->synthetic_mode();
+    accel.safety_filter_is_fallback =
+        npu_post_processor_ && npu_post_processor_->synthetic_mode();
+    accel.safety_filter_score = safety_score_for_report;
+
     // Percentage of NPU-acceleratable CHEAP components that actually used NPU.
-    // Components: text_encode, post_process, cfg_blend.
+    // Components (Round 20): text_encode, post_process, cfg_blend, safety_filter.
     // NOTE: This deliberately EXCLUDES UNet denoising (~90% of compute).
     // A value of 100% here does NOT mean the NPU did the expensive work.
-    int npu_cheap_components_total = 3;
+    int npu_cheap_components_total = 4;
     int npu_cheap_components_used = 0;
-    if (accel.text_encode_used_npu)  ++npu_cheap_components_used;
-    if (accel.post_process_used_npu) ++npu_cheap_components_used;
-    if (accel.cfg_blend_used_npu)    ++npu_cheap_components_used;
+    if (accel.text_encode_used_npu)   ++npu_cheap_components_used;
+    if (accel.post_process_used_npu)  ++npu_cheap_components_used;
+    if (accel.cfg_blend_used_npu)     ++npu_cheap_components_used;
+    if (accel.safety_filter_used_npu) ++npu_cheap_components_used;
     accel.npu_cheap_ops_percent = static_cast<std::uint8_t>(
         (npu_cheap_components_used * 100) / npu_cheap_components_total);
 
-    // UNet denoising on NPU: architecturally blocked. Requires compiled HEF
-    // for Hailo-8L + HailoRT SDK (Linux only). No such HEF exists in this repo.
-    accel.unet_denoise_used_npu = false;
+    // UNet denoising on NPU:
+    // - On Intel OpenVINO NPU path: can be real when the graph was routed to the real Intel NPU backend.
+    // - On Hailo: still blocked (no HEF in this repo).
+    auto* intel_npu_backend = hq::npu::NpuBackendFactory::by_name("Intel-OpenVINO-NPU");
+    if (intel_npu_backend && intel_npu_backend->last_execute_used_real_npu()) {
+        accel.unet_denoise_used_npu = true;
+    } else {
+        // Hailo path remains blocked without HEF
+        accel.unet_denoise_used_npu = false;
+    }
 
     HQ_LOG_INFO("[Pipeline] HardwareAccelerationReport: NPU cheap-ops={}%, "
-                "UNet_on_NPU={}, encoder_fallback={}, postproc_fallback={}",
+                "UNet_on_NPU={}, encoder_fallback={}, postproc_fallback={}, safety_fallback={}",
                 accel.npu_cheap_ops_percent,
-                accel.unet_denoise_used_npu ? "yes" : "no (blocked: no HEF)",
+                accel.unet_denoise_used_npu ? "yes" : "no (blocked: no HEF or not selected)",
                 accel.encoder_is_fallback ? "yes" : "no",
-                accel.post_processor_is_fallback ? "yes" : "no");
+                accel.post_processor_is_fallback ? "yes" : "no",
+                accel.safety_filter_is_fallback ? "yes" : "no");
 
     // Copy acceleration report into the GeneratedImage
     decode_result->acceleration = accel;
@@ -937,6 +991,8 @@ Pipeline::generate(const GenerationRequest& req) {
 
         HQ_LOG_INFO("Generation complete in {:.1f} ms (recovery attempts: {})", total_ms, recovery_attempts_);
 
+    // --- LCMD bootup core: store inference record (success) ---
+    store_inference_record_(req, "success", decode_result->width, decode_result->height, total_ms);
 
     return *decode_result;
 }
@@ -1182,10 +1238,13 @@ Pipeline::denoise_step_(std::uint32_t step,
                     }
                 }
                 if (!blend_ok) {
-                    // Scalar fallback (npu_post_processor_ null or blend failed)
+                    // Scalar fallback (Round 21: use std::fma for consistency with improved
+                    // CpuPostProcessor::blend_noise_cfg numerical stability; reduces cumulative
+                    // FP error over many denoising steps for better quality).
                     for (std::size_t i = 0; i < noise_cond.size(); ++i) {
-                        noise_cond[i] = noise_uncond[i] +
-                                        guidance_scale * (noise_cond[i] - noise_uncond[i]);
+                        noise_cond[i] = std::fma(guidance_scale,
+                                                 (noise_cond[i] - noise_uncond[i]),
+                                                 noise_uncond[i]);
                     }
                 }
                 const auto t_blend1 = std::chrono::high_resolution_clock::now();
@@ -1382,9 +1441,11 @@ Pipeline::denoise_step_(std::uint32_t step,
                     }
                 }
                 if (!blend_ok) {
+                    // Scalar fallback (Round 21: fma for numerical stability consistency)
                     for (std::size_t i = 0; i < noise_cond.size(); ++i) {
-                        noise_cond[i] = noise_uncond[i] +
-                                        guidance_scale * (noise_cond[i] - noise_uncond[i]);
+                        noise_cond[i] = std::fma(guidance_scale,
+                                                 (noise_cond[i] - noise_uncond[i]),
+                                                 noise_uncond[i]);
                     }
                 }
                 const auto t_blend1 = std::chrono::high_resolution_clock::now();
@@ -1888,6 +1949,56 @@ Pipeline::try_cluster_dispatch_(const GenerationRequest& req,
         .generation_time_ms = gen_time_ms,
         .acceleration       = {},  // cluster path — no local hardware acceleration info
     };
+}
+
+// ---------------------------------------------------------------------------
+// LCMD helper — complete implementation (no shortcut)
+// Records both success and failure for full audit trail.
+void Pipeline::store_inference_record_(const GenerationRequest& req,
+                                       const std::string& status,
+                                       std::uint32_t width,
+                                       std::uint32_t height,
+                                       double generation_time_ms)
+{
+    if (!lcmd_db_ || !cfg_.enable_inference_history) return;
+
+    ++inference_counter_;
+    auto now = std::chrono::system_clock::now();
+    auto sec = std::chrono::duration_cast<std::chrono::seconds>(
+        now.time_since_epoch()).count();
+
+    hq::cerberus::privacy::InferenceRecord rec;
+    rec.inference_id           = std::to_string(inference_counter_);
+    rec.session_id             = "local";
+    rec.prompt                 = req.prompt;
+    rec.result_summary         = (status == "success")
+        ? std::string{"ok "} + std::to_string(width) + "x" + std::to_string(height)
+        : "failed";
+    rec.status                 = status;
+    rec.timestamp              = std::to_string(sec);
+    rec.generation_time_ms     = std::to_string(generation_time_ms);
+    rec.width                  = std::to_string(width ? width : req.width);
+    rec.height                 = std::to_string(height ? height : req.height);
+    rec.num_steps              = std::to_string(req.num_steps);
+    rec.guidance_scale         = std::to_string(req.guidance_scale);
+    rec.encoder_name           = last_phase_timings_.acceleration.encoder_name;
+    rec.post_processor_name    = last_phase_timings_.acceleration.post_processor_name;
+    rec.gpu_backend_name       = last_phase_timings_.acceleration.gpu_backend_name;
+    rec.text_encode_used_npu   = last_phase_timings_.acceleration.text_encode_used_npu ? "true" : "false";
+    rec.denoise_used_gpu       = last_phase_timings_.acceleration.denoise_used_gpu ? "true" : "false";
+    rec.vae_decode_used_gpu    = last_phase_timings_.acceleration.vae_decode_used_gpu ? "true" : "false";
+    rec.post_process_used_npu  = last_phase_timings_.acceleration.post_process_used_npu ? "true" : "false";
+    rec.unet_denoise_used_npu  = last_phase_timings_.acceleration.unet_denoise_used_npu ? "true" : "false";
+    rec.npu_cheap_ops_percent  = std::to_string(last_phase_timings_.acceleration.npu_cheap_ops_percent);
+    rec.recovery_attempts      = std::to_string(recovery_attempts_);
+    rec.node_id                = (cfg_.cluster_config && cfg_.cluster_config->this_node_id != 0)
+                                  ? std::to_string(cfg_.cluster_config->this_node_id) : "local";
+
+    if (!lcmd_db_->store_inference_record(rec)) {
+        HQ_LOG_WARN("LCMD: failed to store inference record {} (status={})", rec.inference_id, status);
+    } else {
+        HQ_LOG_DEBUG("LCMD: stored inference record {} (status={})", rec.inference_id, status);
+    }
 }
 
 } // namespace hq

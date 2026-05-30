@@ -69,17 +69,21 @@ public:
 protected:
     void* do_allocate(std::size_t bytes, std::size_t alignment) override {
         const std::size_t a = std::max(alignment, default_align_);
-        if (capacity_ > 0 && allocated_ + bytes > capacity_)
+        const std::size_t actual = align_up(bytes, a);
+        if (capacity_ > 0 && allocated_ + actual > capacity_)
             throw std::bad_alloc{};
-        void* p = alloc_aligned_(a, align_up(bytes, a));
+        void* p = alloc_aligned_(a, actual);
         if (!p) throw std::bad_alloc{};
-        allocated_ += bytes;
+        allocated_ += actual;  // track actual allocated size for accurate accounting
         return p;
     }
 
     void do_deallocate(void* p, std::size_t bytes, std::size_t /*alignment*/) override {
+        const std::size_t a = std::max(/*alignment*/ default_align_, default_align_);
+        const std::size_t actual = align_up(bytes, a);
         free_aligned_(p);
-        if (allocated_ >= bytes) allocated_ -= bytes;
+        if (allocated_ >= actual) allocated_ -= actual;
+        else allocated_ = 0; // defensive
     }
 
     bool do_is_equal(const memory_resource& o) const noexcept override {
@@ -115,7 +119,8 @@ public:
 protected:
     void* do_allocate(std::size_t bytes, std::size_t alignment) override {
         const std::size_t a = std::max(alignment, default_align_);
-        if (capacity_ > 0 && allocated_ + bytes > capacity_)
+        const std::size_t actual = align_up(bytes, a);
+        if (capacity_ > 0 && allocated_ + actual > capacity_)
             throw std::bad_alloc{};
 
         void* p = nullptr;
@@ -123,27 +128,31 @@ protected:
         // Without libnuma / CXL driver, fall back to aligned_alloc.
 #if __has_include(<numa.h>)
         if (cxl_present_) {
-            p = numa_alloc_onnode(align_up(bytes, a), 1 /*CXL node*/);
+            p = numa_alloc_onnode(actual, 1 /*CXL node*/);
         }
 #endif
         if (!p) {
-            p = alloc_aligned_(a, align_up(bytes, a));
+            p = alloc_aligned_(a, actual);
         }
         if (!p) throw std::bad_alloc{};
-        allocated_ += bytes;
+        allocated_ += actual;  // track actual allocated size (with alignment)
         return p;
     }
 
     void do_deallocate(void* p, std::size_t bytes, std::size_t /*alignment*/) override {
+        const std::size_t a = std::max(/*alignment*/ default_align_, default_align_);
+        const std::size_t actual = align_up(bytes, a);
 #if __has_include(<numa.h>)
         if (cxl_present_) {
-            numa_free(p, align_up(bytes, default_align_));
-            if (allocated_ >= bytes) allocated_ -= bytes;
+            numa_free(p, actual);
+            if (allocated_ >= actual) allocated_ -= actual;
+            else allocated_ = 0;
             return;
         }
 #endif
         free_aligned_(p);
-        if (allocated_ >= bytes) allocated_ -= bytes;
+        if (allocated_ >= actual) allocated_ -= actual;
+        else allocated_ = 0; // defensive against drift
     }
 
     bool do_is_equal(const memory_resource& o) const noexcept override {
@@ -340,6 +349,47 @@ TieredMemoryManager::~TieredMemoryManager() noexcept {
     m.registry.clear();
 }
 
+void TieredMemoryManager::reset_for_testing() noexcept {
+    if (!impl_) return;
+    auto& m = *impl_;
+
+    std::unique_lock lock{m.registry_mutex};
+
+    // Drain and free everything (same logic as destructor)
+    for (auto& [handle, alloc] : m.registry) {
+        if (alloc.tier == MemoryTier::Hot) {
+            free_hot(alloc.device_ptr);
+        } else if (alloc.tier == MemoryTier::Warm) {
+            if (alloc.ptr) m.warm_res->deallocate(alloc.ptr, alloc.size_bytes, alloc.alignment);
+        } else if (alloc.tier == MemoryTier::Cool) {
+            if (alloc.ptr) m.cool_res->deallocate(alloc.ptr, alloc.size_bytes, alloc.alignment);
+        } else {
+            auto it = m.cold_files.find(handle);
+            if (it != m.cold_files.end()) {
+                std::error_code ec;
+                std::filesystem::remove(it->second, ec);
+            }
+        }
+    }
+
+    m.registry.clear();
+    m.lru[0].clear();
+    m.lru[1].clear();
+    m.lru[2].clear();
+    m.lru[3].clear();
+    m.cold_files.clear();
+
+    // Reset accounting
+    for (auto& acc : m.acct) {
+        acc.allocated.store(0, std::memory_order_relaxed);
+        acc.peak.store(0, std::memory_order_relaxed);
+        acc.alloc_count.store(0, std::memory_order_relaxed);
+        acc.free_count.store(0, std::memory_order_relaxed);
+        acc.migration_in.store(0, std::memory_order_relaxed);
+        acc.migration_out.store(0, std::memory_order_relaxed);
+    }
+}
+
 TieredMemoryManager::TieredMemoryManager(TieredMemoryManager&&) noexcept = default;
 TieredMemoryManager& TieredMemoryManager::operator=(TieredMemoryManager&&) noexcept = default;
 
@@ -407,10 +457,16 @@ TieredMemoryManager::allocate(std::size_t size_bytes,
 
         } else { // Cold
             if (!m.cold_available) continue;
+
+            // Allocate the handle *first* atomically to avoid TOCTOU between
+            // filename generation, cold_files key, and registry insertion.
+            // This fixes a source of mismatched metadata that manifested as
+            // cross-test heap corruption when Cold tier + promote/demote were exercised.
+            TierHandle h = m.next_handle.fetch_add(1, std::memory_order_relaxed);
+
             // Spill to a temp file on NVMe
             // NOTE: std::format crashes GCC 15 with string_view/char* args.
             char hex_buf[24] = {};
-            auto h = m.next_handle.load(std::memory_order_relaxed);
             std::to_chars(std::begin(hex_buf), std::end(hex_buf), h, 16);
             auto path = std::filesystem::path{m.cfg.cold_spill_dir} /
                         ("cerberus_" + std::string(hex_buf) + ".spill");
@@ -422,15 +478,26 @@ TieredMemoryManager::allocate(std::size_t size_bytes,
                 f.flush();
                 success = f.good();
                 if (success) {
-                    m.cold_files[m.next_handle.load(std::memory_order_relaxed)] = path;
+                    m.cold_files[h] = path;
                     alloc.ptr = nullptr; // NVMe is not directly addressable
                 }
+            }
+
+            if (success) {
+                alloc.handle = h;
+            } else {
+                // Roll back the handle we consumed so it can be reused.
+                // (best-effort; under heavy load a gap is acceptable)
+                m.next_handle.fetch_sub(1, std::memory_order_relaxed);
             }
         }
 
         if (!success) continue;
 
-        alloc.handle = m.next_handle.fetch_add(1, std::memory_order_relaxed);
+        if (alloc.handle == 0) {
+            // For non-Cold tiers, assign handle here
+            alloc.handle = m.next_handle.fetch_add(1, std::memory_order_relaxed);
+        }
 
         acc.allocated.fetch_add(size_bytes, std::memory_order_relaxed);
         const std::size_t cur = acc.allocated.load(std::memory_order_relaxed);

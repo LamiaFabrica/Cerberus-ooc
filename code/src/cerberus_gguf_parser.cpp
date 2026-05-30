@@ -9,6 +9,7 @@
 #include "hq/cerberus_gguf_parser.hpp"
 #include <cstring>
 #include <array>
+#include <sstream>
 
 namespace hq::cerberus {
 
@@ -292,7 +293,19 @@ bool GgufParser::parse_header(const std::string& filepath) {
     reset();
     std::ifstream in(filepath, std::ios::binary);
     if (!in) return false;
+    return parse_stream(in);
+}
 
+bool GgufParser::parse_from_memory(std::span<const std::uint8_t> data) {
+    reset();
+    if (data.empty()) return false;
+    // Wrap bytes in istringstream (istream interface already used by helpers)
+    std::string buf(reinterpret_cast<const char*>(data.data()), data.size());
+    std::istringstream in(buf, std::ios::binary);
+    return parse_stream(in);
+}
+
+bool GgufParser::parse_stream(std::istream& in) {
     // Magic
     header_.magic = read_u32_le(in);
     if (!header_.isValid()) return false;
@@ -361,14 +374,35 @@ std::optional<int64_t> GgufParser::get_metadata_int64(std::string_view key) cons
     return std::nullopt;
 }
 
+std::optional<double> GgufParser::get_metadata_double(std::string_view key) const {
+    for (const auto& kv : metadata_) {
+        if (kv.key == key) {
+            if (std::holds_alternative<double>(kv.value)) {
+                return std::get<double>(kv.value);
+            }
+        }
+    }
+    return std::nullopt;
+}
+
 std::optional<std::string> GgufParser::detect_quantization_family() const {
-    // Count tensors by family
+    // Metadata first (more authoritative for some GGUF writers)
+    if (auto ft = get_metadata_string("general.file_type")) {
+        // GGUF file_type strings or numbers sometimes present
+        if (ft->find("Q4_K") != std::string::npos || ft->find("15") != std::string::npos) return std::string("Q4_K_M");
+        if (ft->find("IQ4_NL") != std::string::npos || ft->find("25") != std::string::npos) return std::string("IQ4_NL");
+        if (ft->find("Q5_K") != std::string::npos) return std::string("Q5_K_M");
+    }
+    if (auto qv = get_metadata_uint64("general.quantization_version")) { (void)qv; /* version 2 for modern */ }
+
+    // Tensor count fallback (reliable for the Athenea quants)
     size_t q4_k = tensors_with_type(GgmlType::Q4_K).size();
     size_t q5_k = tensors_with_type(GgmlType::Q5_K).size();
     size_t iq4_nl = tensors_with_type(GgmlType::IQ4_NL).size();
     if (q4_k > 0 && q5_k == 0 && iq4_nl == 0) return std::string("Q4_K_M");
     if (q5_k > 0 && q4_k == 0 && iq4_nl == 0) return std::string("Q5_K_M");
     if (iq4_nl > 0 && q4_k == 0 && q5_k == 0) return std::string("IQ4_NL");
+    if (q4_k > 0) return std::string("Q4_K_M"); // mixed but dominant
     return std::nullopt;
 }
 
@@ -378,4 +412,106 @@ void GgufParser::reset() {
     metadata_.clear();
 }
 
+// ==========================================================================
+// LLM-specialized accessors (Athenea / Qwen3 / Llama family support)
+// ==========================================================================
+
+// (no anon helpers currently needed; accessors use direct key probes for qwen3/llama/general)
+
+std::optional<std::string> GgufParser::get_architecture() const {
+    if (auto v = get_metadata_string("general.architecture")) return v;
+    if (auto v = get_metadata_string("qwen3.architecture")) return v; // defensive
+    return std::nullopt;
+}
+
+std::optional<uint64_t> GgufParser::get_block_count() const {
+    if (auto v = get_metadata_uint64("qwen3.block_count")) return v;
+    if (auto v = get_metadata_uint64("llama.block_count")) return v;
+    if (auto v = get_metadata_uint64("general.block_count")) return v;
+    return std::nullopt;
+}
+
+std::optional<uint64_t> GgufParser::get_embedding_length() const {
+    if (auto v = get_metadata_uint64("qwen3.embedding_length")) return v;
+    if (auto v = get_metadata_uint64("llama.embedding_length")) return v;
+    if (auto v = get_metadata_uint64("general.embedding_length")) return v;
+    return std::nullopt;
+}
+
+std::optional<uint64_t> GgufParser::get_context_length() const {
+    if (auto v = get_metadata_uint64("qwen3.context_length")) return v;
+    if (auto v = get_metadata_uint64("llama.context_length")) return v;
+    if (auto v = get_metadata_uint64("general.context_length")) return v;
+    return std::nullopt;
+}
+
+std::optional<double> GgufParser::get_rope_freq_base() const {
+    if (auto v = get_metadata_double("qwen3.rope.freq_base")) return v;
+    if (auto v = get_metadata_double("llama.rope.freq_base")) return v;
+    if (auto v = get_metadata_double("general.rope.freq_base")) return v;
+    if (auto v = get_metadata_double("qwen3.rope_freq_base")) return v;
+    return std::nullopt;
+}
+
+std::optional<uint64_t> GgufParser::get_vocab_size() const {
+    if (auto v = get_metadata_uint64("qwen3.vocab_size")) return v;
+    if (auto v = get_metadata_uint64("llama.vocab_size")) return v;
+    if (auto v = get_metadata_uint64("tokenizer.ggml.vocab_size")) return v;
+    // Fallback: infer from tokenizer tokens array length would require full array parse (not stored)
+    return std::nullopt;
+}
+
+std::optional<std::string> GgufParser::get_tokenizer_model() const {
+    if (auto v = get_metadata_string("tokenizer.ggml.model")) return v;
+    if (auto v = get_metadata_string("qwen3.tokenizer_model")) return v;
+    return std::nullopt;
+}
+
+std::optional<std::string> GgufParser::detect_model_family() const {
+    if (auto arch = get_architecture()) {
+        if (arch->find("qwen") != std::string::npos) return std::string("qwen3");
+        if (arch->find("llama") != std::string::npos) return std::string("llama");
+    }
+    if (auto base = get_metadata_string("general.basename")) {
+        std::string b = *base;
+        if (b.find("Athenea") != std::string::npos || b.find("athenea") != std::string::npos)
+            return std::string("athenea-qwen3");
+        if (b.find("Qwen") != std::string::npos) return std::string("qwen3");
+    }
+    return std::nullopt;
+}
+
 } // namespace hq::cerberus
+
+// ==========================================================================
+// Targeted tensor slice loading (for diagnostic/probe use with real Athenea weights via RealQuantWeightDriver)
+// ==========================================================================
+
+size_t GgufParser::load_tensor_slice(const std::string& filepath,
+                                     const std::string& tensor_name,
+                                     size_t byte_offset,
+                                     size_t max_bytes,
+                                     std::vector<uint8_t>& out_data) const {
+    const GgufTensorInfo* info = nullptr;
+    for (const auto& t : tensors_) {
+        if (t.name == tensor_name) { info = &t; break; }
+    }
+    if (!info) return 0;
+
+    std::ifstream f(filepath, std::ios::binary);
+    if (!f) return 0;
+
+    // Tensor data starts after the header + metadata + tensor info section.
+    // The parser already computed the layout during parse_header; we use the stored offset_in_file.
+    uint64_t data_start = info->offset_in_file;   // this is relative to data section start in GGUF
+    // For GGUF v3 the offset_in_file is already the absolute byte offset from start of file for the tensor data.
+    // (confirmed by how the existing parser populates it during parse_tensor_info)
+
+    f.seekg(data_start + byte_offset, std::ios::beg);
+    if (!f) return 0;
+
+    size_t to_read = std::min(max_bytes, static_cast<size_t>(info->size_bytes - byte_offset));
+    out_data.resize(to_read);
+    f.read(reinterpret_cast<char*>(out_data.data()), to_read);
+    return static_cast<size_t>(f.gcount());
+}

@@ -14,6 +14,7 @@
 #include <string_view>
 #include <fstream>
 #include <memory>
+#include <span>
 #include <variant>
 
 namespace hq::cerberus {
@@ -118,15 +119,42 @@ public:
     /// Open and parse the header of a GGUF file (does not load weights).
     [[nodiscard]] bool parse_header(const std::string& filepath);
 
+    /// Parse from an in-memory buffer (synthetic tests + future staged loads from TMM).
+    /// Does not require a filesystem path — critical for boundary-pure synthetic Athenea-profile tests.
+    [[nodiscard]] bool parse_from_memory(std::span<const std::uint8_t> data);
+
     [[nodiscard]] const GgufHeader& header() const noexcept { return header_; }
     [[nodiscard]] const std::vector<GgufTensorInfo>& tensors() const noexcept { return tensors_; }
     [[nodiscard]] std::vector<GgufTensorInfo> tensors_with_type(GgmlType t) const;
     [[nodiscard]] std::optional<std::string> get_metadata_string(std::string_view key) const;
     [[nodiscard]] std::optional<uint64_t> get_metadata_uint64(std::string_view key) const;
     [[nodiscard]] std::optional<int64_t> get_metadata_int64(std::string_view key) const;
+    [[nodiscard]] std::optional<double> get_metadata_double(std::string_view key) const;
 
     /// Detect quantization family from metadata / tensor types.
     [[nodiscard]] std::optional<std::string> detect_quantization_family() const;
+
+    // ======================================================================
+    // LLM-specialized accessors (support Athenea + common GGUF families)
+    // These try architecture-prefixed keys (qwen3.*, llama.*, etc.) then fallbacks.
+    // ======================================================================
+    [[nodiscard]] std::optional<std::string> get_architecture() const;
+    [[nodiscard]] std::optional<uint64_t> get_block_count() const;
+    [[nodiscard]] std::optional<uint64_t> get_embedding_length() const;
+    [[nodiscard]] std::optional<uint64_t> get_context_length() const;
+    [[nodiscard]] std::optional<double> get_rope_freq_base() const;
+    [[nodiscard]] std::optional<uint64_t> get_vocab_size() const;
+    [[nodiscard]] std::optional<std::string> get_tokenizer_model() const;
+    [[nodiscard]] std::optional<std::string> detect_model_family() const;
+
+    /// Load a small contiguous slice of a tensor's raw data (for diagnostic / probe use only).
+    /// `filepath` must be the same GGUF that was passed to parse_header.
+    /// Returns the number of bytes actually read. Does not dequantize.
+    [[nodiscard]] size_t load_tensor_slice(const std::string& filepath,
+                                           const std::string& tensor_name,
+                                           size_t byte_offset,
+                                           size_t max_bytes,
+                                           std::vector<uint8_t>& out_data) const;
 
     /// Reset all parsed state.
     void reset();
@@ -143,6 +171,7 @@ private:
     [[nodiscard]] std::string read_string(std::istream& in) const;
     bool parse_metadata_kv(std::istream& in);
     bool parse_tensor_info(std::istream& in);
+    bool parse_stream(std::istream& in);  // common impl for file + memory paths
 };
 
 } // namespace hq::cerberus

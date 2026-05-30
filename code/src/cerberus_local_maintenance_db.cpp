@@ -212,6 +212,8 @@ bool LocalMaintenanceDB::deserialize_all_(const std::vector<std::uint8_t>& in) {
     rbpc_state_records_ = read_map_of_maps();
     vip_keys_           = read_map_of_maps();
     onboarding_grants_  = read_map_of_maps();
+    inference_records_  = read_map_of_maps();
+    file_vault_records_   = read_map_of_maps();
 
     preferences_      = read_map();
     revoked_hashes_   = read_map();
@@ -251,6 +253,9 @@ bool LocalMaintenanceDB::flush_to_disk_() const {
     serialize_table_(rbpc_state_records_,plaintext);
     serialize_table_(vip_keys_,           plaintext);
     serialize_table_(onboarding_grants_, plaintext);
+
+    serialize_table_(inference_records_,    plaintext);
+    serialize_table_(file_vault_records_,   plaintext);
 
     serialize_table_(preferences_,      plaintext);
     serialize_table_(revoked_hashes_,   plaintext);
@@ -420,6 +425,8 @@ void LocalMaintenanceDB::shutdown() {
     revoked_hashes_.clear();
     trust_policy_.reset();
     sync_queue_.clear();
+    inference_records_.clear();
+    file_vault_records_.clear();
     initialized_ = false;
 }
 
@@ -719,7 +726,10 @@ std::vector<std::string> LocalMaintenanceDB::get_all_vip_key_hashes() const {
 }
 
 // ============================================================================
-// Onboarding grants (stubs — full RBPC onboarding grant flow delegated to PsiForceDB)
+// Onboarding grants — basic RBPC grant storage and consumption.
+// Advanced RBPC onboarding grant lifecycle (issuance, validation, cross-device) is
+// handled by PsiForceDB. This provides the local encrypted table + sync queue
+// following the exact same pattern as revenue_records, audit_events, etc.
 // ============================================================================
 
 bool LocalMaintenanceDB::store_onboarding_grant(const std::map<std::string, std::string>& grant) {
@@ -1050,6 +1060,114 @@ void LocalMaintenanceDB::scrub_(std::vector<std::uint8_t>& buf) const noexcept {
 }
 
 // ============================================================================
+// FileVaultRecord helpers
+// ============================================================================
+
+std::map<std::string, std::string> FileVaultRecord::to_map() const noexcept {
+    std::map<std::string, std::string> m;
+    m["file_id"]              = file_id;
+    m["project_name"]         = project_name;
+    m["folder_path"]          = folder_path;
+    m["original_name"]      = original_name;
+    m["encrypted_disk_path"]  = encrypted_disk_path;
+    m["size_bytes"]           = size_bytes;
+    m["mime_type"]            = mime_type;
+    m["thumbnail_base64"]     = thumbnail_base64;
+    m["created_at"]           = created_at;
+    m["last_accessed"]        = last_accessed;
+    m["jwt_audience"]          = jwt_audience;
+    m["permission_level"]      = permission_level;
+    m["encryption_iv"]         = encryption_iv;
+    m["encryption_tag"]         = encryption_tag;
+    m["status"]               = status;
+    m["node_id"]              = node_id;
+    m["record_class"]          = "file_vault_record";
+    m["plaintext_storage"]     = "forbidden";
+    return m;
+}
+
+FileVaultRecord FileVaultRecord::from_map(const std::map<std::string, std::string>& m) {
+    FileVaultRecord r;
+    auto it = m.find("file_id");          if (it != m.end()) r.file_id          = it->second;
+    it = m.find("project_name");          if (it != m.end()) r.project_name     = it->second;
+    it = m.find("folder_path");           if (it != m.end()) r.folder_path      = it->second;
+    it = m.find("original_name");         if (it != m.end()) r.original_name    = it->second;
+    it = m.find("encrypted_disk_path");   if (it != m.end()) r.encrypted_disk_path = it->second;
+    it = m.find("size_bytes");            if (it != m.end()) r.size_bytes       = it->second;
+    it = m.find("mime_type");           if (it != m.end()) r.mime_type        = it->second;
+    it = m.find("thumbnail_base64");      if (it != m.end()) r.thumbnail_base64 = it->second;
+    it = m.find("created_at");            if (it != m.end()) r.created_at       = it->second;
+    it = m.find("last_accessed");         if (it != m.end()) r.last_accessed    = it->second;
+    it = m.find("jwt_audience");          if (it != m.end()) r.jwt_audience     = it->second;
+    it = m.find("permission_level");    if (it != m.end()) r.permission_level = it->second;
+    it = m.find("encryption_iv");         if (it != m.end()) r.encryption_iv    = it->second;
+    it = m.find("encryption_tag");        if (it != m.end()) r.encryption_tag   = it->second;
+    it = m.find("status");                if (it != m.end()) r.status           = it->second;
+    it = m.find("node_id");               if (it != m.end()) r.node_id          = it->second;
+    return r;
+}
+
+// ============================================================================
+// InferenceRecord helpers
+// ============================================================================
+
+std::map<std::string, std::string> InferenceRecord::to_map() const noexcept {
+    std::map<std::string, std::string> m;
+    m["inference_id"]          = inference_id;
+    m["session_id"]            = session_id;
+    m["prompt"]                = prompt;
+    m["result_summary"]        = result_summary;
+    m["status"]                = status;
+    m["timestamp"]             = timestamp;
+    m["generation_time_ms"]    = generation_time_ms;
+    m["width"]                 = width;
+    m["height"]                = height;
+    m["num_steps"]             = num_steps;
+    m["guidance_scale"]        = guidance_scale;
+    m["encoder_name"]          = encoder_name;
+    m["post_processor_name"]   = post_processor_name;
+    m["gpu_backend_name"]      = gpu_backend_name;
+    m["text_encode_used_npu"]  = text_encode_used_npu;
+    m["denoise_used_gpu"]      = denoise_used_gpu;
+    m["vae_decode_used_gpu"]   = vae_decode_used_gpu;
+    m["post_process_used_npu"] = post_process_used_npu;
+    m["unet_denoise_used_npu"] = unet_denoise_used_npu;
+    m["npu_cheap_ops_percent"] = npu_cheap_ops_percent;
+    m["recovery_attempts"]     = recovery_attempts;
+    m["node_id"]               = node_id;
+    m["record_class"]          = "inference_record";
+    m["plaintext_storage"]     = "forbidden";
+    return m;
+}
+
+InferenceRecord InferenceRecord::from_map(const std::map<std::string, std::string>& m) {
+    InferenceRecord r;
+    auto it = m.find("inference_id");          if (it != m.end()) r.inference_id          = it->second;
+    it = m.find("session_id");                  if (it != m.end()) r.session_id            = it->second;
+    it = m.find("prompt");                       if (it != m.end()) r.prompt                = it->second;
+    it = m.find("result_summary");              if (it != m.end()) r.result_summary        = it->second;
+    it = m.find("status");                      if (it != m.end()) r.status                = it->second;
+    it = m.find("timestamp");                  if (it != m.end()) r.timestamp             = it->second;
+    it = m.find("generation_time_ms");           if (it != m.end()) r.generation_time_ms    = it->second;
+    it = m.find("width");                        if (it != m.end()) r.width                 = it->second;
+    it = m.find("height");                      if (it != m.end()) r.height                = it->second;
+    it = m.find("num_steps");                   if (it != m.end()) r.num_steps             = it->second;
+    it = m.find("guidance_scale");               if (it != m.end()) r.guidance_scale        = it->second;
+    it = m.find("encoder_name");                if (it != m.end()) r.encoder_name          = it->second;
+    it = m.find("post_processor_name");          if (it != m.end()) r.post_processor_name   = it->second;
+    it = m.find("gpu_backend_name");             if (it != m.end()) r.gpu_backend_name      = it->second;
+    it = m.find("text_encode_used_npu");         if (it != m.end()) r.text_encode_used_npu  = it->second;
+    it = m.find("denoise_used_gpu");             if (it != m.end()) r.denoise_used_gpu      = it->second;
+    it = m.find("vae_decode_used_gpu");          if (it != m.end()) r.vae_decode_used_gpu   = it->second;
+    it = m.find("post_process_used_npu");        if (it != m.end()) r.post_process_used_npu = it->second;
+    it = m.find("unet_denoise_used_npu");        if (it != m.end()) r.unet_denoise_used_npu = it->second;
+    it = m.find("npu_cheap_ops_percent");        if (it != m.end()) r.npu_cheap_ops_percent = it->second;
+    it = m.find("recovery_attempts");           if (it != m.end()) r.recovery_attempts     = it->second;
+    it = m.find("node_id");                     if (it != m.end()) r.node_id               = it->second;
+    return r;
+}
+
+// ============================================================================
 // TrustPolicy helpers
 // ============================================================================
 
@@ -1174,6 +1292,294 @@ TrustPolicy TrustPolicy::from_map(const std::map<std::string, std::string>& m) {
     it = m.find("updated_at");
     if (it != m.end()) tp.updated_at = it->second;
     return tp;
+}
+
+// ============================================================================
+// Inference history — bootup core
+// ============================================================================
+
+bool LocalMaintenanceDB::store_inference_record(const InferenceRecord& record) {
+    if (!initialized_ || record.inference_id.empty()) return false;
+    std::lock_guard<std::mutex> lock(mutex_);
+    inference_records_[record.inference_id] = record.to_map();
+    mark_dirty_();
+    if (offline_mode_) queue_for_sync("inference_records", record.inference_id, record.to_map());
+    return true;
+}
+
+std::optional<InferenceRecord> LocalMaintenanceDB::load_inference_record(
+    const std::string& inference_id) const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    auto it = inference_records_.find(inference_id);
+    if (it == inference_records_.end()) return std::nullopt;
+    return InferenceRecord::from_map(it->second);
+}
+
+std::vector<InferenceRecord> LocalMaintenanceDB::query_inference_records(
+    std::time_t since, std::time_t until, std::size_t limit) const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    std::vector<InferenceRecord> out;
+    for (const auto& [id, m] : inference_records_) {
+        auto it = m.find("timestamp");
+        if (it == m.end()) continue;
+        std::time_t ts = 0;
+        try { ts = static_cast<std::time_t>(std::stoll(it->second)); } catch (...) { continue; }
+        if (ts >= since && ts <= until) {
+            out.push_back(InferenceRecord::from_map(m));
+            if (limit > 0 && out.size() >= limit) break;
+        }
+    }
+    return out;
+}
+
+bool LocalMaintenanceDB::export_inference_json(const std::filesystem::path& path) const {
+    std::ofstream ofs(path);
+    if (!ofs) return false;
+    std::lock_guard<std::mutex> lock(mutex_);
+    ofs << "[\n";
+    std::size_t i = 0;
+    for (const auto& [id, m] : inference_records_) {
+        if (i > 0) ofs << ",\n";
+        ofs << "  {\n";
+        std::size_t j = 0;
+        for (const auto& [k, v] : m) {
+            if (j > 0) ofs << ",\n";
+            ofs << "    \"" << k << "\": \"" << v << "\"";
+            ++j;
+        }
+        ofs << "\n  }";
+        ++i;
+    }
+    ofs << "\n]\n";
+    return ofs.good();
+}
+
+bool LocalMaintenanceDB::export_inference_csv(const std::filesystem::path& path) const {
+    std::ofstream ofs(path);
+    if (!ofs) return false;
+    // Header
+    ofs << "inference_id,session_id,prompt,result_summary,status,timestamp,"
+           << "generation_time_ms,width,height,num_steps,guidance_scale,"
+           << "encoder_name,post_processor_name,gpu_backend_name,"
+           << "text_encode_used_npu,denoise_used_gpu,vae_decode_used_gpu,"
+           << "post_process_used_npu,unet_denoise_used_npu,npu_cheap_ops_percent,"
+           << "recovery_attempts,node_id\n";
+    std::lock_guard<std::mutex> lock(mutex_);
+    for (const auto& [id, m] : inference_records_) {
+        auto get = [&m](const std::string& k) {
+            auto it = m.find(k);
+            return it != m.end() ? it->second : std::string{};
+        };
+        ofs << get("inference_id") << ','
+           << get("session_id") << ','
+           << '"' << get("prompt") << '"' << ','
+           << '"' << get("result_summary") << '"' << ','
+           << get("status") << ','
+           << get("timestamp") << ','
+           << get("generation_time_ms") << ','
+           << get("width") << ','
+           << get("height") << ','
+           << get("num_steps") << ','
+           << get("guidance_scale") << ','
+           << get("encoder_name") << ','
+           << get("post_processor_name") << ','
+           << get("gpu_backend_name") << ','
+           << get("text_encode_used_npu") << ','
+           << get("denoise_used_gpu") << ','
+           << get("vae_decode_used_gpu") << ','
+           << get("post_process_used_npu") << ','
+           << get("unet_denoise_used_npu") << ','
+           << get("npu_cheap_ops_percent") << ','
+           << get("recovery_attempts") << ','
+           << get("node_id") << '\n';
+    }
+    return ofs.good();
+}
+
+bool LocalMaintenanceDB::export_inference_markdown(const std::filesystem::path& path) const {
+    std::ofstream ofs(path);
+    if (!ofs) return false;
+    std::lock_guard<std::mutex> lock(mutex_);
+    ofs << "# Cerberus Inference History\n\n";
+    ofs << "| ID | Prompt | Status | Time (ms) | Hardware |\n";
+    ofs << "|----|--------|--------|-----------|----------|\n";
+    double total_ms = 0.0;
+    for (const auto& [id, m] : inference_records_) {
+        auto get = [&m](const std::string& k) {
+            auto it = m.find(k);
+            return it != m.end() ? it->second : std::string{};
+        };
+        double ms = 0.0;
+        try { ms = std::stod(get("generation_time_ms")); } catch (...) {}
+        total_ms += ms;
+        ofs << "| " << get("inference_id")
+           << " | " << get("prompt")
+           << " | " << get("status")
+           << " | " << ms
+           << " | " << get("encoder_name")
+           << "/" << get("gpu_backend_name")
+           << " |\n";
+    }
+    if (!inference_records_.empty()) {
+        double avg = total_ms / static_cast<double>(inference_records_.size());
+        ofs << "\n## Summary\n\n";
+        ofs << "| Metric | Value |\n";
+        ofs << "|--------|-------|\n";
+        ofs << "| Count  | " << inference_records_.size() << " |\n";
+        ofs << "| Avg ms | " << avg << " |\n";
+    }
+    return ofs.good();
+}
+
+bool LocalMaintenanceDB::clear_inference_records() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    inference_records_.clear();
+    mark_dirty_();
+    return true;
+}
+
+std::map<std::string, std::string> LocalMaintenanceDB::inference_stats() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    std::map<std::string, std::string> stats;
+    stats["count"] = std::to_string(inference_records_.size());
+    double total_ms = 0.0;
+    std::size_t success_count = 0;
+    std::size_t fail_count = 0;
+    for (const auto& [id, m] : inference_records_) {
+        auto it = m.find("generation_time_ms");
+        if (it != m.end()) {
+            try { total_ms += std::stod(it->second); } catch (...) {}
+        }
+        auto sit = m.find("status");
+        if (sit != m.end()) {
+            if (sit->second == "success") ++success_count;
+            else if (sit->second == "failed") ++fail_count;
+        }
+    }
+    stats["total_ms"] = std::to_string(total_ms);
+    stats["success_count"] = std::to_string(success_count);
+    stats["fail_count"] = std::to_string(fail_count);
+    if (!inference_records_.empty()) {
+        stats["avg_ms"] = std::to_string(total_ms / static_cast<double>(inference_records_.size()));
+    }
+    return stats;
+}
+
+// ============================================================================
+// File vault (encrypted file metadata + project/folder indexing)
+// ============================================================================
+
+bool LocalMaintenanceDB::store_file_record(const FileVaultRecord& record) {
+    if (!initialized_ || record.file_id.empty()) return false;
+    std::lock_guard<std::mutex> lock(mutex_);
+    file_vault_records_[record.file_id] = record.to_map();
+    mark_dirty_();
+    if (offline_mode_) queue_for_sync("file_vault", record.file_id, record.to_map());
+    return true;
+}
+
+std::optional<FileVaultRecord> LocalMaintenanceDB::load_file_record(
+    const std::string& file_id) const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    auto it = file_vault_records_.find(file_id);
+    if (it == file_vault_records_.end()) return std::nullopt;
+    return FileVaultRecord::from_map(it->second);
+}
+
+bool LocalMaintenanceDB::delete_file_record(const std::string& file_id) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    auto it = file_vault_records_.find(file_id);
+    if (it == file_vault_records_.end()) return false;
+    it->second["status"] = "deleted";
+    mark_dirty_();
+    if (offline_mode_) queue_for_sync("file_vault", file_id, it->second);
+    return true;
+}
+
+bool LocalMaintenanceDB::update_file_accessed(const std::string& file_id) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    auto it = file_vault_records_.find(file_id);
+    if (it == file_vault_records_.end()) return false;
+    auto now = std::chrono::system_clock::now();
+    auto sec = std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count();
+    it->second["last_accessed"] = std::to_string(sec);
+    mark_dirty_();
+    return true;
+}
+
+bool LocalMaintenanceDB::update_file_status(const std::string& file_id, const std::string& status) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    auto it = file_vault_records_.find(file_id);
+    if (it == file_vault_records_.end()) return false;
+    it->second["status"] = status;
+    mark_dirty_();
+    if (offline_mode_) queue_for_sync("file_vault", file_id, it->second);
+    return true;
+}
+
+std::vector<FileVaultRecord> LocalMaintenanceDB::query_files_by_project(
+    const std::string& project_name,
+    const std::string& folder_path,
+    const std::string& status_filter) const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    std::vector<FileVaultRecord> out;
+    for (const auto& [id, m] : file_vault_records_) {
+        auto pit = m.find("project_name");
+        auto fit = m.find("folder_path");
+        auto sit = m.find("status");
+        bool match_project = (pit != m.end() && pit->second == project_name);
+        bool match_folder  = folder_path.empty() || (fit != m.end() && fit->second == folder_path);
+        bool match_status  = status_filter.empty() || (sit != m.end() && sit->second == status_filter);
+        if (match_project && match_folder && match_status) {
+            out.push_back(FileVaultRecord::from_map(m));
+        }
+    }
+    return out;
+}
+
+std::vector<std::string> LocalMaintenanceDB::list_projects() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    std::vector<std::string> out;
+    for (const auto& [id, m] : file_vault_records_) {
+        auto sit = m.find("status");
+        if (sit != m.end() && sit->second == "deleted") continue;
+        auto pit = m.find("project_name");
+        if (pit != m.end()) {
+            bool dup = false;
+            for (const auto& existing : out) {
+                if (existing == pit->second) { dup = true; break; }
+            }
+            if (!dup) out.push_back(pit->second);
+        }
+    }
+    return out;
+}
+
+std::map<std::string, std::string> LocalMaintenanceDB::file_vault_stats() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    std::map<std::string, std::string> stats;
+    std::size_t total_size = 0;
+    std::size_t active_count = 0;
+    std::size_t quarantined_count = 0;
+    std::size_t deleted_count = 0;
+    for (const auto& [id, m] : file_vault_records_) {
+        auto sit = m.find("status");
+        if (sit != m.end()) {
+            if (sit->second == "active") ++active_count;
+            else if (sit->second == "quarantined") ++quarantined_count;
+            else if (sit->second == "deleted") ++deleted_count;
+        }
+        auto sz = m.find("size_bytes");
+        if (sz != m.end()) {
+            try { total_size += std::stoull(sz->second); } catch (...) {}
+        }
+    }
+    stats["total_count"]      = std::to_string(file_vault_records_.size());
+    stats["active_count"]      = std::to_string(active_count);
+    stats["quarantined_count"] = std::to_string(quarantined_count);
+    stats["deleted_count"]      = std::to_string(deleted_count);
+    stats["total_size_bytes"]  = std::to_string(total_size);
+    return stats;
 }
 
 } // namespace hq::cerberus::privacy

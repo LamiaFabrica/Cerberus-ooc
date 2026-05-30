@@ -16,6 +16,7 @@
 #include "hq/cerberus_graph_engine.hpp"
 #include "hq/cerberus_decision_engine.hpp"
 #include "hq/cerberus_glow_engine.hpp"
+#include "hq/cerberus_local_maintenance_db.hpp"
 
 #include <expected>
 #include <string>
@@ -89,8 +90,19 @@ private:
     npu::INpuBackend*                       delegating_backend_{nullptr};
     std::unique_ptr<GlowEngine>             glow_engine_;
 
+public:
+    // Diagnostic accessors (for npu:athenea-probe and similar production-grade tools only)
+    // These allow the Athenea endurance tool to exercise the *real* runtime memory loop
+    // instead of a throwaway local TMM.
+    [[nodiscard]] TieredMemoryManager* getMemoryManagerForDiagnostics() const;
+    [[nodiscard]] CerberusExecutionCoordinator* getExecutionCoordinatorForDiagnostics() const;
+    // Real LCMD (never throwaway/hardcoded path in handlers; passed via runtime for innovative audit path)
+    [[nodiscard]] hq::cerberus::privacy::LocalMaintenanceDB* getLcmdForDiagnostics() const;
+    void setLcmdForDiagnostics(std::shared_ptr<hq::cerberus::privacy::LocalMaintenanceDB> lcmd);
+
     std::vector<ExecutionStep> last_plan_;
     std::unique_ptr<cli::CerberusCommandExecutor> executor_;
+    std::shared_ptr<hq::cerberus::privacy::LocalMaintenanceDB> lcmd_diagnostic_;  // real LCMD passed in (no throwaway creation in athenea-probe handler)
 
     [[nodiscard]] std::expected<void, std::string> init_backend_();
 };

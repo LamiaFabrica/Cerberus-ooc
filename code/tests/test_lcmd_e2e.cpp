@@ -359,6 +359,98 @@ int main() {
     std::cout << "\n";
 
     // ═══════════════════════════════════════════════════════════════════
+    // TEST SUITE 11: File Vault CRUD (project/folder indexing)
+    // ═══════════════════════════════════════════════════════════════════
+    std::cout << "SUITE 11: File Vault CRUD\n";
+    {
+        hq::cerberus::privacy::LocalMaintenanceDB db11;
+        bool ok = db11.initialize(db_path, reg.db_key);
+        CHECK(ok);
+
+        // Store 3 files across 2 projects / 2 folders
+        hq::cerberus::privacy::FileVaultRecord r1;
+        r1.file_id = "uuid-1"; r1.project_name = "ProjectA"; r1.folder_path = "/images";
+        r1.original_name = "cat.png"; r1.mime_type = "image/png";
+        r1.size_bytes = "1024"; r1.status = "active"; r1.node_id = reg.node_id;
+        r1.created_at = "1000000"; r1.jwt_audience = "cerberus-file-vault";
+        r1.permission_level = "write";
+        CHECK(db11.store_file_record(r1));
+
+        hq::cerberus::privacy::FileVaultRecord r2;
+        r2.file_id = "uuid-2"; r2.project_name = "ProjectA"; r2.folder_path = "/images";
+        r2.original_name = "dog.png"; r2.mime_type = "image/png";
+        r2.size_bytes = "2048"; r2.status = "active"; r2.node_id = reg.node_id;
+        r2.created_at = "1000001"; r2.jwt_audience = "cerberus-file-vault";
+        r2.permission_level = "read";
+        CHECK(db11.store_file_record(r2));
+
+        hq::cerberus::privacy::FileVaultRecord r3;
+        r3.file_id = "uuid-3"; r3.project_name = "ProjectB"; r3.folder_path = "/docs";
+        r3.original_name = "report.pdf"; r3.mime_type = "application/pdf";
+        r3.size_bytes = "4096"; r3.status = "active"; r3.node_id = reg.node_id;
+        r3.created_at = "1000002"; r3.jwt_audience = "cerberus-file-vault";
+        r3.permission_level = "admin";
+        CHECK(db11.store_file_record(r3));
+
+        // Query by project
+        auto listA = db11.query_files_by_project("ProjectA");
+        CHECK(listA.size() == 2);
+
+        // Query by project + folder
+        auto listA_img = db11.query_files_by_project("ProjectA", "/images");
+        CHECK(listA_img.size() == 2);
+
+        // Query by project + non-existent folder
+        auto listA_docs = db11.query_files_by_project("ProjectA", "/docs");
+        CHECK(listA_docs.size() == 0);
+
+        // Load individual file
+        auto loaded = db11.load_file_record("uuid-2");
+        CHECK(loaded.has_value());
+        CHECK(loaded->original_name == "dog.png");
+        CHECK(loaded->size_bytes == "2048");
+
+        // Update accessed
+        CHECK(db11.update_file_accessed("uuid-1"));
+        auto after_access = db11.load_file_record("uuid-1");
+        CHECK(after_access.has_value());
+        CHECK(!after_access->last_accessed.empty());
+
+        // Mark deleted
+        CHECK(db11.delete_file_record("uuid-2"));
+        auto deleted = db11.load_file_record("uuid-2");
+        CHECK(deleted.has_value());
+        CHECK(deleted->status == "deleted");
+
+        // List projects
+        auto projects = db11.list_projects();
+        CHECK(projects.size() == 2); // ProjectA still has uuid-1, ProjectB has uuid-3
+
+        // Stats
+        auto stats = db11.file_vault_stats();
+        CHECK(stats.at("total_count") == "3");
+        CHECK(stats.at("active_count") == "2");   // uuid-1, uuid-3
+        CHECK(stats.at("deleted_count") == "1");   // uuid-2
+
+        // Persist and reload
+        db11.shutdown();
+
+        hq::cerberus::privacy::LocalMaintenanceDB db11_r;
+        bool ok_r = db11_r.initialize(db_path, reg.db_key);
+        CHECK(ok_r);
+
+        auto reloaded = db11_r.load_file_record("uuid-3");
+        CHECK(reloaded.has_value());
+        CHECK(reloaded->project_name == "ProjectB");
+        CHECK(reloaded->folder_path == "/docs");
+        CHECK(reloaded->mime_type == "application/pdf");
+
+        auto re_projects = db11_r.list_projects();
+        CHECK(re_projects.size() == 2);
+    }
+    std::cout << "\n";
+
+    // ═══════════════════════════════════════════════════════════════════
     // Summary
     // ═══════════════════════════════════════════════════════════════════
     std::cout << "══════════════════════════════════════════════════════════════════\n";

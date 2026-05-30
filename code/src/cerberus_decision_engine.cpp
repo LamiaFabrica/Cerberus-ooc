@@ -8,6 +8,7 @@
 
 #include "hq/cerberus_decision_engine.hpp"
 #include "hq/cerberus_quantized_kernels.hpp"
+#include "hq/npu_backend_unified.hpp"
 
 #include <string>
 #include <unordered_map>
@@ -77,13 +78,28 @@ DecisionEngine::pick_backend(const CerberusGraph& g, std::int32_t node_id) const
     if (!idx_opt) return ExecutionStep::Backend::Native;
     const auto& node = g.nodes[*idx_opt];
 
-    // If node carries a QuantProfile with sub-8-bit, prefer native
-    // (our native path supports asymmetric uint8; vendor paths may not)
-    (void)node;
+    // Ground-up: actual implementation of the quant-aware routing that the architecture declared.
+    // When a node (or its weight input) carries a real low-prec PerBlock profile (IQ4_NL/Q4_K from GGUF),
+    // prefer the Native backend that has the dedicated kernel_matmul_iq4_nl_block path (real block bytes, TMM Hot).
+    // This makes the probe's 4-node quant graphs (and future real Athenea layers) route correctly through
+    // the low-prec + coordinator memory loop instead of being silently treated as F32.
+    if (node.quant_profile.weight_bits <= 4 &&
+        node.quant_profile.weight_granularity == hq::npu::QuantGranularity::PerBlock) {
+        return ExecutionStep::Backend::Native;   // hits the real IQ4 kernel with uint8 block bytes
+    }
 
-    if (node.op == npu::KernelNode::Op::MatMul) {
-        if (!is_small_enough_for_native(node, g.tensors))
+    // Strong NPU preference when Intel OpenVINO NPU backend is real and available
+    auto* npu_backend = npu::NpuBackendFactory::best_for("intel_npu");
+    const bool npu_available = npu_backend && !npu_backend->synthetic_mode();
+
+    if (node.op == npu::KernelNode::Op::MatMul || node.op == npu::KernelNode::Op::Conv) { // Round 20 hygiene: Conv (enum has no Conv2D)
+        if (npu_available) {
+            // When real Intel NPU is present, prefer OpenVINO path for these ops
             return ExecutionStep::Backend::OpenVINO;
+        }
+        if (!is_small_enough_for_native(node, g.tensors)) {
+            return ExecutionStep::Backend::OpenVINO;
+        }
     }
     return ExecutionStep::Backend::Native;
 }

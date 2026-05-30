@@ -228,6 +228,12 @@ public:
     [[nodiscard]] std::expected<TierAllocation, TierError>
     query(TierHandle handle) const noexcept;
 
+    /// Full reset for testing / cross-test isolation.
+    /// Drains all allocations, clears registry/LRU/cold files, and resets counters.
+    /// Intended to reduce heap corruption between heavy TMM migration tests
+    /// and subsequent staging tests in the same process.
+    void reset_for_testing() noexcept;
+
     // ------------------------------------------------------------------
     // Migration API (callable by watchdog on memory-pressure events)
     // ------------------------------------------------------------------
