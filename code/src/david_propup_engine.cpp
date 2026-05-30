@@ -2285,7 +2285,8 @@ hq::propup::PropupResult propup_round22_reduced_sampling_util([[maybe_unused]] s
 hq::propup::PropupResult propup_round22_tmm_hot_during_optimized_burst([[maybe_unused]] std::ostream* log) {
     using PropupResult = hq::propup::PropupResult;
     auto t0 = now_ms();
-    auto* rt = hq::CerberusRuntime::getInstanceForTesting();
+    using CerberusRuntime = hq::CerberusRuntime;
+    auto* rt = CerberusRuntime::getInstanceForTesting();
     bool ok = (rt && rt->getMemoryManagerForDiagnostics());
     auto elapsed = now_ms() - t0;
     return {ok, "round22_tmm_hot_during_optimized_burst", elapsed, "TMM Hot residency in optimized loop"};
@@ -2294,7 +2295,8 @@ hq::propup::PropupResult propup_round22_tmm_hot_during_optimized_burst([[maybe_u
 hq::propup::PropupResult propup_round22_lcmd_via_runtime_only([[maybe_unused]] std::ostream* log) {
     using PropupResult = hq::propup::PropupResult;
     auto t0 = now_ms();
-    auto* rt = hq::CerberusRuntime::getInstanceForTesting();
+    using CerberusRuntime = hq::CerberusRuntime;
+    auto* rt = CerberusRuntime::getInstanceForTesting();
     bool ok = (rt && rt->getLcmdForDiagnostics());
     auto elapsed = now_ms() - t0;
     return {ok, "round22_lcmd_via_runtime_only", elapsed, "LCMD exclusively via getLcmdForDiagnostics()"};
@@ -2323,7 +2325,8 @@ hq::propup::PropupResult propup_round22_cache_in_intel_telemetry([[maybe_unused]
 hq::propup::PropupResult propup_round22_endurance_with_reduced_sync([[maybe_unused]] std::ostream* log) {
     using PropupResult = hq::propup::PropupResult;
     auto t0 = now_ms();
-    auto* rt = hq::CerberusRuntime::getInstanceForTesting();
+    using CerberusRuntime = hq::CerberusRuntime;
+    auto* rt = CerberusRuntime::getInstanceForTesting();
     bool ok = rt != nullptr;
     auto elapsed = now_ms() - t0;
     return {ok, "round22_endurance_with_reduced_sync", elapsed, "reduced sync endurance path"};
@@ -2350,7 +2353,8 @@ hq::propup::PropupResult propup_round22_npu_util_metrics_in_report([[maybe_unuse
 hq::propup::PropupResult propup_round22_tmm_coordinator_interaction([[maybe_unused]] std::ostream* log) {
     using PropupResult = hq::propup::PropupResult;
     auto t0 = now_ms();
-    auto* rt = hq::CerberusRuntime::getInstanceForTesting();
+    using CerberusRuntime = hq::CerberusRuntime;
+    auto* rt = CerberusRuntime::getInstanceForTesting();
     bool ok = (rt && rt->getExecutionCoordinatorForDiagnostics());
     auto elapsed = now_ms() - t0;
     return {ok, "round22_tmm_coordinator_interaction", elapsed, "memory loop + TMM paths"};
@@ -2443,9 +2447,10 @@ hq::propup::PropupResult propup_round23_diagnostic_accessors_no_fake_db([[maybe_
 
 hq::propup::PropupResult propup_round24_athenea_60s_endurance_cold_hot([[maybe_unused]] std::ostream* log) {
     using PropupResult = hq::propup::PropupResult;
+    using CerberusRuntime = hq::CerberusRuntime;
     auto t0 = now_ms();
     // Re-implemented using real runtime paths + owning report
-    auto* rt = hq::CerberusRuntime::getInstanceForTesting();
+    auto* rt = CerberusRuntime::getInstanceForTesting();
     bool can_run = (rt != nullptr);
     auto elapsed = now_ms() - t0;
     return {can_run, "round24_athenea_60s_endurance_cold_hot", elapsed, "60s endurance cold-vs-hot using real runtime TMM + LCMD"};
@@ -2465,7 +2470,8 @@ hq::propup::PropupResult propup_round24_npu_memory_loop_readiness_score([[maybe_
 hq::propup::PropupResult propup_round24_athenea_cold_vs_hot_burst([[maybe_unused]] std::ostream* log) {
     using PropupResult = hq::propup::PropupResult;
     auto t0 = now_ms();
-    auto* rt = hq::CerberusRuntime::getInstanceForTesting();
+    using CerberusRuntime = hq::CerberusRuntime;
+    auto* rt = CerberusRuntime::getInstanceForTesting();
     bool path_exists = (rt && rt->getMemoryManagerForDiagnostics() && rt->getLcmdForDiagnostics());
     auto elapsed = now_ms() - t0;
     return {path_exists, "round24_athenea_cold_vs_hot_burst", elapsed, "Cold-vs-hot comparison path using real runtime accessors"};
@@ -2483,7 +2489,8 @@ hq::propup::PropupResult propup_round24_npu_memory_loop_full_athenea_pressure([[
 hq::propup::PropupResult propup_round24_athenea_probe_readiness_lcmd([[maybe_unused]] std::ostream* log) {
     using PropupResult = hq::propup::PropupResult;
     auto t0 = now_ms();
-    auto* rt = hq::CerberusRuntime::getInstanceForTesting();
+    using CerberusRuntime = hq::CerberusRuntime;
+    auto* rt = CerberusRuntime::getInstanceForTesting();
     auto* lcmd = rt ? rt->getLcmdForDiagnostics() : nullptr;
     bool can_record_readiness = (lcmd != nullptr);
     auto elapsed = now_ms() - t0;
@@ -2493,7 +2500,8 @@ hq::propup::PropupResult propup_round24_athenea_probe_readiness_lcmd([[maybe_unu
 hq::propup::PropupResult propup_round24_npu_memory_loop_cold_hot_delta_lcmd([[maybe_unused]] std::ostream* log) {
     using PropupResult = hq::propup::PropupResult;
     auto t0 = now_ms();
-    auto* rt = hq::CerberusRuntime::getInstanceForTesting();
+    using CerberusRuntime = hq::CerberusRuntime;
+    auto* rt = CerberusRuntime::getInstanceForTesting();
     bool delta_path = (rt != nullptr);
     auto elapsed = now_ms() - t0;
     return {delta_path, "round24_npu_memory_loop_cold_hot_delta_lcmd", elapsed, "Cold-hot delta measurement with LCMD audit ready"};
@@ -2502,7 +2510,8 @@ hq::propup::PropupResult propup_round24_npu_memory_loop_cold_hot_delta_lcmd([[ma
 hq::propup::PropupResult propup_round24_athenea_30s_endurance_cold_hot([[maybe_unused]] std::ostream* log) {
     using PropupResult = hq::propup::PropupResult;
     auto t0 = now_ms();
-    auto* rt = hq::CerberusRuntime::getInstanceForTesting();
+    using CerberusRuntime = hq::CerberusRuntime;
+    auto* rt = CerberusRuntime::getInstanceForTesting();
     bool supported = (rt && rt->getExecutionCoordinatorForDiagnostics());
     auto elapsed = now_ms() - t0;
     return {supported, "round24_athenea_30s_endurance_cold_hot", elapsed, "30s endurance cold-hot using coordinator"};
