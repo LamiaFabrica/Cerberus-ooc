@@ -171,9 +171,7 @@ std::string CerberusRuntime::execute_command(const std::string& raw_command) {
     return oss.str();
 }
 
-} // namespace hq::cerberus
-
-// Diagnostic accessors implementation (for npu:athenea-probe and similar tools)
+// Diagnostic accessors (must be inside namespace hq::cerberus)
 TieredMemoryManager* CerberusRuntime::getMemoryManagerForDiagnostics() const {
     return mem_mgr_.get();
 }
@@ -189,3 +187,5 @@ hq::cerberus::privacy::LocalMaintenanceDB* CerberusRuntime::getLcmdForDiagnostic
 void CerberusRuntime::setLcmdForDiagnostics(std::shared_ptr<hq::cerberus::privacy::LocalMaintenanceDB> lcmd) {
     lcmd_diagnostic_ = std::move(lcmd);
 }
+
+} // namespace hq::cerberus

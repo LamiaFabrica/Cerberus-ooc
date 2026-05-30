@@ -521,7 +521,8 @@ void CerberusCommandExecutor::register_default_handlers_() {
                 if (ran_cold_comparison) readiness_score += 18; if (hot_avg_util > 50) readiness_score += 8;
                 if (has_real_hw_source) readiness_score += 10; if (using_real_runtime_tmm) readiness_score += 18;
                 if (pct_time_above_65 > 80) readiness_score += 10; if (pct_time_above_70 > 50) readiness_score += 12;
-                if (longest_70_streak_sec > 15) readiness_score += 8; readiness_score += 12;
+                if (longest_70_streak_sec > 15) { readiness_score += 8; }
+                readiness_score += 12;  // Round 22 hygiene: explicit, no misleading-indent warning
                 if (readiness_score > 100) readiness_score = 100;
                 if (readiness_score < 0) readiness_score = 0;
             }
