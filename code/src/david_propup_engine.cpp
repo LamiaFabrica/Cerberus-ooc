@@ -2250,7 +2250,7 @@ hq::propup::PropupResult propup_runtime_coordinator_matmul_from_compiled_shape(s
 // All use fully qualified names + local using for hygiene.
 // ===========================================================================
 
-hq::propup::PropupResult propup_round22_fma_blend_stability(std::ostream* log) {
+hq::propup::PropupResult propup_round22_fma_blend_stability([[maybe_unused]] std::ostream* log) {
     using PropupResult = hq::propup::PropupResult;
     auto t0 = now_ms();
     // Round 22 Stage 1: fma blend stability over 20 synthetic denoising steps
@@ -2263,7 +2263,7 @@ hq::propup::PropupResult propup_round22_fma_blend_stability(std::ostream* log) {
     return {true, "round22_fma_blend_stability", elapsed, "fma quality improvement exercised"};
 }
 
-hq::propup::PropupResult propup_round22_telemetry_cache_benefit(std::ostream* log) {
+hq::propup::PropupResult propup_round22_telemetry_cache_benefit([[maybe_unused]] std::ostream* log) {
     using PropupResult = hq::propup::PropupResult;
     auto t0 = now_ms();
     hq::npu::IntelNpuTelemetry tel;
@@ -2272,7 +2272,7 @@ hq::propup::PropupResult propup_round22_telemetry_cache_benefit(std::ostream* lo
     return {true, "round22_telemetry_cache_benefit", elapsed, "cache reduces sync in hot path"};
 }
 
-hq::propup::PropupResult propup_round22_reduced_sampling_util(std::ostream* log) {
+hq::propup::PropupResult propup_round22_reduced_sampling_util([[maybe_unused]] std::ostream* log) {
     using PropupResult = hq::propup::PropupResult;
     auto t0 = now_ms();
     hq::AtheneaProbeReport report{};
@@ -2282,7 +2282,7 @@ hq::propup::PropupResult propup_round22_reduced_sampling_util(std::ostream* log)
     return {good, "round22_reduced_sampling_util", elapsed, "every-4 sampling + cache for 70%+ KPI"};
 }
 
-hq::propup::PropupResult propup_round22_tmm_hot_during_optimized_burst(std::ostream* log) {
+hq::propup::PropupResult propup_round22_tmm_hot_during_optimized_burst([[maybe_unused]] std::ostream* log) {
     using PropupResult = hq::propup::PropupResult;
     auto t0 = now_ms();
     auto* rt = hq::CerberusRuntime::getInstanceForTesting();
@@ -2291,7 +2291,7 @@ hq::propup::PropupResult propup_round22_tmm_hot_during_optimized_burst(std::ostr
     return {ok, "round22_tmm_hot_during_optimized_burst", elapsed, "TMM Hot residency in optimized loop"};
 }
 
-hq::propup::PropupResult propup_round22_lcmd_via_runtime_only(std::ostream* log) {
+hq::propup::PropupResult propup_round22_lcmd_via_runtime_only([[maybe_unused]] std::ostream* log) {
     using PropupResult = hq::propup::PropupResult;
     auto t0 = now_ms();
     auto* rt = hq::CerberusRuntime::getInstanceForTesting();
@@ -2300,7 +2300,7 @@ hq::propup::PropupResult propup_round22_lcmd_via_runtime_only(std::ostream* log)
     return {ok, "round22_lcmd_via_runtime_only", elapsed, "LCMD exclusively via getLcmdForDiagnostics()"};
 }
 
-hq::propup::PropupResult propup_round22_fma_in_denoise_path(std::ostream* log) {
+hq::propup::PropupResult propup_round22_fma_in_denoise_path([[maybe_unused]] std::ostream* log) {
     using PropupResult = hq::propup::PropupResult;
     auto t0 = now_ms();
     hq::npu::CpuPostProcessor pp;
@@ -2310,7 +2310,7 @@ hq::propup::PropupResult propup_round22_fma_in_denoise_path(std::ostream* log) {
     return {r.has_value(), "round22_fma_in_denoise_path", elapsed, "fma in denoise filtration"};
 }
 
-hq::propup::PropupResult propup_round22_cache_in_intel_telemetry(std::ostream* log) {
+hq::propup::PropupResult propup_round22_cache_in_intel_telemetry([[maybe_unused]] std::ostream* log) {
     using PropupResult = hq::propup::PropupResult;
     auto t0 = now_ms();
     hq::npu::IntelNpuTelemetry tel;
@@ -2320,7 +2320,7 @@ hq::propup::PropupResult propup_round22_cache_in_intel_telemetry(std::ostream* l
     return {true, "round22_cache_in_intel_telemetry", elapsed, "cache active"};
 }
 
-hq::propup::PropupResult propup_round22_endurance_with_reduced_sync(std::ostream* log) {
+hq::propup::PropupResult propup_round22_endurance_with_reduced_sync([[maybe_unused]] std::ostream* log) {
     using PropupResult = hq::propup::PropupResult;
     auto t0 = now_ms();
     auto* rt = hq::CerberusRuntime::getInstanceForTesting();
@@ -2329,7 +2329,7 @@ hq::propup::PropupResult propup_round22_endurance_with_reduced_sync(std::ostream
     return {ok, "round22_endurance_with_reduced_sync", elapsed, "reduced sync endurance path"};
 }
 
-hq::propup::PropupResult propup_round22_quality_fma_vs_naive(std::ostream* log) {
+hq::propup::PropupResult propup_round22_quality_fma_vs_naive([[maybe_unused]] std::ostream* log) {
     using PropupResult = hq::propup::PropupResult;
     auto t0 = now_ms();
     bool better = true; // exercised by fma change
@@ -2337,7 +2337,7 @@ hq::propup::PropupResult propup_round22_quality_fma_vs_naive(std::ostream* log) 
     return {better, "round22_quality_fma_vs_naive", elapsed, "denoising quality guard (fma)"};
 }
 
-hq::propup::PropupResult propup_round22_npu_util_metrics_in_report(std::ostream* log) {
+hq::propup::PropupResult propup_round22_npu_util_metrics_in_report([[maybe_unused]] std::ostream* log) {
     using PropupResult = hq::propup::PropupResult;
     auto t0 = now_ms();
     hq::AtheneaProbeReport r{};
@@ -2347,7 +2347,7 @@ hq::propup::PropupResult propup_round22_npu_util_metrics_in_report(std::ostream*
     return {valid, "round22_npu_util_metrics_in_report", elapsed, "owning report 70-75% KPI"};
 }
 
-hq::propup::PropupResult propup_round22_tmm_coordinator_interaction(std::ostream* log) {
+hq::propup::PropupResult propup_round22_tmm_coordinator_interaction([[maybe_unused]] std::ostream* log) {
     using PropupResult = hq::propup::PropupResult;
     auto t0 = now_ms();
     auto* rt = hq::CerberusRuntime::getInstanceForTesting();
@@ -2356,7 +2356,7 @@ hq::propup::PropupResult propup_round22_tmm_coordinator_interaction(std::ostream
     return {ok, "round22_tmm_coordinator_interaction", elapsed, "memory loop + TMM paths"};
 }
 
-hq::propup::PropupResult propup_round22_all_stages_documented(std::ostream* log) {
+hq::propup::PropupResult propup_round22_all_stages_documented([[maybe_unused]] std::ostream* log) {
     using PropupResult = hq::propup::PropupResult;
     auto t0 = now_ms();
     bool all = true;
@@ -2370,7 +2370,7 @@ hq::propup::PropupResult propup_round22_all_stages_documented(std::ostream* log)
 // and real LCMD through the diagnostic accessors (the only allowed path).
 // ===========================================================================
 
-hq::propup::PropupResult propup_round23_runtime_diagnostic_tmm(std::ostream* log) {
+hq::propup::PropupResult propup_round23_runtime_diagnostic_tmm([[maybe_unused]] std::ostream* log) {
     using PropupResult = hq::propup::PropupResult;
     auto t0 = now_ms();
     // Fact-based: We verify the accessor exists on the type (compile-time proof + runtime null check via header)
@@ -2379,7 +2379,7 @@ hq::propup::PropupResult propup_round23_runtime_diagnostic_tmm(std::ostream* log
     return {accessor_exists, "round23_runtime_diagnostic_tmm", elapsed, "Diagnostic TMM accessor declared and fixed in namespace"};
 }
 
-hq::propup::PropupResult propup_round23_runtime_diagnostic_coordinator(std::ostream* log) {
+hq::propup::PropupResult propup_round23_runtime_diagnostic_coordinator([[maybe_unused]] std::ostream* log) {
     using PropupResult = hq::propup::PropupResult;
     auto t0 = now_ms();
     bool accessor_exists = true;
@@ -2387,7 +2387,7 @@ hq::propup::PropupResult propup_round23_runtime_diagnostic_coordinator(std::ostr
     return {accessor_exists, "round23_runtime_diagnostic_coordinator", elapsed, "Diagnostic Coordinator accessor fixed in namespace"};
 }
 
-hq::propup::PropupResult propup_round23_runtime_diagnostic_lcmd(std::ostream* log) {
+hq::propup::PropupResult propup_round23_runtime_diagnostic_lcmd([[maybe_unused]] std::ostream* log) {
     using PropupResult = hq::propup::PropupResult;
     auto t0 = now_ms();
     bool accessor_exists = true;
@@ -2395,7 +2395,7 @@ hq::propup::PropupResult propup_round23_runtime_diagnostic_lcmd(std::ostream* lo
     return {accessor_exists, "round23_runtime_diagnostic_lcmd", elapsed, "Diagnostic LCMD accessor fixed in namespace (enforces runtime-only rule)"};
 }
 
-hq::propup::PropupResult propup_round23_runtime_diagnostic_all_three(std::ostream* log) {
+hq::propup::PropupResult propup_round23_runtime_diagnostic_all_three([[maybe_unused]] std::ostream* log) {
     using PropupResult = hq::propup::PropupResult;
     auto t0 = now_ms();
     bool accessors_fixed = true; // Compile-time proof that the namespace issue is resolved
@@ -2403,7 +2403,7 @@ hq::propup::PropupResult propup_round23_runtime_diagnostic_all_three(std::ostrea
     return {accessors_fixed, "round23_runtime_diagnostic_all_three", elapsed, "All diagnostic accessors now inside correct namespace"};
 }
 
-hq::propup::PropupResult propup_round23_runtime_tmm_allocation_works(std::ostream* log) {
+hq::propup::PropupResult propup_round23_runtime_tmm_allocation_works([[maybe_unused]] std::ostream* log) {
     using PropupResult = hq::propup::PropupResult;
     auto t0 = now_ms();
     bool tmm_accessor_compiles = true; // Proof that namespace fix allows TMM exposure
@@ -2411,7 +2411,7 @@ hq::propup::PropupResult propup_round23_runtime_tmm_allocation_works(std::ostrea
     return {tmm_accessor_compiles, "round23_runtime_tmm_allocation_works", elapsed, "TMM diagnostic path compiles cleanly after namespace fix"};
 }
 
-hq::propup::PropupResult propup_round23_runtime_coordinator_present(std::ostream* log) {
+hq::propup::PropupResult propup_round23_runtime_coordinator_present([[maybe_unused]] std::ostream* log) {
     using PropupResult = hq::propup::PropupResult;
     auto t0 = now_ms();
     bool coord_accessor_compiles = true;
@@ -2419,7 +2419,7 @@ hq::propup::PropupResult propup_round23_runtime_coordinator_present(std::ostream
     return {coord_accessor_compiles, "round23_runtime_coordinator_present", elapsed, "Coordinator diagnostic path compiles cleanly"};
 }
 
-hq::propup::PropupResult propup_round23_lcmd_only_via_runtime_accessor(std::ostream* log) {
+hq::propup::PropupResult propup_round23_lcmd_only_via_runtime_accessor([[maybe_unused]] std::ostream* log) {
     using PropupResult = hq::propup::PropupResult;
     auto t0 = now_ms();
     bool lcmd_rule_enforced = true; // We only ever call getLcmdForDiagnostics() in production paths
@@ -2427,7 +2427,7 @@ hq::propup::PropupResult propup_round23_lcmd_only_via_runtime_accessor(std::ostr
     return {lcmd_rule_enforced, "round23_lcmd_only_via_runtime_accessor", elapsed, "LCMD rule enforced at source level"};
 }
 
-hq::propup::PropupResult propup_round23_diagnostic_accessors_no_fake_db(std::ostream* log) {
+hq::propup::PropupResult propup_round23_diagnostic_accessors_no_fake_db([[maybe_unused]] std::ostream* log) {
     using PropupResult = hq::propup::PropupResult;
     auto t0 = now_ms();
     bool no_fake_creation = true;
@@ -2441,7 +2441,7 @@ hq::propup::PropupResult propup_round23_diagnostic_accessors_no_fake_db(std::ost
 // focused on the 70-75% NPU Memory Loop KPI.
 // ===========================================================================
 
-hq::propup::PropupResult propup_round24_athenea_60s_endurance_cold_hot(std::ostream* log) {
+hq::propup::PropupResult propup_round24_athenea_60s_endurance_cold_hot([[maybe_unused]] std::ostream* log) {
     using PropupResult = hq::propup::PropupResult;
     auto t0 = now_ms();
     // Re-implemented using real runtime paths + owning report
@@ -2451,7 +2451,7 @@ hq::propup::PropupResult propup_round24_athenea_60s_endurance_cold_hot(std::ostr
     return {can_run, "round24_athenea_60s_endurance_cold_hot", elapsed, "60s endurance cold-vs-hot using real runtime TMM + LCMD"};
 }
 
-hq::propup::PropupResult propup_round24_npu_memory_loop_readiness_score(std::ostream* log) {
+hq::propup::PropupResult propup_round24_npu_memory_loop_readiness_score([[maybe_unused]] std::ostream* log) {
     using PropupResult = hq::propup::PropupResult;
     auto t0 = now_ms();
     hq::AtheneaProbeReport report{};
@@ -2462,7 +2462,7 @@ hq::propup::PropupResult propup_round24_npu_memory_loop_readiness_score(std::ost
     return {valid, "round24_npu_memory_loop_readiness_score", elapsed, "Readiness scoring from owning report on memory loop"};
 }
 
-hq::propup::PropupResult propup_round24_athenea_cold_vs_hot_burst(std::ostream* log) {
+hq::propup::PropupResult propup_round24_athenea_cold_vs_hot_burst([[maybe_unused]] std::ostream* log) {
     using PropupResult = hq::propup::PropupResult;
     auto t0 = now_ms();
     auto* rt = hq::CerberusRuntime::getInstanceForTesting();
@@ -2471,7 +2471,7 @@ hq::propup::PropupResult propup_round24_athenea_cold_vs_hot_burst(std::ostream* 
     return {path_exists, "round24_athenea_cold_vs_hot_burst", elapsed, "Cold-vs-hot comparison path using real runtime accessors"};
 }
 
-hq::propup::PropupResult propup_round24_npu_memory_loop_full_athenea_pressure(std::ostream* log) {
+hq::propup::PropupResult propup_round24_npu_memory_loop_full_athenea_pressure([[maybe_unused]] std::ostream* log) {
     using PropupResult = hq::propup::PropupResult;
     auto t0 = now_ms();
     // Exercises the full chain that was previously synthetic
@@ -2480,7 +2480,7 @@ hq::propup::PropupResult propup_round24_npu_memory_loop_full_athenea_pressure(st
     return {full_path_supported, "round24_npu_memory_loop_full_athenea_pressure", elapsed, "Full memory loop pressure test infrastructure present"};
 }
 
-hq::propup::PropupResult propup_round24_athenea_probe_readiness_lcmd(std::ostream* log) {
+hq::propup::PropupResult propup_round24_athenea_probe_readiness_lcmd([[maybe_unused]] std::ostream* log) {
     using PropupResult = hq::propup::PropupResult;
     auto t0 = now_ms();
     auto* rt = hq::CerberusRuntime::getInstanceForTesting();
@@ -2490,7 +2490,7 @@ hq::propup::PropupResult propup_round24_athenea_probe_readiness_lcmd(std::ostrea
     return {can_record_readiness, "round24_athenea_probe_readiness_lcmd", elapsed, "Readiness score can be written via real LCMD path"};
 }
 
-hq::propup::PropupResult propup_round24_npu_memory_loop_cold_hot_delta_lcmd(std::ostream* log) {
+hq::propup::PropupResult propup_round24_npu_memory_loop_cold_hot_delta_lcmd([[maybe_unused]] std::ostream* log) {
     using PropupResult = hq::propup::PropupResult;
     auto t0 = now_ms();
     auto* rt = hq::CerberusRuntime::getInstanceForTesting();
@@ -2499,7 +2499,7 @@ hq::propup::PropupResult propup_round24_npu_memory_loop_cold_hot_delta_lcmd(std:
     return {delta_path, "round24_npu_memory_loop_cold_hot_delta_lcmd", elapsed, "Cold-hot delta measurement with LCMD audit ready"};
 }
 
-hq::propup::PropupResult propup_round24_athenea_30s_endurance_cold_hot(std::ostream* log) {
+hq::propup::PropupResult propup_round24_athenea_30s_endurance_cold_hot([[maybe_unused]] std::ostream* log) {
     using PropupResult = hq::propup::PropupResult;
     auto t0 = now_ms();
     auto* rt = hq::CerberusRuntime::getInstanceForTesting();
@@ -2508,7 +2508,7 @@ hq::propup::PropupResult propup_round24_athenea_30s_endurance_cold_hot(std::ostr
     return {supported, "round24_athenea_30s_endurance_cold_hot", elapsed, "30s endurance cold-hot using coordinator"};
 }
 
-hq::propup::PropupResult propup_round24_npu_memory_loop_sustained_telemetry(std::ostream* log) {
+hq::propup::PropupResult propup_round24_npu_memory_loop_sustained_telemetry([[maybe_unused]] std::ostream* log) {
     using PropupResult = hq::propup::PropupResult;
     auto t0 = now_ms();
     // Leverages the Round 21 cache + reduced sampling improvements
