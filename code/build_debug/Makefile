@@ -256,6 +256,32 @@ david_propup_engine/fast:
 .PHONY : david_propup_engine/fast
 
 #=============================================================================
+# Target rules for targets named cerberus_register
+
+# Build rule for target.
+cerberus_register: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\Makefile2 cerberus_register
+.PHONY : cerberus_register
+
+# fast build rule for target.
+cerberus_register/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\cerberus_register.dir\build.make CMakeFiles/cerberus_register.dir/build
+.PHONY : cerberus_register/fast
+
+#=============================================================================
+# Target rules for targets named test_lcmd_e2e
+
+# Build rule for target.
+test_lcmd_e2e: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\Makefile2 test_lcmd_e2e
+.PHONY : test_lcmd_e2e
+
+# fast build rule for target.
+test_lcmd_e2e/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\test_lcmd_e2e.dir\build.make CMakeFiles/test_lcmd_e2e.dir/build
+.PHONY : test_lcmd_e2e/fast
+
+#=============================================================================
 # Target rules for targets named cerberus_npu
 
 # Build rule for target.
@@ -908,6 +934,30 @@ src/cerberus_quantized_kernels.s: src/cerberus_quantized_kernels.cpp.s
 src/cerberus_quantized_kernels.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\um790_pipeline.dir\build.make CMakeFiles/um790_pipeline.dir/src/cerberus_quantized_kernels.cpp.s
 .PHONY : src/cerberus_quantized_kernels.cpp.s
+
+src/cerberus_register_main.obj: src/cerberus_register_main.cpp.obj
+.PHONY : src/cerberus_register_main.obj
+
+# target to build an object file
+src/cerberus_register_main.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\cerberus_register.dir\build.make CMakeFiles/cerberus_register.dir/src/cerberus_register_main.cpp.obj
+.PHONY : src/cerberus_register_main.cpp.obj
+
+src/cerberus_register_main.i: src/cerberus_register_main.cpp.i
+.PHONY : src/cerberus_register_main.i
+
+# target to preprocess a source file
+src/cerberus_register_main.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\cerberus_register.dir\build.make CMakeFiles/cerberus_register.dir/src/cerberus_register_main.cpp.i
+.PHONY : src/cerberus_register_main.cpp.i
+
+src/cerberus_register_main.s: src/cerberus_register_main.cpp.s
+.PHONY : src/cerberus_register_main.s
+
+# target to generate assembly for a file
+src/cerberus_register_main.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\cerberus_register.dir\build.make CMakeFiles/cerberus_register.dir/src/cerberus_register_main.cpp.s
+.PHONY : src/cerberus_register_main.cpp.s
 
 src/cerberus_runtime.obj: src/cerberus_runtime.cpp.obj
 .PHONY : src/cerberus_runtime.obj
@@ -1605,6 +1655,30 @@ tests/test_all.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\um790_test.dir\build.make CMakeFiles/um790_test.dir/tests/test_all.cpp.s
 .PHONY : tests/test_all.cpp.s
 
+tests/test_lcmd_e2e.obj: tests/test_lcmd_e2e.cpp.obj
+.PHONY : tests/test_lcmd_e2e.obj
+
+# target to build an object file
+tests/test_lcmd_e2e.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\test_lcmd_e2e.dir\build.make CMakeFiles/test_lcmd_e2e.dir/tests/test_lcmd_e2e.cpp.obj
+.PHONY : tests/test_lcmd_e2e.cpp.obj
+
+tests/test_lcmd_e2e.i: tests/test_lcmd_e2e.cpp.i
+.PHONY : tests/test_lcmd_e2e.i
+
+# target to preprocess a source file
+tests/test_lcmd_e2e.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\test_lcmd_e2e.dir\build.make CMakeFiles/test_lcmd_e2e.dir/tests/test_lcmd_e2e.cpp.i
+.PHONY : tests/test_lcmd_e2e.cpp.i
+
+tests/test_lcmd_e2e.s: tests/test_lcmd_e2e.cpp.s
+.PHONY : tests/test_lcmd_e2e.s
+
+# target to generate assembly for a file
+tests/test_lcmd_e2e.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\test_lcmd_e2e.dir\build.make CMakeFiles/test_lcmd_e2e.dir/tests/test_lcmd_e2e.cpp.s
+.PHONY : tests/test_lcmd_e2e.cpp.s
+
 # Help Target
 help:
 	@echo The following are some of the valid targets for this Makefile:
@@ -1621,12 +1695,14 @@ help:
 	@echo ... rebuild_cache
 	@echo ... test
 	@echo ... cerberus_npu
+	@echo ... cerberus_register
 	@echo ... cerberus_server
 	@echo ... david_propup_engine
 	@echo ... gmock
 	@echo ... gmock_main
 	@echo ... gtest
 	@echo ... gtest_main
+	@echo ... test_lcmd_e2e
 	@echo ... test_smoke_ov
 	@echo ... um790_pipeline
 	@echo ... um790_run
@@ -1703,6 +1779,9 @@ help:
 	@echo ... src/cerberus_quantized_kernels.obj
 	@echo ... src/cerberus_quantized_kernels.i
 	@echo ... src/cerberus_quantized_kernels.s
+	@echo ... src/cerberus_register_main.obj
+	@echo ... src/cerberus_register_main.i
+	@echo ... src/cerberus_register_main.s
 	@echo ... src/cerberus_runtime.obj
 	@echo ... src/cerberus_runtime.i
 	@echo ... src/cerberus_runtime.s
@@ -1790,6 +1869,9 @@ help:
 	@echo ... tests/test_all.obj
 	@echo ... tests/test_all.i
 	@echo ... tests/test_all.s
+	@echo ... tests/test_lcmd_e2e.obj
+	@echo ... tests/test_lcmd_e2e.i
+	@echo ... tests/test_lcmd_e2e.s
 .PHONY : help
 
 

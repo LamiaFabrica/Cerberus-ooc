@@ -1117,7 +1117,7 @@ void CerberusCommandExecutor::register_default_handlers_() {
                         oss << "    Hot burst util:        " << report.hot_avg_util << " %\n";
                         oss << "    Real HW source:        " << (report.has_real_hw_source ? "YES (" + direct_telemetry.source_description() + ")" : "NO — using activity-based derived estimate (real PDH/Level Zero unavailable)") << "\n";
                         oss << "    Memory loop path:      " << (report.using_real_runtime_tmm ? "REAL runtime TMM (via CerberusRuntime)" : "local diagnostic TMM") 
-                            << " Cool->Warm" << (report.used_hot ? "+Hot" : "") << " + PinnedTensor for " << (act_bytes + w_bytes) / 1024 << " KiB Athenea-shaped buffers (w=real IQ4_NL block bytes when quant)\n";
+                            << " Cool->Warm" << (report.used_hot ? "+Hot" : "") << " + PinnedTensor for real IQ4_NL block bytes (via RealQuantWeightDriver, size in driver-owned buffers)\n";
                         oss << "    Target (user):         70-75 % sustained NPU utilization on Windows + Linux\n\n";
 
                         if (report.hot_avg_util >= 65.0f) {

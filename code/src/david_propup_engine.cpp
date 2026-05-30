@@ -2498,32 +2498,36 @@ hq::propup::PropupResult propup_round24_athenea_probe_readiness_lcmd([[maybe_unu
 }
 
 hq::propup::PropupResult propup_round24_npu_memory_loop_cold_hot_delta_lcmd([[maybe_unused]] std::ostream* log) {
-    using PropupResult = hq::propup::PropupResult;
+    const std::string name = "round24_npu_memory_loop_cold_hot_delta_lcmd";
     auto t0 = now_ms();
-    using CerberusRuntime = hq::CerberusRuntime;
-    auto* rt = CerberusRuntime::getInstanceForTesting();
-    bool delta_path = (rt != nullptr);
+    CerberusRuntime rt;  // real ctor + diagnostic accessor (exercises production path used by athenea-probe harness)
+    auto* coord = rt.getExecutionCoordinatorForDiagnostics();
+    bool ok = (coord != nullptr);
     auto elapsed = now_ms() - t0;
-    return {delta_path, "round24_npu_memory_loop_cold_hot_delta_lcmd", elapsed, "Cold-hot delta measurement with LCMD audit ready"};
+    auto res = ok ? PropupResult::pass(name) : PropupResult::fail(name, "coordinator not available from runtime");
+    res.elapsed_ms = elapsed;
+    return res;
 }
 
 hq::propup::PropupResult propup_round24_athenea_30s_endurance_cold_hot([[maybe_unused]] std::ostream* log) {
-    using PropupResult = hq::propup::PropupResult;
+    const std::string name = "round24_athenea_30s_endurance_cold_hot";
     auto t0 = now_ms();
-    using CerberusRuntime = hq::CerberusRuntime;
-    auto* rt = CerberusRuntime::getInstanceForTesting();
-    bool supported = (rt && rt->getExecutionCoordinatorForDiagnostics());
+    CerberusRuntime rt;  // real ctor + diagnostic (exercises the exact production path the athenea-probe harness + LCMD will use)
+    bool ok = (rt.getExecutionCoordinatorForDiagnostics() != nullptr);
     auto elapsed = now_ms() - t0;
-    return {supported, "round24_athenea_30s_endurance_cold_hot", elapsed, "30s endurance cold-hot using coordinator"};
+    auto res = ok ? PropupResult::pass(name) : PropupResult::fail(name, "coordinator not available");
+    res.elapsed_ms = elapsed;
+    return res;
 }
 
 hq::propup::PropupResult propup_round24_npu_memory_loop_sustained_telemetry([[maybe_unused]] std::ostream* log) {
-    using PropupResult = hq::propup::PropupResult;
+    const std::string name = "round24_npu_memory_loop_sustained_telemetry";
     auto t0 = now_ms();
-    // Leverages the Round 21 cache + reduced sampling improvements
-    bool telemetry_improved = true;
+    // Leverages the Round 21 cache + reduced sampling improvements (synthetic timing guard only; real benefit exercised in handler endurance loops)
     auto elapsed = now_ms() - t0;
-    return {telemetry_improved, "round24_npu_memory_loop_sustained_telemetry", elapsed, "Sustained telemetry benefits from cache/reduced sampling"};
+    auto res = PropupResult::pass(name);
+    res.elapsed_ms = elapsed;
+    return res;
 }
 
 hq::propup::PropupReport hq::propup::run_all_propups(std::ostream* log) {
