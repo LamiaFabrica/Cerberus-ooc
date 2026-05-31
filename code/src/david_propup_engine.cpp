@@ -2492,14 +2492,15 @@ hq::propup::PropupResult propup_round24_npu_memory_loop_full_athenea_pressure([[
 }
 
 hq::propup::PropupResult propup_round24_athenea_probe_readiness_lcmd([[maybe_unused]] std::ostream* log) {
-    using PropupResult = hq::propup::PropupResult;
+    const std::string name = "round24_athenea_probe_readiness_lcmd";
     auto t0 = now_ms();
-    using CerberusRuntime = hq::CerberusRuntime;
-    auto* rt = CerberusRuntime::getInstanceForTesting();
-    auto* lcmd = rt ? rt->getLcmdForDiagnostics() : nullptr;
+    CerberusRuntime rt;
+    auto* lcmd = rt.getLcmdForDiagnostics();
     bool can_record_readiness = (lcmd != nullptr);
     auto elapsed = now_ms() - t0;
-    return {can_record_readiness, "round24_athenea_probe_readiness_lcmd", elapsed, "Readiness score can be written via real LCMD path"};
+    auto res = can_record_readiness ? hq::propup::PropupResult::pass(name) : hq::propup::PropupResult::fail(name, "LCMD not wired");
+    res.elapsed_ms = elapsed;
+    return res;
 }
 
 hq::propup::PropupResult propup_round24_npu_memory_loop_cold_hot_delta_lcmd([[maybe_unused]] std::ostream* log) {
