@@ -195,6 +195,46 @@ struct PropupReport {
 
 [[nodiscard]] PropupReport run_all_propups(std::ostream* log = nullptr);
 
+// ===========================================================================
+// Round 22 propups (12 tests — FMA blend, telemetry cache, TMM hot, LCMD, denoise, endurance, quality, NPU metrics, coordination, documentation)
+// ===========================================================================
+
+/// @brief Prop up: FMA blend stability.
+PropupResult propup_round22_fma_blend_stability(std::ostream* log = nullptr);
+
+/// @brief Prop up: telemetry cache benefit.
+PropupResult propup_round22_telemetry_cache_benefit(std::ostream* log = nullptr);
+
+/// @brief Prop up: reduced sampling utilization.
+PropupResult propup_round22_reduced_sampling_util(std::ostream* log = nullptr);
+
+/// @brief Prop up: TMM hot during optimized burst.
+PropupResult propup_round22_tmm_hot_during_optimized_burst(std::ostream* log = nullptr);
+
+/// @brief Prop up: LCMD via runtime only.
+PropupResult propup_round22_lcmd_via_runtime_only(std::ostream* log = nullptr);
+
+/// @brief Prop up: FMA in denoise path.
+PropupResult propup_round22_fma_in_denoise_path(std::ostream* log = nullptr);
+
+/// @brief Prop up: cache in Intel telemetry.
+PropupResult propup_round22_cache_in_intel_telemetry(std::ostream* log = nullptr);
+
+/// @brief Prop up: endurance with reduced sync.
+PropupResult propup_round22_endurance_with_reduced_sync(std::ostream* log = nullptr);
+
+/// @brief Prop up: quality FMA vs naive.
+PropupResult propup_round22_quality_fma_vs_naive(std::ostream* log = nullptr);
+
+/// @brief Prop up: NPU utilization metrics in report.
+PropupResult propup_round22_npu_util_metrics_in_report(std::ostream* log = nullptr);
+
+/// @brief Prop up: TMM coordinator interaction.
+PropupResult propup_round22_tmm_coordinator_interaction(std::ostream* log = nullptr);
+
+/// @brief Prop up: all stages documented.
+PropupResult propup_round22_all_stages_documented(std::ostream* log = nullptr);
+
 /// @brief Prop up: Athenea 60s endurance cold→hot.
 PropupResult propup_round24_athenea_60s_endurance_cold_hot(std::ostream* log = nullptr);
 
