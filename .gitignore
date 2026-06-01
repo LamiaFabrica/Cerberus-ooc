@@ -35,6 +35,7 @@ Thumbs.db
 desktop.ini
 *.tmp
 *.bak
+*.bak2
 *.swp
 *~
 
@@ -85,3 +86,6 @@ Cerberus-*-Grok-*.zip
 # Temporary benchmark or NPU trace outputs
 *.npu_bench.json
 *.npu_trace.log
+
+# Hermes agent internal tracking (kanban boards, plans, etc.)
+.hermes/
