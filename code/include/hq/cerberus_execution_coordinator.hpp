@@ -14,6 +14,7 @@
 
 #include "hq/npu_backend_unified.hpp"
 #include "hq/tiered_memory_manager.hpp"
+#include "hq/cerberus_error.hpp"
 
 #include <cstring>
 #include <expected>
@@ -60,7 +61,7 @@ public:
     /// @param user_inputs  Pointers to caller-owned input host buffers.
     /// @param user_outputs Pointers to caller-owned output host buffers.
     /// @param debug_log    Optional file stream for visible tier decisions.
-    [[nodiscard]] std::expected<void, std::string>
+    [[nodiscard]] hq::ExpectedVoid
     run(npu::INpuBackend& backend,
         const npu::CompiledKernel& kernel,
         std::span<const std::byte*> user_inputs,

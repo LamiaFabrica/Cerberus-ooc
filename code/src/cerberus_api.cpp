@@ -994,7 +994,7 @@ cerberus_status_t cerberus_run_graph(cerberus_graph_handle_t graph,
 
         auto result = rt.run_graph(kg, out_ptrs, in_ptrs);
         if (!result) {
-            set_error_fmt(std::string("cerberus_run_graph: ") + result.error());
+            set_error_fmt(std::string("cerberus_run_graph: ") + hq::to_string(result.error()));
             return CERBERUS_INFERENCE_FAILED;
         }
 

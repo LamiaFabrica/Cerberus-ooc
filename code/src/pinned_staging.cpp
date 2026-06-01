@@ -39,7 +39,7 @@ namespace hq {
 // PinnedStagingPool — Construction / Destruction
 // ===========================================================================
 
-template<typename T>
+template<hq::HqScalar T>
 PinnedStagingPool<T>::PinnedStagingPool(std::size_t embedding_bytes, int num_slots)
     : embedding_bytes_{embedding_bytes}
     , num_slots_{num_slots}
@@ -119,7 +119,7 @@ PinnedStagingPool<T>::PinnedStagingPool(std::size_t embedding_bytes, int num_slo
                static_cast<std::size_t>(num_slots_) * embedding_bytes_);
 }
 
-template<typename T>
+template<hq::HqScalar T>
 PinnedStagingPool<T>::~PinnedStagingPool() {
     free_all();
 }
@@ -128,7 +128,7 @@ PinnedStagingPool<T>::~PinnedStagingPool() {
 // Move semantics
 // ===========================================================================
 
-template<typename T>
+template<hq::HqScalar T>
 PinnedStagingPool<T>::PinnedStagingPool(PinnedStagingPool&& other) noexcept
     : embedding_bytes_{other.embedding_bytes_}
     , num_slots_{other.num_slots_}
@@ -142,7 +142,7 @@ PinnedStagingPool<T>::PinnedStagingPool(PinnedStagingPool&& other) noexcept
     other.initialized_ = false;
 }
 
-template<typename T>
+template<hq::HqScalar T>
 PinnedStagingPool<T>& PinnedStagingPool<T>::operator=(PinnedStagingPool&& other) noexcept {
     if (this != &other) {
         free_all();
@@ -165,7 +165,7 @@ PinnedStagingPool<T>& PinnedStagingPool<T>::operator=(PinnedStagingPool&& other)
 // acquire_host_buffer — get writable host buffer, drain if in flight
 // ===========================================================================
 
-template<typename T>
+template<hq::HqScalar T>
 std::expected<std::span<T>, StagingErrorInfo>
 PinnedStagingPool<T>::acquire_host_buffer(std::uint32_t step) {
     if (!initialized_) {
@@ -201,7 +201,7 @@ PinnedStagingPool<T>::acquire_host_buffer(std::uint32_t step) {
 // stage_to_gpu — start async host→device transfer
 // ===========================================================================
 
-template<typename T>
+template<hq::HqScalar T>
 std::expected<void, StagingErrorInfo>
 PinnedStagingPool<T>::stage_to_gpu(std::uint32_t step) {
     if (!initialized_) {
@@ -270,7 +270,7 @@ PinnedStagingPool<T>::stage_to_gpu(std::uint32_t step) {
 // get_gpu_buffer — get device pointer if transfer is complete
 // ===========================================================================
 
-template<typename T>
+template<hq::HqScalar T>
 std::expected<T*, StagingErrorInfo>
 PinnedStagingPool<T>::get_gpu_buffer(std::uint32_t step) {
     if (!initialized_) {
@@ -329,7 +329,7 @@ PinnedStagingPool<T>::get_gpu_buffer(std::uint32_t step) {
 // synchronize_step — block until GPU buffer is ready
 // ===========================================================================
 
-template<typename T>
+template<hq::HqScalar T>
 std::expected<void, StagingErrorInfo>
 PinnedStagingPool<T>::synchronize_step(std::uint32_t step) {
     if (!initialized_) {
@@ -374,7 +374,7 @@ PinnedStagingPool<T>::synchronize_step(std::uint32_t step) {
 // is_ready — lightweight poll without blocking
 // ===========================================================================
 
-template<typename T>
+template<hq::HqScalar T>
 bool PinnedStagingPool<T>::is_ready(std::uint32_t step) noexcept {
     if (!initialized_) {
         return false;
@@ -412,7 +412,7 @@ bool PinnedStagingPool<T>::is_ready(std::uint32_t step) noexcept {
 // drain_slot — block until in-flight transfer completes
 // ===========================================================================
 
-template<typename T>
+template<hq::HqScalar T>
 void PinnedStagingPool<T>::drain_slot(int slot_idx) {
     if (slot_idx < 0 || slot_idx >= num_slots_) {
         return;
@@ -440,7 +440,7 @@ void PinnedStagingPool<T>::drain_slot(int slot_idx) {
 // free_all — release all HIP resources (noexcept for destructor safety)
 // ===========================================================================
 
-template<typename T>
+template<hq::HqScalar T>
 void PinnedStagingPool<T>::free_all() noexcept {
 #if PINNED_STAGING_HAS_HIP
     for (Slot& s : slots_) {

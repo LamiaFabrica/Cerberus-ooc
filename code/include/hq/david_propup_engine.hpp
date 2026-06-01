@@ -127,6 +127,9 @@ PropupResult propup_kernel_sigmoid(std::ostream* log = nullptr);
 /// @brief Prop up: kernel_relu numerical correctness.
 PropupResult propup_kernel_relu(std::ostream* log = nullptr);
 
+/// @brief Prop up: std::ranges algorithms adopted in kernel files produce correct results.
+PropupResult propup_ranges_adopted_in_kernels(std::ostream* log = nullptr);
+
 // ===========================================================================
 // Privacy / RBPC / Local Maintenance DB (carbon copy of PsiForceDB security surface)
 // ===========================================================================
@@ -196,6 +199,12 @@ PropupResult propup_round23_lcmd_only_via_runtime_accessor(std::ostream* log = n
 /// @brief Prop up: diagnostic accessors no fake DB.
 PropupResult propup_round23_diagnostic_accessors_no_fake_db(std::ostream* log = nullptr);
 
+/// @brief Prop up: C++26 concepts enforced on all unconstrained templates.
+PropupResult propup_concepts_enforced_in_headers(std::ostream* log = nullptr);
+
+/// @brief Prop up: std::expected monadic chains (and_then, or_else, transform) behave correctly.
+PropupResult propup_expected_chains_valid(std::ostream* log = nullptr);
+
 // ===========================================================================
 // E2E DETECTABLE TESTBED — 25 additional propups (target 260+)
 // ===========================================================================
@@ -234,10 +243,10 @@ struct PropupReport {
     [[nodiscard]] bool all_passed() const noexcept {
         return failed_count == 0;
     }
-    void print(std::ostream& out) const;
+    void print() const;
 };
 
-[[nodiscard]] PropupReport run_all_propups(std::ostream* log = nullptr);
+[[nodiscard]] PropupReport run_all_propups();
 
 // ===========================================================================
 // Round 22 propups (12 tests — FMA blend, telemetry cache, TMM hot, LCMD, denoise, endurance, quality, NPU metrics, coordination, documentation)

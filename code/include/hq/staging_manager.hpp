@@ -4,6 +4,7 @@
 /// Pinned staging buffer management for zero-copy CPU↔GPU transfers.
 
 #include "hq/cxx26_features.hpp"
+#include "hq/concepts.hpp"
 
 #include <cstdint>
 #if UM790_HAS_STD_EXPECTED
@@ -103,7 +104,7 @@ private:
 /// @brief A simplified mdspan view over a staging buffer (C++26).
 // ---------------------------------------------------------------------------
 #if UM790_HAS_STD_MDSPAN
-template<typename T>
+template<hq::HqScalar T>
 using staging_view = std::mdspan<T, std::dextents<std::size_t, 2>>;
 #endif
 

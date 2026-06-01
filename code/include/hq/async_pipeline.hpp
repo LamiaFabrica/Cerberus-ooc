@@ -22,6 +22,7 @@
 /// @version 1.0.0
 
 #include "hq/cxx26_features.hpp"
+#include "hq/concepts.hpp"
 #include "hq/pipeline.hpp"
 #include "hq/npu_pipeline.hpp"
 
@@ -90,7 +91,7 @@ concept Awaiter = requires(T a, std::coroutine_handle<> h) {
 // task<T>: minimal C++26 coroutine task type
 // ===========================================================================
 
-template<typename T>
+template<hq::HqCoroValue T>
 class task;
 
 namespace detail {
@@ -103,7 +104,7 @@ struct task_promise_base {
     void unhandled_exception() noexcept { exception_ = std::current_exception(); }
 };
 
-template<typename T>
+template<hq::HqCoroValue T>
 struct task_promise final : task_promise_base {
     task<T> get_return_object();
 
@@ -151,7 +152,7 @@ struct task_promise<void> : task_promise_base {
 
 } // namespace detail
 
-template<typename T>
+template<hq::HqCoroValue T>
 class task {
 public:
     using promise_type = detail::task_promise<T>;
@@ -305,7 +306,7 @@ private:
 };
 
 namespace detail {
-template<typename T>
+template<hq::HqCoroValue T>
 task<T> task_promise<T>::get_return_object() {
     return task<T>{
         std::coroutine_handle<task_promise<T>>::from_promise(*this)};
@@ -320,12 +321,12 @@ inline task<void> task_promise<void>::get_return_object() {
 // Generator<T>: minimal lazy generator
 // ===========================================================================
 
-template<typename T>
+template<hq::HqGeneratorValue T>
 class Generator;
 
 namespace detail {
 
-template<typename T>
+template<hq::HqGeneratorValue T>
 struct generator_promise {
     std::optional<T>   current_value_;
     std::exception_ptr exception_;
@@ -346,7 +347,7 @@ struct generator_promise {
 
 } // namespace detail
 
-template<typename T>
+template<hq::HqGeneratorValue T>
 class Generator {
 public:
     using promise_type = detail::generator_promise<T>;
@@ -430,7 +431,7 @@ private:
 };
 
 namespace detail {
-template<typename T>
+template<hq::HqGeneratorValue T>
 Generator<T> generator_promise<T>::get_return_object() {
     return Generator<T>{
         std::coroutine_handle<generator_promise<T>>::from_promise(*this)};
@@ -540,7 +541,7 @@ private:
 // SleepAwaiter: co_await a duration
 // ===========================================================================
 
-template<typename Rep, typename Period>
+template<hq::HqChronoRep Rep, hq::HqChronoPeriod Period>
 class SleepAwaiter {
 public:
     explicit SleepAwaiter(std::chrono::duration<Rep, Period> d) noexcept

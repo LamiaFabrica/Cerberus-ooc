@@ -7,6 +7,8 @@
 /// @version 1.0.0
 
 #include "hq/david_propup_engine.hpp"
+#include "hq/concepts.hpp"
+#include "hq/cerberus_error.hpp"
 #include "hq/cerberus_native_kernels.hpp"
 #include "hq/cerberus_native_backend.hpp"
 #include "hq/cerberus_fused_kernels.hpp"
@@ -52,6 +54,19 @@
 #include <sstream>
 #include <fstream>
 #include <filesystem>
+#include <format>
+
+extern "C" std::size_t hq_safe_write(int fd, const char* data, std::size_t len);
+
+namespace {
+    inline void hq_print(std::string msg) {
+        hq_safe_write(1, msg.data(), msg.size());
+    }
+    inline void hq_println(std::string msg) {
+        hq_safe_write(1, msg.data(), msg.size());
+        hq_safe_write(1, "\n", 1);
+    }
+}
 
 using PropupResult = hq::propup::PropupResult;
 #include <fstream>
@@ -221,7 +236,7 @@ public:
 // Native kernel propups
 // ===========================================================================
 
-hq::propup::PropupResult hq::propup::propup_kernel_matmul(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_kernel_matmul([[maybe_unused]] std::ostream* log) {
     (void)log;
     const std::string name = "propup_kernel_matmul";
     auto t0 = now_ms();
@@ -248,11 +263,11 @@ hq::propup::PropupResult hq::propup::propup_kernel_matmul(std::ostream* log) {
 
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    if (log) *log << "[PROPUP] " << name << " passed in " << res.elapsed_ms << " ms\n";
+    hq_println(std::format("[PROPUP] {} passed in {} ms", name, res.elapsed_ms));
     return res;
 }
 
-hq::propup::PropupResult hq::propup::propup_kernel_elementwise(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_kernel_elementwise([[maybe_unused]] std::ostream* log) {
     (void)log;
     const std::string name = "propup_kernel_elementwise";
     auto t0 = now_ms();
@@ -278,11 +293,11 @@ hq::propup::PropupResult hq::propup::propup_kernel_elementwise(std::ostream* log
 
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    if (log) *log << "[PROPUP] " << name << " passed in " << res.elapsed_ms << " ms\n";
+    hq_println(std::format("[PROPUP] {} passed in {} ms", name, res.elapsed_ms));
     return res;
 }
 
-hq::propup::PropupResult hq::propup::propup_lcmd_offline_sync_count(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_lcmd_offline_sync_count([[maybe_unused]] std::ostream* log) {
     (void)log;
     const std::string name = "propup_lcmd_offline_sync_count";
     auto t0 = now_ms();
@@ -305,7 +320,7 @@ hq::propup::PropupResult hq::propup::propup_lcmd_offline_sync_count(std::ostream
 // Tiered Memory Propup
 // ===========================================================================
 
-hq::propup::PropupResult hq::propup::propup_tiered_memory(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_tiered_memory([[maybe_unused]] std::ostream* log) {
     const std::string name = "propup_tiered_memory";
     auto t0 = now_ms();
 
@@ -319,7 +334,7 @@ hq::propup::PropupResult hq::propup::propup_tiered_memory(std::ostream* log) {
     auto alloc_r = mgr.allocate(1024, MemoryTier::Cool);
     if (!alloc_r) {
         return PropupResult::fail(name,
-            "allocate failed: " + to_string(alloc_r.error()));
+            "allocate failed: " + hq::to_string(alloc_r.error()));
     }
     if (alloc_r->ptr == nullptr) {
         return PropupResult::fail(name, "alloc returned null ptr");
@@ -334,7 +349,7 @@ hq::propup::PropupResult hq::propup::propup_tiered_memory(std::ostream* log) {
     auto free_r = mgr.free(alloc_r->handle);
     if (!free_r) {
         return PropupResult::fail(name,
-            "free failed: " + to_string(free_r.error()));
+            "free failed: " + hq::to_string(free_r.error()));
     }
     if (!ok) {
         return PropupResult::fail(name, "memory pattern verification failed");
@@ -342,7 +357,7 @@ hq::propup::PropupResult hq::propup::propup_tiered_memory(std::ostream* log) {
 
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    if (log) *log << "[PROPUP] " << name << " passed in " << res.elapsed_ms << " ms\n";
+    hq_println(std::format("[PROPUP] {} passed in {} ms", name, res.elapsed_ms));
     return res;
 }
 
@@ -350,7 +365,7 @@ hq::propup::PropupResult hq::propup::propup_tiered_memory(std::ostream* log) {
 // Coordinator memory-loop propup
 // ===========================================================================
 
-hq::propup::PropupResult hq::propup::propup_coordinator_memory_loop(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_coordinator_memory_loop([[maybe_unused]] std::ostream* log) {
     const std::string name = "propup_coordinator_memory_loop";
     auto t0 = now_ms();
 
@@ -376,7 +391,7 @@ hq::propup::PropupResult hq::propup::propup_coordinator_memory_loop(std::ostream
     auto run_r = coord.run(backend, *ck,
                            std::span<const std::byte*>(ins),
                            std::span<std::byte*>(outs));
-    if (!run_r) return PropupResult::fail(name, "run: " + run_r.error());
+    if (!run_r) return PropupResult::fail(name, "run: " + hq::to_string(run_r.error()));
 
     float expected[] = {3,5,7,9};
     for (std::size_t i = 0; i < 4; ++i) {
@@ -387,11 +402,11 @@ hq::propup::PropupResult hq::propup::propup_coordinator_memory_loop(std::ostream
 
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    if (log) *log << "[PROPUP] " << name << " passed in " << res.elapsed_ms << " ms\n";
+    hq_println(std::format("[PROPUP] {} passed in {} ms", name, res.elapsed_ms));
     return res;
 }
 
-hq::propup::PropupResult hq::propup::propup_coordinator_tier_decisions(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_coordinator_tier_decisions([[maybe_unused]] std::ostream* log) {
     const std::string name = "propup_coordinator_tier_decisions";
     auto t0 = now_ms();
 
@@ -433,11 +448,11 @@ hq::propup::PropupResult hq::propup::propup_coordinator_tier_decisions(std::ostr
 
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    if (log) *log << "[PROPUP] " << name << " passed in " << res.elapsed_ms << " ms\n";
+    hq_println(std::format("[PROPUP] {} passed in {} ms", name, res.elapsed_ms));
     return res;
 }
 
-hq::propup::PropupResult hq::propup::propup_compile_graph_analysis(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_compile_graph_analysis([[maybe_unused]] std::ostream* log) {
     const std::string name = "propup_compile_graph_analysis";
     auto t0 = now_ms();
 
@@ -463,7 +478,7 @@ hq::propup::PropupResult hq::propup::propup_compile_graph_analysis(std::ostream*
 
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    if (log) *log << "[PROPUP] " << name << " passed in " << res.elapsed_ms << " ms\n";
+    hq_println(std::format("[PROPUP] {} passed in {} ms", name, res.elapsed_ms));
     return res;
 }
 
@@ -471,7 +486,7 @@ hq::propup::PropupResult hq::propup::propup_compile_graph_analysis(std::ostream*
 // End-to-end native propup using CerberusNativeBackend
 // ===========================================================================
 
-hq::propup::PropupResult hq::propup::propup_end_to_end_native(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_end_to_end_native([[maybe_unused]] std::ostream* log) {
     const std::string name = "propup_end_to_end_native";
     auto t0 = now_ms();
 
@@ -511,7 +526,7 @@ hq::propup::PropupResult hq::propup::propup_end_to_end_native(std::ostream* log)
     auto run_r = coord.run(backend, *ck,
                            std::span<const std::byte*>(ins),
                            std::span<std::byte*>(outs));
-    if (!run_r) return PropupResult::fail(name, "run: " + run_r.error());
+    if (!run_r) return PropupResult::fail(name, "run: " + hq::to_string(run_r.error()));
 
     float expected[] = {3,5,7,9};
     for (std::size_t i = 0; i < 4; ++i) {
@@ -524,7 +539,7 @@ hq::propup::PropupResult hq::propup::propup_end_to_end_native(std::ostream* log)
 
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    if (log) *log << "[PROPUP] " << name << " passed in " << res.elapsed_ms << " ms\n";
+    hq_println(std::format("[PROPUP] {} passed in {} ms", name, res.elapsed_ms));
     return res;
 }
 
@@ -532,7 +547,7 @@ hq::propup::PropupResult hq::propup::propup_end_to_end_native(std::ostream* log)
 // Decision engine + integration propups
 // ===========================================================================
 
-hq::propup::PropupResult hq::propup::propup_decision_engine_fusion(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_decision_engine_fusion([[maybe_unused]] std::ostream* log) {
     const std::string name = "propup_decision_engine_fusion";
     auto t0 = now_ms();
 
@@ -568,7 +583,10 @@ hq::propup::PropupResult hq::propup::propup_decision_engine_fusion(std::ostream*
     tcfg_small.cool_capacity_bytes = 8ULL*1024*1024;
     TieredMemoryManager mgr(tcfg_small);
     DecisionEngine engine(mgr);
-    auto plan = engine.analyse(graph, "cpu");
+    auto plan_r = engine.analyse(graph, "cpu");
+    if (!plan_r)
+        return PropupResult::fail(name, "analyse failed");
+    auto& plan = *plan_r;
     if (plan.empty())
         return PropupResult::fail(name, "plan is empty");
 
@@ -588,7 +606,7 @@ hq::propup::PropupResult hq::propup::propup_decision_engine_fusion(std::ostream*
 
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    if (log) *log << "[PROPUP] " << name << " passed in " << res.elapsed_ms << " ms\n";
+    hq_println(std::format("[PROPUP] {} passed in {} ms", name, res.elapsed_ms));
     return res;
 }
 
@@ -596,7 +614,7 @@ hq::propup::PropupResult hq::propup::propup_decision_engine_fusion(std::ostream*
 // Fused kernel + performance propups
 // ===========================================================================
 
-hq::propup::PropupResult hq::propup::propup_kernel_fma(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_kernel_fma([[maybe_unused]] std::ostream* log) {
     const std::string name = "propup_kernel_fma";
     auto t0 = now_ms();
 
@@ -617,11 +635,11 @@ hq::propup::PropupResult hq::propup::propup_kernel_fma(std::ostream* log) {
 
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    if (log) *log << "[PROPUP] " << name << " passed in " << res.elapsed_ms << " ms\n";
+    hq_println(std::format("[PROPUP] {} passed in {} ms", name, res.elapsed_ms));
     return res;
 }
 
-hq::propup::PropupResult hq::propup::propup_kernel_matmul_blocked(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_kernel_matmul_blocked([[maybe_unused]] std::ostream* log) {
     const std::string name = "propup_kernel_matmul_blocked";
     auto t0 = now_ms();
 
@@ -645,11 +663,11 @@ hq::propup::PropupResult hq::propup::propup_kernel_matmul_blocked(std::ostream* 
 
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    if (log) *log << "[PROPUP] " << name << " passed in " << res.elapsed_ms << " ms\n";
+    hq_println(std::format("[PROPUP] {} passed in {} ms", name, res.elapsed_ms));
     return res;
 }
 
-hq::propup::PropupResult hq::propup::propup_performance_matmul_vs_naive(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_performance_matmul_vs_naive([[maybe_unused]] std::ostream* log) {
     const std::string name = "propup_performance_matmul_vs_naive";
     auto t0 = now_ms();
 
@@ -685,8 +703,7 @@ hq::propup::PropupResult hq::propup::propup_performance_matmul_vs_naive(std::ost
     double speedup = naive_ms / blocked_ms;
 
     if (log) {
-        *log << "[PROPUP] " << name << " naive=" << naive_ms
-            << " ms blocked=" << blocked_ms << " ms speedup=" << speedup << "\n";
+        hq_println(std::format("[PROPUP] {} naive={} ms blocked={} ms speedup={}", name, naive_ms, blocked_ms, speedup));
     }
 
     // The blocked version should be faster on matrices >64x64.
@@ -699,11 +716,11 @@ hq::propup::PropupResult hq::propup::propup_performance_matmul_vs_naive(std::ost
 
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    if (log) *log << "[PROPUP] " << name << " passed in " << res.elapsed_ms << " ms\n";
+    hq_println(std::format("[PROPUP] {} passed in {} ms", name, res.elapsed_ms));
     return res;
 }
 
-hq::propup::PropupResult hq::propup::propup_kernel_matmul_avx2(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_kernel_matmul_avx2([[maybe_unused]] std::ostream* log) {
     const std::string name = "propup_kernel_matmul_avx2";
     auto t0 = now_ms();
 
@@ -739,8 +756,7 @@ hq::propup::PropupResult hq::propup::propup_kernel_matmul_avx2(std::ostream* log
 
     double avx_ms = std::chrono::duration<double, std::milli>(t_avx_1 - t_avx_0).count();
     if (log) {
-        *log << "[PROPUP] " << name << " avx2=" << avx_ms
-             << " ms max_err=" << max_err << std::endl;
+        hq_println(std::format("[PROPUP] {} avx2={} ms max_err={}", name, avx_ms, max_err));
     }
 #endif
     (void)log;
@@ -753,7 +769,7 @@ hq::propup::PropupResult hq::propup::propup_kernel_matmul_avx2(std::ostream* log
 // Additional native kernel propups
 // ===========================================================================
 
-hq::propup::PropupResult hq::propup::propup_kernel_relu(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_kernel_relu([[maybe_unused]] std::ostream* log) {
     const std::string name = "propup_kernel_relu";
     auto t0 = now_ms();
     std::vector<float> in = {-2.0f, -1.0f, 0.0f, 1.0f, 2.0f};
@@ -784,18 +800,83 @@ hq::propup::PropupResult hq::propup::propup_kernel_sigmoid(std::ostream* log) {
     return res;
 }
 
+hq::propup::PropupResult hq::propup::propup_ranges_adopted_in_kernels(std::ostream* log) {
+    const std::string name = "propup_ranges_adopted_in_kernels";
+    auto t0 = now_ms();
+    (void)log;
+
+    // 1. kernel_relu (std::ranges::transform)
+    {
+        std::vector<float> in = {-2.0f, -1.0f, 0.0f, 1.0f, 2.0f};
+        std::vector<float> out(in.size(), -1.0f);
+        auto r = cerberus::native::kernel_relu(in.data(), out.data(), in.size());
+        if (!r) return PropupResult::fail(name, "kernel_relu: " + r.error());
+        if (out[0] != 0.0f || out[1] != 0.0f || out[2] != 0.0f || out[3] != 1.0f || out[4] != 2.0f)
+            return PropupResult::fail(name, "kernel_relu output incorrect");
+    }
+
+    // 2. kernel_add (std::views::zip + std::ranges::transform)
+    {
+        std::vector<float> a = {1.0f, 2.0f, 3.0f};
+        std::vector<float> b = {4.0f, 5.0f, 6.0f};
+        std::vector<float> out(3, 0.0f);
+        auto r = cerberus::native::kernel_add(a.data(), b.data(), out.data(), 3);
+        if (!r) return PropupResult::fail(name, "kernel_add: " + r.error());
+        for (std::size_t i = 0; i < 3; ++i) {
+            if (std::fabs(out[i] - (a[i] + b[i])) > 1e-5f)
+                return PropupResult::fail(name, "kernel_add output incorrect");
+        }
+    }
+
+    // 3. kernel_softmax (std::ranges::max_element + transform + for_each)
+    {
+        std::vector<float> in = {1.0f, 2.0f, 3.0f};
+        std::vector<float> out(3, 0.0f);
+        auto r = cerberus::native::kernel_softmax(in.data(), out.data(), 1, 3);
+        if (!r) return PropupResult::fail(name, "kernel_softmax: " + r.error());
+        float sum = 0.0f;
+        for (float v : out) sum += v;
+        if (std::fabs(sum - 1.0f) > 1e-4f)
+            return PropupResult::fail(name, "kernel_softmax does not sum to 1");
+        if (out[0] >= out[1] || out[1] >= out[2])
+            return PropupResult::fail(name, "kernel_softmax monotonicity broken");
+    }
+
+    // 4. kernel_layernorm (std::ranges::for_each + transform)
+    {
+        std::vector<float> in = {1.0f, 2.0f, 3.0f};
+        std::vector<float> out(3, 0.0f);
+        auto r = cerberus::native::kernel_layernorm(in.data(), out.data(), 1, 3, 1e-5f);
+        if (!r) return PropupResult::fail(name, "kernel_layernorm: " + r.error());
+        float mean = 0.0f;
+        for (float v : out) mean += v;
+        mean /= 3.0f;
+        if (std::fabs(mean) > 1e-4f)
+            return PropupResult::fail(name, "kernel_layernorm mean not zero");
+        float var = 0.0f;
+        for (float v : out) var += v * v;
+        var /= 3.0f;
+        if (std::fabs(var - 1.0f) > 1e-3f)
+            return PropupResult::fail(name, "kernel_layernorm variance not ~1");
+    }
+
+    auto res = PropupResult::pass(name);
+    res.elapsed_ms = now_ms() - t0;
+    hq_println(std::format("[PROPUP] {} passed in {} ms", name, res.elapsed_ms));
+    return res;
+}
+
 // ===========================================================================
 // AVX-512 dispatch propups
 // ===========================================================================
 
-hq::propup::PropupResult hq::propup::propup_kernel_avx512_detect(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_kernel_avx512_detect([[maybe_unused]] std::ostream* log) {
     const std::string name = "propup_kernel_avx512_detect";
     auto t0 = now_ms();
     bool has_avx2 = cerberus::native::cpu_has_avx2();
     bool has_avx512 = cerberus::native::cpu_has_avx512f();
     if (log) {
-        *log << "[PROPUP] " << name << " avx2=" << (has_avx2 ? "yes" : "no")
-             << " avx512f=" << (has_avx512 ? "yes" : "no") << std::endl;
+        hq_println(std::format("[PROPUP] {} avx2={} avx512f={}", name, has_avx2 ? "yes" : "no", has_avx512 ? "yes" : "no"));
     }
     // Detection must be consistent: if compile-time AVX512 is set but cpuid says no, that's fine on non-AVX512 host
     // The only invariant we enforce is that the auto t0 = now_ms();
@@ -849,7 +930,7 @@ hq::propup::PropupResult hq::propup::propup_kernel_avx512_detect(std::ostream* l
 // or fake pct calcs (the /65*78 etc pattern or total_tele in pct expr without report.*) or coord bypasses reappear in handler.
 // Also exercises owned record path (would have caught all 4 classes of leakage).
 // Final NPU surface language hygiene regression propup (catches any reintroduction of the 7 forbidden terms in production NPU/probe/telemetry/backend code).
-hq::propup::PropupResult hq::propup::propup_npu_surface_language_hygiene(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_npu_surface_language_hygiene([[maybe_unused]] std::ostream* log) {
     (void)log;
     const std::string name = "propup_npu_surface_language_hygiene";
     auto t0 = now_ms();
@@ -929,7 +1010,7 @@ hq::propup::PropupResult hq::propup::propup_npu_surface_language_hygiene(std::os
 // === Re-implemented (Round 30): full ground-up quant memory loop with real runtime path + LCMD
 
 // === NEW (final hygiene subagent 019e77a9-d99b-7052-b264-2081e4003455): no "stub"/"minimal innovative deblock"/heuristic language in quant kernels
-hq::propup::PropupResult hq::propup::propup_quant_kernels_no_prohibited_language_in_iq4_path(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_quant_kernels_no_prohibited_language_in_iq4_path([[maybe_unused]] std::ostream* log) {
     (void)log;
     const std::string name = "propup_quant_kernels_no_prohibited_language_in_iq4_path";
     auto t0 = now_ms();
@@ -952,7 +1033,7 @@ hq::propup::PropupResult hq::propup::propup_quant_kernels_no_prohibited_language
 }
 
 // === NEW (final hygiene subagent): no duplicate kernel_matmul_iq4_nl_block definitions
-hq::propup::PropupResult hq::propup::propup_quant_kernels_no_duplicate_iq4_definition(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_quant_kernels_no_duplicate_iq4_definition([[maybe_unused]] std::ostream* log) {
     (void)log;
     const std::string name = "propup_quant_kernels_no_duplicate_iq4_definition";
     auto t0 = now_ms();
@@ -973,7 +1054,7 @@ hq::propup::PropupResult hq::propup::propup_quant_kernels_no_duplicate_iq4_defin
 }
 
 // === NEW PROPUP: Linux Level Zero graceful dynamic discovery + real numbers when present
-hq::propup::PropupResult hq::propup::propup_intel_npu_telemetry_linux_levelzero_graceful(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_intel_npu_telemetry_linux_levelzero_graceful([[maybe_unused]] std::ostream* log) {
     (void)log;
     const std::string name = "propup_intel_npu_telemetry_linux_levelzero_graceful";
     auto t0 = now_ms();
@@ -1010,7 +1091,7 @@ hq::propup::PropupResult hq::propup::propup_intel_npu_telemetry_linux_levelzero_
 // Intel NPU Telemetry validation suite (reconstructed — Phase 2)
 // ===========================================================================
 
-hq::propup::PropupResult hq::propup::propup_intel_npu_telemetry_construction(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_intel_npu_telemetry_construction([[maybe_unused]] std::ostream* log) {
     (void)log;
     const std::string name = "propup_intel_npu_telemetry_construction";
     auto t0 = now_ms();
@@ -1026,7 +1107,7 @@ hq::propup::PropupResult hq::propup::propup_intel_npu_telemetry_construction(std
     return res;
 }
 
-hq::propup::PropupResult hq::propup::propup_intel_npu_telemetry_graceful_unavailable(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_intel_npu_telemetry_graceful_unavailable([[maybe_unused]] std::ostream* log) {
     (void)log;
     const std::string name = "propup_intel_npu_telemetry_graceful_unavailable";
     auto t0 = now_ms();
@@ -1046,7 +1127,7 @@ hq::propup::PropupResult hq::propup::propup_intel_npu_telemetry_graceful_unavail
     return res;
 }
 
-hq::propup::PropupResult hq::propup::propup_intel_npu_telemetry_source_description(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_intel_npu_telemetry_source_description([[maybe_unused]] std::ostream* log) {
     (void)log;
     const std::string name = "propup_intel_npu_telemetry_source_description";
     auto t0 = now_ms();
@@ -1067,7 +1148,7 @@ hq::propup::PropupResult hq::propup::propup_intel_npu_telemetry_source_descripti
     return res;
 }
 
-hq::propup::PropupResult hq::propup::propup_intel_npu_telemetry_repeated_calls_safe(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_intel_npu_telemetry_repeated_calls_safe([[maybe_unused]] std::ostream* log) {
     (void)log;
     const std::string name = "propup_intel_npu_telemetry_repeated_calls_safe";
     auto t0 = now_ms();
@@ -1085,7 +1166,7 @@ hq::propup::PropupResult hq::propup::propup_intel_npu_telemetry_repeated_calls_s
     return res;
 }
 
-hq::propup::PropupResult hq::propup::propup_intel_npu_telemetry_backend_integration(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_intel_npu_telemetry_backend_integration([[maybe_unused]] std::ostream* log) {
     (void)log;
     const std::string name = "propup_intel_npu_telemetry_backend_integration";
     auto t0 = now_ms();
@@ -1106,7 +1187,7 @@ hq::propup::PropupResult hq::propup::propup_intel_npu_telemetry_backend_integrat
     return res;
 }
 
-hq::propup::PropupResult hq::propup::propup_intel_npu_telemetry_discovery_does_not_crash(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_intel_npu_telemetry_discovery_does_not_crash([[maybe_unused]] std::ostream* log) {
     (void)log;
     const std::string name = "propup_intel_npu_telemetry_discovery_does_not_crash";
     auto t0 = now_ms();
@@ -1121,7 +1202,7 @@ hq::propup::PropupResult hq::propup::propup_intel_npu_telemetry_discovery_does_n
     return res;
 }
 
-hq::propup::PropupResult hq::propup::propup_intel_npu_telemetry_real_source_flag_consistent(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_intel_npu_telemetry_real_source_flag_consistent([[maybe_unused]] std::ostream* log) {
     (void)log;
     const std::string name = "propup_intel_npu_telemetry_real_source_flag_consistent";
     auto t0 = now_ms();
@@ -1143,7 +1224,7 @@ hq::propup::PropupResult hq::propup::propup_intel_npu_telemetry_real_source_flag
     return res;
 }
 
-hq::propup::PropupResult hq::propup::propup_intel_npu_telemetry_with_tmm_athenea_shape(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_intel_npu_telemetry_with_tmm_athenea_shape([[maybe_unused]] std::ostream* log) {
     (void)log;
     const std::string name = "propup_intel_npu_telemetry_with_tmm_athenea_shape";
     auto t0 = now_ms();
@@ -1175,7 +1256,7 @@ hq::propup::PropupResult hq::propup::propup_intel_npu_telemetry_with_tmm_athenea
     return res;
 }
 
-hq::propup::PropupResult hq::propup::propup_intel_npu_telemetry_during_tier_migration(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_intel_npu_telemetry_during_tier_migration([[maybe_unused]] std::ostream* log) {
     (void)log;
     const std::string name = "propup_intel_npu_telemetry_during_tier_migration";
     auto t0 = now_ms();
@@ -1205,7 +1286,7 @@ hq::propup::PropupResult hq::propup::propup_intel_npu_telemetry_during_tier_migr
     return res;
 }
 
-hq::propup::PropupResult hq::propup::propup_intel_npu_telemetry_sustained_sampling(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_intel_npu_telemetry_sustained_sampling([[maybe_unused]] std::ostream* log) {
     (void)log;
     const std::string name = "propup_intel_npu_telemetry_sustained_sampling";
     auto t0 = now_ms();
@@ -1223,7 +1304,7 @@ hq::propup::PropupResult hq::propup::propup_intel_npu_telemetry_sustained_sampli
     return res;
 }
 
-hq::propup::PropupResult hq::propup::propup_runtime_memory_loop_60s_lcmd(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_runtime_memory_loop_60s_lcmd([[maybe_unused]] std::ostream* log) {
     (void)log;
     const std::string name = "propup_runtime_memory_loop_60s_lcmd";
     auto t0 = now_ms();
@@ -1559,6 +1640,113 @@ hq::propup::PropupResult hq::propup::propup_round23_diagnostic_accessors_no_fake
 }
 
 // ===========================================================================
+// Concept enforcement propup
+// ===========================================================================
+
+hq::propup::PropupResult hq::propup::propup_concepts_enforced_in_headers([[maybe_unused]] std::ostream* log) {
+    const std::string name = "propup_concepts_enforced_in_headers";
+    auto t0 = now_ms();
+
+    // Verify that concept-constrained templates reject invalid types at compile time.
+    // We test this by static_assert on concept predicates and by checking that
+    // valid instantiations compile and run.
+    static_assert(hq::HqScalar<float>);
+    static_assert(hq::HqScalar<std::int8_t>);
+    static_assert(hq::HqScalar<std::byte>);
+    static_assert(!hq::HqScalar<std::vector<float>>);
+
+    static_assert(hq::HqBuffer<std::vector<float>>);
+    static_assert(hq::HqBuffer<std::span<float>>);
+    static_assert(!hq::HqBuffer<float>);
+
+    static_assert(hq::HqQuantized<std::int8_t>);
+    static_assert(hq::HqQuantized<float>);
+    static_assert(!hq::HqQuantized<double>);
+
+    static_assert(hq::HqCoroValue<float>);
+    static_assert(hq::HqCoroValue<void>);
+
+    static_assert(hq::HqGeneratorValue<float>);
+    static_assert(!hq::HqGeneratorValue<void>);
+
+    static_assert(hq::HqChronoRep<int>);
+    static_assert(hq::HqChronoRep<double>);
+    static_assert(!hq::HqChronoRep<std::string>);
+
+    static_assert(hq::HqChronoPeriod<std::ratio<1, 1000>>);
+    static_assert(!hq::HqChronoPeriod<float>);
+
+    // Verify that valid template instantiations still work
+    hq::tensor::TensorView<float, 1> valid_view(nullptr, 4);
+    (void)valid_view;
+
+    auto elapsed = now_ms() - t0;
+    return {true, false, name, "All concept constraints enforced correctly", elapsed};
+}
+
+// ===========================================================================
+// std::expected monadic chain validation
+// ===========================================================================
+
+static hq::Expected<int> make_expected_int(int x) {
+    return x;
+}
+
+static hq::Expected<int> expected_double_it(int x) {
+    return x * 2;
+}
+
+static hq::Expected<int> expected_fail_always() {
+    return std::unexpected{hq::CerberusError::Unknown};
+}
+
+hq::propup::PropupResult hq::propup::propup_expected_chains_valid([[maybe_unused]] std::ostream* log) {
+    // and_then chain success
+    auto r1 = make_expected_int(5)
+        .and_then(expected_double_it)
+        .and_then(expected_double_it);
+    if (!r1.has_value() || r1.value() != 20) {
+        return PropupResult::fail("propup_expected_chains_valid", "and_then chain failed");
+    }
+
+    // or_else on error
+    auto r2 = expected_fail_always().or_else([](hq::CerberusError e) -> hq::Expected<int> {
+        if (e == hq::CerberusError::Unknown) return 42;
+        return std::unexpected{e};
+    });
+    if (!r2.has_value() || r2.value() != 42) {
+        return PropupResult::fail("propup_expected_chains_valid", "or_else recovery failed");
+    }
+
+    // transform
+    auto r3 = make_expected_int(3).transform([](int x){ return x + 1; });
+    if (!r3.has_value() || r3.value() != 4) {
+        return PropupResult::fail("propup_expected_chains_valid", "transform failed");
+    }
+
+    // ExpectedVoid and_then
+    hq::ExpectedVoid ok = {};
+    auto r4 = ok.and_then([]() -> hq::ExpectedVoid {
+        return {};
+    });
+    if (!r4.has_value()) {
+        return PropupResult::fail("propup_expected_chains_valid", "ExpectedVoid and_then failed");
+    }
+
+    // ExpectedVoid or_else
+    hq::ExpectedVoid bad = std::unexpected{hq::CerberusError::Unknown};
+    auto r5 = bad.or_else([](hq::CerberusError e) -> hq::ExpectedVoid {
+        if (e == hq::CerberusError::Unknown) return {};
+        return std::unexpected{e};
+    });
+    if (!r5.has_value()) {
+        return PropupResult::fail("propup_expected_chains_valid", "ExpectedVoid or_else failed");
+    }
+
+    return PropupResult::pass("propup_expected_chains_valid");
+}
+
+// ===========================================================================
 // Round 24: Strategic Re-enablement of High-Value Disabled Propups
 // These replace vague "synthetic hygiene" comments with real, runtime-based tests
 // focused on the 70-75% NPU Memory Loop KPI.
@@ -1572,11 +1760,11 @@ hq::propup::PropupResult hq::propup::propup_round23_diagnostic_accessors_no_fake
 
 
 
-hq::propup::PropupReport hq::propup::run_all_propups(std::ostream* log) {
+hq::propup::PropupReport hq::propup::run_all_propups() {
     PropupReport report;
     auto run_one = [&](auto fn, const std::string& name_hint = "") {
         try {
-            auto r = fn(log);
+            auto r = fn(nullptr);
             report.results.push_back(r);
             if (r.skipped) {
                 ++report.skipped_verbose_count;
@@ -1586,17 +1774,23 @@ hq::propup::PropupReport hq::propup::run_all_propups(std::ostream* log) {
                 ++report.failed_count;
             }
             report.total_ms += r.elapsed_ms;
-            if (log) { *log << std::flush; }
+            // ostream flush removed — no longer needed
         } catch (const std::bad_alloc& e) {
-            if (log) *log << "[PROPUP] " << (name_hint.empty() ? "<unknown>" : name_hint) << " FAILED — std::bad_alloc: " << e.what() << "\n";
+            auto s = std::format("[PROPUP] {} FAILED — std::bad_alloc: {}\n",
+                         name_hint.empty() ? "<unknown>" : name_hint, e.what());
+            hq_safe_write(1, s.data(), s.size());
             report.results.push_back(PropupResult::fail(name_hint.empty() ? "<enter>" : name_hint, e.what()));
             ++report.failed_count;
         } catch (const std::exception& e) {
-            if (log) *log << "[PROPUP] " << (name_hint.empty() ? "<unknown>" : name_hint) << " FAILED — exception: " << e.what() << "\n";
+            auto s = std::format("[PROPUP] {} FAILED — exception: {}\n",
+                         name_hint.empty() ? "<unknown>" : name_hint, e.what());
+            hq_safe_write(1, s.data(), s.size());
             report.results.push_back(PropupResult::fail(name_hint.empty() ? "<error>" : name_hint, e.what()));
             ++report.failed_count;
         } catch (...) {
-            if (log) *log << "[PROPUP] " << (name_hint.empty() ? "<unknown>" : name_hint) << " FAILED — unknown exception\n";
+            auto s = std::format("[PROPUP] {} FAILED — unknown exception\n",
+                         name_hint.empty() ? "<unknown>" : name_hint);
+            hq_safe_write(1, s.data(), s.size());
             report.results.push_back(PropupResult::fail(name_hint.empty() ? "<error>" : name_hint, "unknown exception"));
             ++report.failed_count;
         }
@@ -1622,6 +1816,7 @@ hq::propup::PropupReport hq::propup::run_all_propups(std::ostream* log) {
     // Mega suite
     run_one(propup_kernel_relu, "propup_kernel_relu");
     run_one(propup_kernel_sigmoid, "propup_kernel_sigmoid");
+    run_one(propup_ranges_adopted_in_kernels, "propup_ranges_adopted_in_kernels");
 
     // Adversarial robustness suite
 
@@ -1724,6 +1919,8 @@ hq::propup::PropupReport hq::propup::run_all_propups(std::ostream* log) {
     run_one(propup_round23_runtime_coordinator_present, "propup_round23_runtime_coordinator_present");
     run_one(propup_round23_lcmd_only_via_runtime_accessor, "propup_round23_lcmd_only_via_runtime_accessor");
     run_one(propup_round23_diagnostic_accessors_no_fake_db, "propup_round23_diagnostic_accessors_no_fake_db");
+    run_one(propup_concepts_enforced_in_headers, "propup_concepts_enforced_in_headers");
+    run_one(propup_expected_chains_valid, "propup_expected_chains_valid");
 
     // Round 24: Re-enabled / re-implemented high-value NPU memory loop propups
 
@@ -1749,23 +1946,38 @@ hq::propup::PropupReport hq::propup::run_all_propups(std::ostream* log) {
     return report;
 }
 
-void hq::propup::PropupReport::print(std::ostream& out) const {
-    out << "\n=== David Propup Engine Report ===\n";
+void hq::propup::PropupReport::print() const {
+    {
+        auto s = std::format("\n=== David Propup Engine Report ===\n");
+        hq_safe_write(1, s.data(), s.size());
+    }
     for (const auto& r : results) {
         const char* status = r.skipped ? "SKIP" : (r.passed ? "PASS" : "FAIL");
-        out << "  [" << status << "] " << r.name;
+        auto s = std::format("  [{}] {} ({} ms)", status, r.name, r.elapsed_ms);
         if ((!r.passed || r.skipped) && !r.diagnostic.empty())
-            out << " | " << r.diagnostic;
-        out << " (" << r.elapsed_ms << " ms)\n";
+            s += std::format(" | {}", r.diagnostic);
+        s += '\n';
+        hq_safe_write(1, s.data(), s.size());
     }
-    out << "-----------------------------------\n";
-    out << "  TOTAL: " << passed_count << "/" << results.size()
-       << " passed in " << total_ms << " ms";
-    if (skipped_verbose_count > 0)
-        out << " (" << skipped_verbose_count << " skipped)";
-    out << "\n";
-    out << "  STATUS: " << (all_passed() ? "ALL CLEAR" : "BLOCKERS DETECTED") << "\n";
-    out << "===================================\n";
+    {
+        auto s = std::format("-----------------------------------\n");
+        hq_safe_write(1, s.data(), s.size());
+    }
+    {
+        auto s = std::format("  TOTAL: {}/{} passed in {} ms", passed_count, results.size(), total_ms);
+        if (skipped_verbose_count > 0)
+            s += std::format(" ({} skipped)", skipped_verbose_count);
+        s += '\n';
+        hq_safe_write(1, s.data(), s.size());
+    }
+    {
+        auto s = std::format("  STATUS: {}\n", all_passed() ? "ALL CLEAR" : "BLOCKERS DETECTED");
+        hq_safe_write(1, s.data(), s.size());
+    }
+    {
+        auto s = std::format("===================================\n");
+        hq_safe_write(1, s.data(), s.size());
+    }
 } // end of run_all_propups / report
 
 

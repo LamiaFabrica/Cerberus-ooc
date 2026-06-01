@@ -22,6 +22,7 @@
 #include "hq/cerberus_graph_engine.hpp"
 #include "hq/cerberus_native_kernels.hpp"
 #include "hq/tiered_memory_manager.hpp"
+#include "hq/cerberus_error.hpp"
 
 #include <vector>
 #include <string>
@@ -74,7 +75,7 @@ public:
 
     /// Analyse the graph and produce an ordered execution plan.
     /// Modifies graph node routing fields in-place.
-    [[nodiscard]] std::vector<ExecutionStep>
+    [[nodiscard]] hq::Expected<std::vector<ExecutionStep>>
     analyse(CerberusGraph& graph, std::string_view target_name);
 
     /// Re-evaluate a single step under current memory pressure (can demote tier).
