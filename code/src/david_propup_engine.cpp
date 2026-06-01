@@ -2878,8 +2878,8 @@ hq::propup::PropupReport hq::propup::run_all_propups(std::ostream* log) {
     // Heavy tier tests omitted — heap corruption with TMM promote/demote
 
     // Mega suite
-    // run_one(propup_kernel_relu, "propup_kernel_relu");
-    // run_one(propup_kernel_sigmoid, "propup_kernel_sigmoid");
+    run_one(propup_kernel_relu, "propup_kernel_relu");
+    run_one(propup_kernel_sigmoid, "propup_kernel_sigmoid");
 
     // Adversarial robustness suite
 
@@ -2933,7 +2933,7 @@ hq::propup::PropupReport hq::propup::run_all_propups(std::ostream* log) {
     // NEW Extension edge negatives
 
     // FINAL 12 — reach 200+
-    // run_one(propup_lcmd_offline_sync_count, "propup_lcmd_offline_sync_count");
+    run_one(propup_lcmd_offline_sync_count, "propup_lcmd_offline_sync_count");
 
     // Inference audit + RBPC surface (new production stage — every handler path + gate tested)
 
