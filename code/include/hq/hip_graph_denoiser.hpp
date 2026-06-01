@@ -226,7 +226,14 @@ private:
     // ========================================================================
     // Persistent pinned host buffer for step scalars (C12 fix)
     // ========================================================================
-    struct DdimDeviceParams;
+    // DdimDeviceParams is defined here (not forward-declared) to avoid ODR
+    // violations: the .cpp defines it with __align__(16), which would give
+    // a different size/alignment in the header if left as an incomplete type.
+    struct DdimDeviceParams {
+        float coeff_x0{0.0f};
+        float coeff_eps{0.0f};
+        float padding[2]{};
+    };
     DdimDeviceParams* h_pinned_params_{nullptr};
 
     // ========================================================================

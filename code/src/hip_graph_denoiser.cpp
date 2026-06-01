@@ -67,11 +67,8 @@ namespace hq {
 // ===========================================================================
 #ifdef __HIP_PLATFORM_AMD__
 
-struct __align__(16) DdimDeviceParams {
-    float coeff_x0{0.0f};
-    float coeff_eps{0.0f};
-    float padding[2]{};
-};
+// DdimDeviceParams is now defined in hip_graph_denoiser.hpp (not here)
+// to avoid ODR violations between header and implementation.
 
 __global__ void ddim_update_kernel(float* __restrict__ latents,
                                     const float* __restrict__ noise_pred,
