@@ -36,6 +36,8 @@ desktop.ini
 *.tmp
 *.bak
 *.bak2
+*.bak3
+*.orig
 *.swp
 *~
 
