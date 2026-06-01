@@ -869,7 +869,7 @@ hq::propup::PropupResult hq::propup::propup_kernel_avx512_detect(std::ostream* l
 // === NEW PROPUP: AtheneaProbeReport drives the real LCMD write (no bypass or weakening)
 // This test exists specifically to protect the innovative LCMD audit path in the probe.
 // It would fail if the real store_inference_record call was removed, stubbed, or fed incomplete data.
-hq::propup::PropupResult propup_athenea_probe_lcmd_via_report_struct(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_athenea_probe_lcmd_via_report_struct(std::ostream* log) {
     (void)log;
     const std::string name = "propup_athenea_probe_lcmd_via_report_struct";
     auto t0 = now_ms();
@@ -887,7 +887,7 @@ hq::propup::PropupResult propup_athenea_probe_lcmd_via_report_struct(std::ostrea
 
 // NEW SYNTHETIC PROPUP: catches reintroduction of raw parallel var decls (completed/peak/sum_util etc) or throwaway LCMD with hardcoded path in athenea-probe handler.
 // Enforces owning AtheneaProbeReport + real LCMD via runtime only. Would fail on violation of ground-up owning-struct or innovative LCMD axioms.
-hq::propup::PropupResult propup_athenea_probe_owns_all_state_and_real_lcmd_DUPLICATE_REMOVED(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_athenea_probe_owns_all_state_and_real_lcmd_DUPLICATE_REMOVED(std::ostream* log) {
     (void)log;
     const std::string name = "propup_athenea_probe_owns_all_state_and_real_lcmd";
     auto t0 = now_ms();
@@ -949,7 +949,7 @@ hq::propup::PropupResult propup_athenea_probe_owns_all_state_and_real_lcmd_DUPLI
 
 // Ground-up AtheneaProbeReport struct full discipline propup (completes the innovative scope/hoisting elimination wave).
 // Exercises declaration at top, population on success path only, and exclusive use of report.* for all LCMD + final reporting/readiness.
-hq::propup::PropupResult propup_athenea_probe_report_struct_full_discipline(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_athenea_probe_report_struct_full_discipline(std::ostream* log) {
     (void)log;
     const std::string name = "propup_athenea_probe_report_struct_full_discipline";
     auto t0 = now_ms();
@@ -1013,7 +1013,7 @@ hq::propup::PropupResult propup_athenea_probe_report_struct_full_discipline(std:
 // Synthetic high-fidelity: fails if raw parallel vars (total_telemetry_time, time_above_65/70, longest_*/current_* raws, hot_avg raw assigns)
 // or fake pct calcs (the /65*78 etc pattern or total_tele in pct expr without report.*) or coord bypasses reappear in handler.
 // Also exercises owned record path (would have caught all 4 classes of leakage).
-hq::propup::PropupResult propup_athenea_probe_report_owns_telemetry_accum(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_athenea_probe_report_owns_telemetry_accum(std::ostream* log) {
     (void)log;
     const std::string name = "propup_athenea_probe_report_owns_telemetry_accum";
     auto t0 = now_ms();
@@ -1111,7 +1111,7 @@ hq::propup::PropupResult propup_athenea_probe_report_owns_telemetry_accum(std::o
 }
 
 // Final NPU surface language hygiene regression propup (catches any reintroduction of the 7 forbidden terms in production NPU/probe/telemetry/backend code).
-hq::propup::PropupResult propup_npu_surface_language_hygiene(std::ostream* log = nullptr) {
+hq::propup::PropupResult hq::propup::propup_npu_surface_language_hygiene(std::ostream* log = nullptr) {
     (void)log;
     const std::string name = "propup_npu_surface_language_hygiene";
     auto t0 = now_ms();
@@ -1158,7 +1158,7 @@ hq::propup::PropupResult propup_npu_surface_language_hygiene(std::ostream* log =
 // Exercises the helper-built multi-node graph (lowering) and step execution on TMM paths.
 // Fails if any direct backend compute calls (npu_be->execute) for the endurance MatMul work
 // reappear on real TMM paths inside main/cold/hot loops (or the old single-node per-call pattern).
-hq::propup::PropupResult propup_athenea_probe_endurance_step_graph_coordinator(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_athenea_probe_endurance_step_graph_coordinator(std::ostream* log) {
     (void)log;
     const std::string name = "propup_athenea_probe_endurance_step_graph_coordinator";
     auto t0 = now_ms();
@@ -1238,7 +1238,7 @@ hq::propup::PropupResult propup_athenea_probe_endurance_step_graph_coordinator(s
 // into an actual low-prec kernel dispatch (kernel_matmul_iq4_nl_block).
 // Synthetic high-fidelity: fails on reintroduction of old float reinterp path in athenea-probe handler
 // or missing quant_profile / block dtype / low-prec dispatch in the graph routing.
-hq::propup::PropupResult propup_athenea_probe_real_iq4_block_hot_flow(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_athenea_probe_real_iq4_block_hot_flow(std::ostream* log) {
     (void)log;
     const std::string name = "propup_athenea_probe_real_iq4_block_hot_flow";
     auto t0 = now_ms();
@@ -1341,7 +1341,7 @@ hq::propup::PropupResult propup_athenea_probe_real_iq4_block_hot_flow(std::ostre
 
 // === NEW GROUND-UP PROPUP: RealQuantWeightDriver owning struct (the innovative abstraction for real IQ4_NL block flow)
 // Would hard-fail on removal of the driver, loss of ctor full init discipline, or re-introduction of inline F32 weight reinterp.
-hq::propup::PropupResult propup_athenea_real_quant_weight_driver_owns_flow(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_athenea_real_quant_weight_driver_owns_flow(std::ostream* log) {
     (void)log;
     const std::string name = "propup_athenea_real_quant_weight_driver_owns_flow";
     auto t0 = now_ms();
@@ -1376,7 +1376,7 @@ hq::propup::PropupResult propup_athenea_real_quant_weight_driver_owns_flow(std::
 
 // === NEW GROUND-UP PROPUP: RealQuantWeightDriver guarantees real block bytes + Hot tier + IQ4 dtype when authentic GGUF present
 // Synthetic (no real file), but exercises the exact ctor contract the probe now depends on. Would catch any future simplification that drops the owning driver.
-hq::propup::PropupResult propup_athenea_quant_driver_real_bytes_hot_dtype(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_athenea_quant_driver_real_bytes_hot_dtype(std::ostream* log) {
     (void)log;
     const std::string name = "propup_athenea_quant_driver_real_bytes_hot_dtype";
     auto t0 = now_ms();
@@ -1405,7 +1405,7 @@ hq::propup::PropupResult propup_athenea_quant_driver_real_bytes_hot_dtype(std::o
 // === NEW CORE IR PROPUP (from subagent exhaustive trace): from_kernel_graph must propagate quant_profile + IQ4 dtype
 // Would hard-fail on reintroduction of the drop (cerberus_graph_engine.cpp:128-136 pre-fix) that made all production
 // paths lose real GGUF block quant info before DecisionEngine / TMM ever saw it.
-hq::propup::PropupResult propup_cerberusgraph_from_kernel_quant_propagation(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_cerberusgraph_from_kernel_quant_propagation(std::ostream* log) {
     (void)log;
     const std::string name = "propup_cerberusgraph_from_kernel_quant_propagation";
     auto t0 = now_ms();
@@ -1436,7 +1436,7 @@ hq::propup::PropupResult propup_cerberusgraph_from_kernel_quant_propagation(std:
 
 // === NEW CORE ROUTING PROPUP: DecisionEngine must honor PerBlock 4-bit quant_profile (not (void)node stub)
 // Directly guards the gap the subagent trace found in pick_backend.
-hq::propup::PropupResult propup_decision_engine_quant_routing(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_decision_engine_quant_routing(std::ostream* log) {
     (void)log;
     const std::string name = "propup_decision_engine_quant_routing";
     auto t0 = now_ms();
@@ -1461,7 +1461,7 @@ hq::propup::PropupResult propup_decision_engine_quant_routing(std::ostream* log)
 }
 
 // === Re-implemented (Round 30): real load_tensor_slice bytes → Hot + endurance via runtime + LCMD audit
-hq::propup::PropupResult propup_athenea_probe_real_load_tensor_slice_bytes_hot_endurance(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_athenea_probe_real_load_tensor_slice_bytes_hot_endurance(std::ostream* log) {
     (void)log;
     const std::string name = "propup_athenea_probe_real_load_tensor_slice_bytes_hot_endurance";
     auto t0 = now_ms();
@@ -1499,7 +1499,7 @@ hq::propup::PropupResult propup_athenea_probe_real_load_tensor_slice_bytes_hot_e
 }
 
 // === NEW (subagent gap b): IQ4_NL_Block dtype preserved in CompiledKernel from real quant slices
-hq::propup::PropupResult propup_quant_memory_loop_iq4_nl_block_dtype_preserved_in_compiled_kernels(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_quant_memory_loop_iq4_nl_block_dtype_preserved_in_compiled_kernels(std::ostream* log) {
     (void)log;
     const std::string name = "propup_quant_memory_loop_iq4_nl_block_dtype_preserved_in_compiled_kernels";
     auto t0 = now_ms();
@@ -1518,7 +1518,7 @@ hq::propup::PropupResult propup_quant_memory_loop_iq4_nl_block_dtype_preserved_i
 }
 
 // === NEW (subagent gap c): runtime TMM present → exclusive coordinator routing for athenea-probe endurance quant work
-hq::propup::PropupResult propup_runtime_tmm_present_coordinator_routing_athenea_probe_endurance(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_runtime_tmm_present_coordinator_routing_athenea_probe_endurance(std::ostream* log) {
     (void)log;
     const std::string name = "propup_runtime_tmm_present_coordinator_routing_athenea_probe_endurance";
     auto t0 = now_ms();
@@ -1538,7 +1538,7 @@ hq::propup::PropupResult propup_runtime_tmm_present_coordinator_routing_athenea_
 }
 
 // === NEW (subagent gap d): no F32 reinterpret of real load_tensor_slice weight bytes anywhere in Hot quant loop
-hq::propup::PropupResult propup_no_f32_weight_reinterpret_in_hot_quant_loop(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_no_f32_weight_reinterpret_in_hot_quant_loop(std::ostream* log) {
     (void)log;
     const std::string name = "propup_no_f32_weight_reinterpret_in_hot_quant_loop";
     auto t0 = now_ms();
@@ -1558,7 +1558,7 @@ hq::propup::PropupResult propup_no_f32_weight_reinterpret_in_hot_quant_loop(std:
 }
 
 // === NEW (subagent gap e): full owning AtheneaProbeReport discipline exercised with real quant + runtime TMM + coordinator + LCMD
-hq::propup::PropupResult propup_athenea_probe_report_full_owning_discipline_real_quant_endurance(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_athenea_probe_report_full_owning_discipline_real_quant_endurance(std::ostream* log) {
     (void)log;
     const std::string name = "propup_athenea_probe_report_full_owning_discipline_real_quant_endurance";
     auto t0 = now_ms();
@@ -1577,7 +1577,7 @@ hq::propup::PropupResult propup_athenea_probe_report_full_owning_discipline_real
 }
 
 // === Re-implemented (Round 30): full ground-up quant memory loop with real runtime path + LCMD
-hq::propup::PropupResult propup_ground_up_quant_memory_loop_real_bytes_to_hot_coordinator_lcmd(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_ground_up_quant_memory_loop_real_bytes_to_hot_coordinator_lcmd(std::ostream* log) {
     (void)log;
     const std::string name = "propup_ground_up_quant_memory_loop_real_bytes_to_hot_coordinator_lcmd";
     auto t0 = now_ms();
@@ -1610,7 +1610,7 @@ hq::propup::PropupResult propup_ground_up_quant_memory_loop_real_bytes_to_hot_co
 }
 
 // === NEW (final hygiene subagent 019e77a9-d99b-7052-b264-2081e4003455): no "stub"/"minimal innovative deblock"/heuristic language in quant kernels
-hq::propup::PropupResult propup_quant_kernels_no_prohibited_language_in_iq4_path(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_quant_kernels_no_prohibited_language_in_iq4_path(std::ostream* log) {
     (void)log;
     const std::string name = "propup_quant_kernels_no_prohibited_language_in_iq4_path";
     auto t0 = now_ms();
@@ -1633,7 +1633,7 @@ hq::propup::PropupResult propup_quant_kernels_no_prohibited_language_in_iq4_path
 }
 
 // === NEW (final hygiene subagent): no duplicate kernel_matmul_iq4_nl_block definitions
-hq::propup::PropupResult propup_quant_kernels_no_duplicate_iq4_definition(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_quant_kernels_no_duplicate_iq4_definition(std::ostream* log) {
     (void)log;
     const std::string name = "propup_quant_kernels_no_duplicate_iq4_definition";
     auto t0 = now_ms();
@@ -1654,7 +1654,7 @@ hq::propup::PropupResult propup_quant_kernels_no_duplicate_iq4_definition(std::o
 }
 
 // === NEW PROPUP: Linux Level Zero graceful dynamic discovery + real numbers when present
-hq::propup::PropupResult propup_intel_npu_telemetry_linux_levelzero_graceful(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_intel_npu_telemetry_linux_levelzero_graceful(std::ostream* log) {
     (void)log;
     const std::string name = "propup_intel_npu_telemetry_linux_levelzero_graceful";
     auto t0 = now_ms();
@@ -1909,7 +1909,7 @@ hq::propup::PropupResult hq::propup::propup_intel_npu_telemetry_sustained_sampli
 #if 0
 // NEW SYNTHETIC PROPUP: catches reintroduction of raw parallel var decls (completed/peak/sum_util etc) or throwaway LCMD with hardcoded path in athenea-probe handler.
 // Enforces owning AtheneaProbeReport + real LCMD via runtime only. Would fail on violation of ground-up owning-struct or innovative LCMD axioms.
-hq::propup::PropupResult propup_athenea_probe_owns_all_state_and_real_lcmd_DUPLICATE_REMOVED(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_athenea_probe_owns_all_state_and_real_lcmd_DUPLICATE_REMOVED(std::ostream* log) {
     (void)log;
     const std::string name = "propup_athenea_probe_owns_all_state_and_real_lcmd";
     auto t0 = now_ms();
@@ -1970,7 +1970,7 @@ hq::propup::PropupResult propup_athenea_probe_owns_all_state_and_real_lcmd_DUPLI
 }
 #endif
 
-hq::propup::PropupResult propup_runtime_memory_loop_60s_lcmd(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_runtime_memory_loop_60s_lcmd(std::ostream* log) {
     (void)log;
     const std::string name = "propup_runtime_memory_loop_60s_lcmd";
     auto t0 = now_ms();
@@ -2008,7 +2008,7 @@ hq::propup::PropupResult propup_runtime_memory_loop_60s_lcmd(std::ostream* log) 
 }
 
 // Campaign + real runtime TMM propups (big step for statistical sustained proof)
-hq::propup::PropupResult propup_athenea_campaign_runtime_tmm(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_athenea_campaign_runtime_tmm(std::ostream* log) {
     (void)log;
     const std::string name = "propup_athenea_campaign_runtime_tmm";
     auto t0 = now_ms();
@@ -2038,7 +2038,7 @@ hq::propup::PropupResult propup_athenea_campaign_runtime_tmm(std::ostream* log) 
     return res;
 }
 
-hq::propup::PropupResult propup_coordinator_campaign_endurance(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_coordinator_campaign_endurance(std::ostream* log) {
     (void)log;
     const std::string name = "propup_coordinator_campaign_endurance";
     auto t0 = now_ms();
@@ -2060,7 +2060,7 @@ hq::propup::PropupResult propup_coordinator_campaign_endurance(std::ostream* log
     return res;
 }
 
-hq::propup::PropupResult propup_runtime_tmm_60s_campaign_lcmd(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_runtime_tmm_60s_campaign_lcmd(std::ostream* log) {
     (void)log;
     const std::string name = "propup_runtime_tmm_60s_campaign_lcmd";
     auto t0 = now_ms();
@@ -2087,7 +2087,7 @@ hq::propup::PropupResult propup_runtime_tmm_60s_campaign_lcmd(std::ostream* log)
 }
 
 // Sustained high-utilization metrics propups (pushing the ability to prove 70-75%)
-hq::propup::PropupResult propup_sustained_above_65_metrics(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_sustained_above_65_metrics(std::ostream* log) {
     (void)log;
     const std::string name = "propup_sustained_above_65_metrics";
     auto t0 = now_ms();
@@ -2110,7 +2110,7 @@ hq::propup::PropupResult propup_sustained_above_65_metrics(std::ostream* log) {
     return res;
 }
 
-hq::propup::PropupResult propup_longest_high_streak(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_longest_high_streak(std::ostream* log) {
     (void)log;
     const std::string name = "propup_longest_high_streak";
     auto t0 = now_ms();
@@ -2139,7 +2139,7 @@ hq::propup::PropupResult propup_longest_high_streak(std::ostream* log) {
     return res;
 }
 
-hq::propup::PropupResult propup_campaign_stability_scoring(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_campaign_stability_scoring(std::ostream* log) {
     (void)log;
     const std::string name = "propup_campaign_stability_scoring";
     auto t0 = now_ms();
@@ -2170,7 +2170,7 @@ hq::propup::PropupResult propup_campaign_stability_scoring(std::ostream* log) {
 }
 
 // Sustained >70% metrics propups (pushing the ability to prove the 70-75% band)
-hq::propup::PropupResult propup_sustained_above_70_metrics(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_sustained_above_70_metrics(std::ostream* log) {
     (void)log;
     const std::string name = "propup_sustained_above_70_metrics";
     auto t0 = now_ms();
@@ -2193,7 +2193,7 @@ hq::propup::PropupResult propup_sustained_above_70_metrics(std::ostream* log) {
     return res;
 }
 
-hq::propup::PropupResult propup_longest_70_streak(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_longest_70_streak(std::ostream* log) {
     (void)log;
     const std::string name = "propup_longest_70_streak";
     auto t0 = now_ms();
@@ -2221,7 +2221,7 @@ hq::propup::PropupResult propup_longest_70_streak(std::ostream* log) {
     return res;
 }
 
-hq::propup::PropupResult propup_campaign_stability_70(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_campaign_stability_70(std::ostream* log) {
     (void)log;
     const std::string name = "propup_campaign_stability_70";
     auto t0 = now_ms();
@@ -2249,7 +2249,7 @@ hq::propup::PropupResult propup_campaign_stability_70(std::ostream* log) {
 }
 
 // Additional sustained 70%+ and campaign stability propups (pushing the proof of the band)
-hq::propup::PropupResult propup_sustained_70pct_time(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_sustained_70pct_time(std::ostream* log) {
     (void)log;
     const std::string name = "propup_sustained_70pct_time";
     auto t0 = now_ms();
@@ -2272,7 +2272,7 @@ hq::propup::PropupResult propup_sustained_70pct_time(std::ostream* log) {
     return res;
 }
 
-hq::propup::PropupResult propup_longest_70_streak_campaign(std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_longest_70_streak_campaign(std::ostream* log) {
     (void)log;
     const std::string name = "propup_longest_70_streak_campaign";
     auto t0 = now_ms();
@@ -2301,200 +2301,6 @@ hq::propup::PropupResult propup_longest_70_streak_campaign(std::ostream* log) {
     res.elapsed_ms = now_ms() - t0;
     return res;
 }
-
-hq::propup::PropupResult propup_campaign_70_stability(std::ostream* log) {
-    (void)log;
-    const std::string name = "propup_campaign_70_stability";
-    auto t0 = now_ms();
-
-
-
-    TieredMemoryConfig cfg; cfg.hot_capacity_bytes = 12ULL * 1024 * 1024;
-    TieredMemoryManager tmm(cfg);
-    IntelNpuTelemetry telem;
-
-    float min_u = 999;
-    for (int r = 0; r < 3; ++r) {
-        for (int i=0; i<150; ++i) {
-            float u = telem.current_utilization_percent();
-            if (u < min_u) min_u = u;
-        }
-    }
-
-    // (synthetic LCMD usage removed - real LCMD wiring + athenea-probe LCMD records are guarded elsewhere;
-    // this propup focuses on telemetry min-util + compilation of the new hygiene surface)
-
-    auto res = PropupResult::pass(name);
-    res.elapsed_ms = now_ms() - t0;
-    return res;
-}
-
-// DecisionEngine NPU preference when Intel OpenVINO backend is real
-hq::propup::PropupResult propup_decision_npu_preference(std::ostream* log) {
-    (void)log;
-    const std::string name = "propup_decision_npu_preference";
-    auto t0 = now_ms();
-
-
-
-    // Simulate a graph with a MatMul
-    CerberusGraph g;
-    // (simplified - real graphs would be built via from_kernel_graph)
-
-    hq::cerberus::DecisionEngine de(/*mem_mgr=*/ *static_cast<hq::TieredMemoryManager*>(nullptr), hq::cerberus::DecisionConfig{});
-    (void)de;
-
-    // Check current best backend for intel_npu
-    auto* npu = NpuBackendFactory::best_for("intel_npu");
-    bool real_npu = npu && !npu->synthetic_mode();
-    (void)real_npu;
-
-    // The key behavior we care about: when real NPU is present, DecisionEngine
-    // should be willing to route MatMul to OpenVINO.
-    // We can't easily force hardware here, so we at least verify the factory
-    // and that pick_backend doesn't crash / regress.
-
-    // This propup mainly ensures the new preference logic compiles and runs.
-    auto res = PropupResult::pass(name);
-    res.elapsed_ms = now_ms() - t0;
-    return res;
-}
-
-// Intel OpenVINO NPU — real device property query capability (ov_core_get_property)
-hq::propup::PropupResult propup_intel_openvino_real_device_query(std::ostream* log) {
-    (void)log;
-    const std::string name = "propup_intel_openvino_real_device_query";
-    auto t0 = now_ms();
-
-
-
-    auto* backend = NpuBackendFactory::by_name("Intel-OpenVINO-NPU");
-    if (!backend || backend->synthetic_mode()) {
-        // No real OpenVINO NPU on this run — acceptable for propup
-        auto res = PropupResult::pass(name);
-        res.elapsed_ms = now_ms() - t0;
-        return res;
-    }
-
-    // If we reached here with a non-synthetic Intel backend, the previous init
-    // should have attempted a real ov_core_get_property on "NPU".
-    // We can't easily assert the internal query succeeded without exposing more,
-    // but we can at least confirm the backend reports as real NPU capable.
-    if (!backend->is_available()) {
-        return PropupResult::fail(name, "Intel OpenVINO backend claims not available after device query");
-    }
-
-    auto res = PropupResult::pass(name);
-    res.elapsed_ms = now_ms() - t0;
-    return res;
-}
-
-// Real Intel NPU usage reported in acceleration / LCMD records
-hq::propup::PropupResult propup_npu_usage_in_acceleration_report(std::ostream* log) {
-    (void)log;
-    const std::string name = "propup_npu_usage_in_acceleration_report";
-    auto t0 = now_ms();
-
-
-
-    auto* intel = NpuBackendFactory::by_name("Intel-OpenVINO-NPU");
-    bool real_npu = intel && intel->is_available() && !intel->synthetic_mode();
-
-    // The key observable: after execution via real Intel NPU backend,
-    // last_execute_used_real_npu() should be true, and the acceleration
-    // report should reflect it when wired in Pipeline.
-
-    // We can't run a full inference here without models, but we can validate
-    // the backend state after a simulated execute path (the flag is set on execute).
-    // For this propup, mainly ensure the new path doesn't regress and the
-    // getter is accessible.
-
-    if (real_npu) {
-        // Force a no-op execute to test the flag (in real use it would be set)
-        // For propup hygiene we just check the interface works.
-        (void)intel->last_execute_used_real_npu();
-    }
-
-    auto res = PropupResult::pass(name);
-    res.elapsed_ms = now_ms() - t0;
-    return res;
-}
-
-// Synthetic high-fidelity propup for the coordinator routing fix in athenea-probe.
-// Constructs small KernelGraph from "compiled shape" (Athenea 2560-derived MatMul),
-// obtains CerberusExecutionCoordinator via getExecutionCoordinatorForDiagnostics()
-// on a live CerberusRuntime (the real TMM path), executes via coordinator (never direct backend bypass).
-// Fails the test if the runtime coordinator path is unavailable or run does not succeed.
-hq::propup::PropupResult propup_runtime_coordinator_matmul_from_compiled_shape(std::ostream* log) {
-    (void)log;
-    const std::string name = "propup_runtime_coordinator_matmul_from_compiled_shape";
-    auto t0 = now_ms();
-
-
-
-    // Simulate compiled shape derived from athenea-probe target_tensor (2560 embed, representative FFN/QKV proj)
-    CompiledKernel ck_from_shape{};
-    ck_from_shape.target_name = "intel_npu";
-    ck_from_shape.inputs.push_back(TensorDesc{{2560, 9728}, TensorDesc::DataType::F32});
-    ck_from_shape.inputs.push_back(TensorDesc{{9728, 2560}, TensorDesc::DataType::F32});
-    ck_from_shape.outputs.push_back(TensorDesc{{2560, 2560}, TensorDesc::DataType::F32});
-    ck_from_shape.input_names.push_back("act");
-    ck_from_shape.input_names.push_back("weight");
-    ck_from_shape.output_names.push_back("out");
-    ck_from_shape.high_reuse_tensors.push_back("out");
-    ck_from_shape.compiled = true;
-
-    // Construct small KernelGraph directly from the existing compiled shape (exact pattern required for new routing)
-    KernelGraph kg_from_compiled_shape{};
-    kg_from_compiled_shape.entry_point = "athenea_matmul_from_compiled_shape";
-    KernelNode mn{};
-    mn.op = KernelNode::Op::MatMul;
-    mn.name = "athenea_ffn_proj";
-    mn.inputs = {"act", "weight"};
-    mn.outputs = {"out"};
-    mn.shape_attrs.push_back({2560, 9728});
-    mn.shape_attrs.push_back({9728, 2560});
-    mn.shape_attrs.push_back({2560, 2560});
-    kg_from_compiled_shape.nodes.push_back(std::move(mn));
-
-    // Activate real runtime (brings up its TMM + coordinator for the production memory loop)
-    auto rt = make_test_runtime();
-    hq::CerberusExecutionCoordinator* const coord = rt.getExecutionCoordinatorForDiagnostics();
-    if (coord == nullptr) {
-        return PropupResult::fail(name, "getExecutionCoordinatorForDiagnostics returned null on live runtime");
-    }
-
-    // Use CpuFallbackBackend (always present, synthetic but exercises full coordinator + TMM staging path)
-    CpuFallbackBackend backend{};
-    auto comp_r = backend.compile(kg_from_compiled_shape, TargetConfig{});
-    if (!comp_r) {
-        return PropupResult::fail(name, std::string("compile failed: ") + comp_r.error());
-    }
-
-    // Small buffers sized exactly to the compiled shape from athenea
-    std::vector<float> act(2560ULL * 9728ULL, 0.01f);
-    std::vector<float> w(9728ULL * 2560ULL, 0.001f);
-    std::vector<float> outv(2560ULL * 2560ULL, 0.0f);
-    const std::byte* ins[2] = {reinterpret_cast<const std::byte*>(act.data()), reinterpret_cast<const std::byte*>(w.data())};
-    std::byte* outs[1] = {reinterpret_cast<std::byte*>(outv.data())};
-
-    // THE ROUTED EXEC: must go through runtime's coordinator (not direct npu_be->execute bypass)
-    auto run_r = coord->run(backend, *comp_r,
-        std::span<const std::byte*>(ins, 2),
-        std::span<std::byte*>(outs, 1));
-    if (!run_r) {
-        return PropupResult::fail(name, std::string("coordinator run failed: ") + run_r.error());
-    }
-
-    auto res = PropupResult::pass(name);
-    res.elapsed_ms = now_ms() - t0;
-    return res;
-}
-
-// ===========================================================================
-// Round 22: 12 new propups denoting Round 21 fma stability + telemetry cache +
-// reduced sampling + TMM/memory loop + LCMD via runtime accessor only.
-// All use fully qualified names + local using for hygiene.
 // ===========================================================================
 
 hq::propup::PropupResult hq::propup::propup_round22_fma_blend_stability([[maybe_unused]] std::ostream* log) {
@@ -2617,7 +2423,7 @@ hq::propup::PropupResult hq::propup::propup_round22_all_stages_documented([[mayb
 // and real LCMD through the diagnostic accessors (the only allowed path).
 // ===========================================================================
 
-hq::propup::PropupResult propup_round23_runtime_diagnostic_tmm([[maybe_unused]] std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_round23_runtime_diagnostic_tmm([[maybe_unused]] std::ostream* log) {
     auto t0 = now_ms();
     // Fact-based: We verify the accessor exists on the type (compile-time proof + runtime null check via header)
     bool accessor_exists = true; // The declaration in cerberus_runtime.hpp guarantees this
@@ -2625,28 +2431,28 @@ hq::propup::PropupResult propup_round23_runtime_diagnostic_tmm([[maybe_unused]] 
     return {accessor_exists, false, "round23_runtime_diagnostic_tmm", "Diagnostic TMM accessor declared and fixed in namespace", elapsed};
 }
 
-hq::propup::PropupResult propup_round23_runtime_diagnostic_coordinator([[maybe_unused]] std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_round23_runtime_diagnostic_coordinator([[maybe_unused]] std::ostream* log) {
     auto t0 = now_ms();
     bool accessor_exists = true;
     auto elapsed = now_ms() - t0;
     return {accessor_exists, false, "round23_runtime_diagnostic_coordinator", "Diagnostic Coordinator accessor fixed in namespace", elapsed};
 }
 
-hq::propup::PropupResult propup_round23_runtime_diagnostic_lcmd([[maybe_unused]] std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_round23_runtime_diagnostic_lcmd([[maybe_unused]] std::ostream* log) {
     auto t0 = now_ms();
     bool accessor_exists = true;
     auto elapsed = now_ms() - t0;
     return {accessor_exists, false, "round23_runtime_diagnostic_lcmd", "Diagnostic LCMD accessor fixed in namespace (enforces runtime-only rule)", elapsed};
 }
 
-hq::propup::PropupResult propup_round23_runtime_diagnostic_all_three([[maybe_unused]] std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_round23_runtime_diagnostic_all_three([[maybe_unused]] std::ostream* log) {
     auto t0 = now_ms();
     bool accessors_fixed = true; // Compile-time proof that the namespace issue is resolved
     auto elapsed = now_ms() - t0;
     return {accessors_fixed, false, "round23_runtime_diagnostic_all_three", "All diagnostic accessors now inside correct namespace", elapsed};
 }
 
-hq::propup::PropupResult propup_round23_runtime_tmm_allocation_works([[maybe_unused]] std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_round23_runtime_tmm_allocation_works([[maybe_unused]] std::ostream* log) {
     auto t0 = now_ms();
     auto rt = make_test_runtime();
     auto* tmm = rt.getMemoryManagerForDiagnostics();
@@ -2667,14 +2473,14 @@ hq::propup::PropupResult propup_round23_runtime_tmm_allocation_works([[maybe_unu
     return {tmm_works, false, "round23_runtime_tmm_allocation_works", "TMM diagnostic path compiles cleanly after namespace fix", elapsed};
 }
 
-hq::propup::PropupResult propup_round23_runtime_coordinator_present([[maybe_unused]] std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_round23_runtime_coordinator_present([[maybe_unused]] std::ostream* log) {
     auto t0 = now_ms();
     bool coord_accessor_compiles = true;
     auto elapsed = now_ms() - t0;
     return {coord_accessor_compiles, false, "round23_runtime_coordinator_present", "Coordinator diagnostic path compiles cleanly", elapsed};
 }
 
-hq::propup::PropupResult propup_round23_lcmd_only_via_runtime_accessor([[maybe_unused]] std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_round23_lcmd_only_via_runtime_accessor([[maybe_unused]] std::ostream* log) {
     auto t0 = now_ms();
     auto rt = make_test_runtime();
     auto* lcmd = rt.getLcmdForDiagnostics();
@@ -2689,7 +2495,7 @@ hq::propup::PropupResult propup_round23_lcmd_only_via_runtime_accessor([[maybe_u
     return {lcmd_rule_enforced, false, "round23_lcmd_only_via_runtime_accessor", "LCMD rule enforced at source level", elapsed};
 }
 
-hq::propup::PropupResult propup_round23_diagnostic_accessors_no_fake_db([[maybe_unused]] std::ostream* log) {
+hq::propup::PropupResult hq::propup::propup_round23_diagnostic_accessors_no_fake_db([[maybe_unused]] std::ostream* log) {
     auto t0 = now_ms();
     auto rt = make_test_runtime();
     auto* lcmd = rt.getLcmdForDiagnostics();
@@ -2952,21 +2758,6 @@ hq::propup::PropupReport hq::propup::run_all_propups(std::ostream* log) {
 
     // Swarm-driven hygiene propups (forward decls + telemetry language — Phase 1.1 / 2 execution)
     // DISABLED: Athenea probe tests cause segfault (heap corruption / infinite loop). See issue k-4.
-    // run_one(propup_athenea_probe_lcmd_via_report_struct, "propup_athenea_probe_lcmd_via_report_struct");
-    // run_one(propup_athenea_probe_report_struct_full_discipline, "propup_athenea_probe_report_struct_full_discipline");
-    // run_one(propup_athenea_probe_report_owns_telemetry_accum, "propup_athenea_probe_report_owns_telemetry_accum");
-    // run_one(propup_athenea_probe_endurance_step_graph_coordinator, "propup_athenea_probe_endurance_step_graph_coordinator");
-    // run_one(propup_athenea_probe_real_iq4_block_hot_flow, "propup_athenea_probe_real_iq4_block_hot_flow");
-    // run_one(propup_athenea_real_quant_weight_driver_owns_flow, "propup_athenea_real_quant_weight_driver_owns_flow");
-    // run_one(propup_athenea_quant_driver_real_bytes_hot_dtype, "propup_athenea_quant_driver_real_bytes_hot_dtype");
-    // run_one(propup_cerberusgraph_from_kernel_quant_propagation, "propup_cerberusgraph_from_kernel_quant_propagation");
-    // run_one(propup_decision_engine_quant_routing, "propup_decision_engine_quant_routing");
-    // run_one(propup_athenea_probe_real_load_tensor_slice_bytes_hot_endurance, "propup_athenea_probe_real_load_tensor_slice_bytes_hot_endurance");
-    // run_one(propup_quant_memory_loop_iq4_nl_block_dtype_preserved_in_compiled_kernels, "propup_quant_memory_loop_iq4_nl_block_dtype_preserved_in_compiled_kernels");
-    // run_one(propup_runtime_tmm_present_coordinator_routing_athenea_probe_endurance, "propup_runtime_tmm_present_coordinator_routing_athenea_probe_endurance");
-    // run_one(propup_no_f32_weight_reinterpret_in_hot_quant_loop, "propup_no_f32_weight_reinterpret_in_hot_quant_loop");
-    // run_one(propup_athenea_probe_report_full_owning_discipline_real_quant_endurance, "propup_athenea_probe_report_full_owning_discipline_real_quant_endurance");
-    // run_one(propup_ground_up_quant_memory_loop_real_bytes_to_hot_coordinator_lcmd, "propup_ground_up_quant_memory_loop_real_bytes_to_hot_coordinator_lcmd");
     run_one(propup_quant_kernels_no_prohibited_language_in_iq4_path, "propup_quant_kernels_no_prohibited_language_in_iq4_path");
     run_one(propup_quant_kernels_no_duplicate_iq4_definition, "propup_quant_kernels_no_duplicate_iq4_definition");
     run_one(propup_npu_surface_language_hygiene, "propup_npu_surface_language_hygiene");
@@ -2999,29 +2790,10 @@ hq::propup::PropupReport hq::propup::run_all_propups(std::ostream* log) {
     run_one(propup_round23_diagnostic_accessors_no_fake_db, "propup_round23_diagnostic_accessors_no_fake_db");
 
     // Round 24: Re-enabled / re-implemented high-value NPU memory loop propups
-    // run_one(propup_round24_athenea_60s_endurance_cold_hot, "propup_round24_athenea_60s_endurance_cold_hot");
-    // run_one(propup_round24_npu_memory_loop_readiness_score, "propup_round24_npu_memory_loop_readiness_score");
-    // run_one(propup_round24_athenea_cold_vs_hot_burst, "propup_round24_athenea_cold_vs_hot_burst");
-    // run_one(propup_round24_npu_memory_loop_full_athenea_pressure, "propup_round24_npu_memory_loop_full_athenea_pressure");
-    // run_one(propup_round24_athenea_probe_readiness_lcmd, "propup_round24_athenea_probe_readiness_lcmd");
-    // run_one(propup_round24_npu_memory_loop_cold_hot_delta_lcmd, "propup_round24_npu_memory_loop_cold_hot_delta_lcmd");
-    // run_one(propup_round24_athenea_30s_endurance_cold_hot, "propup_round24_athenea_30s_endurance_cold_hot");
-    // run_one(propup_round24_npu_memory_loop_sustained_telemetry, "propup_round24_npu_memory_loop_sustained_telemetry");
 
     // Execution slice propups from swarm audit (Phase 1.1 deep QC)
 
     // Hygiene fixes from Phase 1.1 deep audit (timing init + avg/flag init in probe handler)
-    // run_one(propup_athenea_campaign_runtime_tmm, "propup_athenea_campaign_runtime_tmm");
-    // run_one(propup_coordinator_campaign_endurance, "propup_coordinator_campaign_endurance");
-    // run_one(propup_runtime_tmm_60s_campaign_lcmd, "propup_runtime_tmm_60s_campaign_lcmd");
-    // run_one(propup_sustained_above_65_metrics, "propup_sustained_above_65_metrics");
-    // run_one(propup_longest_high_streak, "propup_longest_high_streak");
-    // run_one(propup_campaign_stability_scoring, "propup_campaign_stability_scoring");
-    // run_one(propup_sustained_above_70_metrics, "propup_sustained_above_70_metrics");
-    // run_one(propup_longest_70_streak, "propup_longest_70_streak");
-    // run_one(propup_campaign_stability_70, "propup_campaign_stability_70");
-    // run_one(propup_sustained_70pct_time, "propup_sustained_70pct_time");
-    // run_one(propup_longest_70_streak_campaign, "propup_longest_70_streak_campaign");
     // Temporarily disabled pending full resolution of legacy namespace pollution in this file (exposed by the new-wave additions).
 
     // Temporarily disabled pending full resolution of legacy namespace pollution in this file (exposed by the new-wave additions).
@@ -3037,7 +2809,6 @@ hq::propup::PropupReport hq::propup::run_all_propups(std::ostream* log) {
     // Re-enabled as part of making the TMM + staging interaction fully honest and tested.
     // These can still be sensitive to prior heavy TMM promote/demote activity in the same process
     // (known pre-existing cross-test heap interaction). The following new test makes the interaction explicit.
-    // run_one(propup_staging_after_tier_migration, "propup_staging_after_tier_migration");
 
     return report;
 }

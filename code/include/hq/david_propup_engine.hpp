@@ -41,6 +41,9 @@ struct PropupResult {
     static PropupResult fail(std::string_view n, std::string_view diag) {
         return PropupResult{false, false, std::string(n), std::string(diag), 0.0};
     }
+    static PropupResult skip(std::string_view n, std::string_view diag) {
+        return PropupResult{false, true, std::string(n), std::string(diag), 0.0};
+    }
 };
 
 // ===========================================================================
@@ -202,6 +205,7 @@ PropupResult propup_runtime_tmm_present_coordinator_routing_athenea_probe_endura
 PropupResult propup_no_f32_weight_reinterpret_in_hot_quant_loop(std::ostream* log = nullptr);
 PropupResult propup_athenea_probe_report_full_owning_discipline_real_quant_endurance(std::ostream* log = nullptr);
 PropupResult propup_ground_up_quant_memory_loop_real_bytes_to_hot_coordinator_lcmd(std::ostream* log = nullptr);
+PropupResult propup_runtime_memory_loop_60s_lcmd(std::ostream* log = nullptr);
 
 // ===========================================================================
 // Full test suite — runs all validators and returns aggregate report
@@ -212,6 +216,7 @@ struct PropupReport {
     std::size_t passed_count{0};
     std::size_t failed_count{0};
     double total_ms{0.0};
+    std::size_t skipped_count{0};
     std::size_t skipped_verbose_count{0};
 
     [[nodiscard]] bool all_passed() const noexcept {
