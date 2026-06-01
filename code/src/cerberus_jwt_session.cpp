@@ -42,7 +42,6 @@
 #include <chrono>
 #include <map>
 #include <set>
-#include <iostream>
 
 namespace hq::cerberus::privacy {
 

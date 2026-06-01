@@ -26,7 +26,17 @@
 #include <string>
 #include <string_view>
 #include <vector>
-#include <iostream>
+extern "C" std::size_t hq_safe_write(int fd, const char* data, std::size_t len);
+
+namespace {
+    inline void hq_print(std::string msg) {
+        hq_safe_write(1, msg.data(), msg.size());
+    }
+    inline void hq_println(std::string msg) {
+        hq_safe_write(1, msg.data(), msg.size());
+        hq_safe_write(1, "\n", 1);
+    }
+}
 
 #ifdef _WIN32
 #  include <winsock2.h>
@@ -292,9 +302,9 @@ DeviceLoadBalancer::DeviceChoice DeviceLoadBalancer::pick_device() {
                     last_gpu_temp_ = telem->temperature_celsius;
                     gpu_available_ = true;
                     if (verbose_)
-                        std::cout << std::format("[lb] GPU {}: {}% {}C\n",
+                        hq_println(std::format("[lb] GPU {}: {}% {}C",
                                    gpu_monitor_->device_index(),
-                                   last_gpu_util_, last_gpu_temp_);
+                                   last_gpu_util_, last_gpu_temp_));
                     if (telem->utilization_percent < 95.0f)
                         best = {"gpu_780m", telem->utilization_percent, true};
                 }
@@ -314,9 +324,9 @@ DeviceLoadBalancer::DeviceChoice DeviceLoadBalancer::pick_device() {
                     last_hailo_temp_ = stats->temperature_celsius;
                     hailo_available_ = true;
                     if (verbose_)
-                        std::cout << std::format("[lb] Hailo {}: {}% {}C\n",
+                        hq_println(std::format("[lb] Hailo {}: {}% {}C",
                                    hailo_monitor_->device_id(),
-                                   last_hailo_util_, last_hailo_temp_);
+                                   last_hailo_util_, last_hailo_temp_));
                     if (stats->nn_core_utilization < 90.0f
                         && best.utilization_percent > stats->nn_core_utilization)
                         best = {"hailo_8l", stats->nn_core_utilization, true};
@@ -330,7 +340,7 @@ DeviceLoadBalancer::DeviceChoice DeviceLoadBalancer::pick_device() {
     }
 
     if (verbose_)
-        std::cout << std::format("[lb] picked {} ({}%)\n", best.device_name, best.utilization_percent);
+        hq_println(std::format("[lb] picked {} ({}%)", best.device_name, best.utilization_percent));
     return best;
 }
 
@@ -545,7 +555,7 @@ int InferenceServer::start() {
     // Open listening socket
     impl_->listen_fd = static_cast<int>(::socket(AF_INET, SOCK_STREAM, 0));
     if (impl_->listen_fd < 0) {
-        std::cout << std::format("[cerberus] socket() failed: {}\n", strerror(errno));
+        hq_println(std::format("[cerberus] socket() failed: {}", strerror(errno)));
         return 1;
     }
 
@@ -557,26 +567,26 @@ int InferenceServer::start() {
     addr.sin_family = AF_INET;
     addr.sin_port   = htons(cfg_.port);
     if (inet_pton(AF_INET, cfg_.bind_address.c_str(), &addr.sin_addr) != 1) {
-        std::cout << std::format("[cerberus] inet_pton failed\n");
+        hq_println(std::format("[cerberus] inet_pton failed"));
         impl_->close_listen();
         return 1;
     }
 
     if (::bind(impl_->listen_fd,
                reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) < 0) {
-        std::cout << std::format("[cerberus] bind({}:{}) failed\n",
-                   cfg_.bind_address, cfg_.port);
+        hq_println(std::format("[cerberus] bind({}:{}) failed",
+                   cfg_.bind_address, cfg_.port));
         impl_->close_listen();
         return 1;
     }
 
     if (::listen(impl_->listen_fd, LISTEN_BACKLOG) < 0) {
-        std::cout << std::format("[cerberus] listen() failed\n");
+        hq_println(std::format("[cerberus] listen() failed"));
         impl_->close_listen();
         return 1;
     }
 
-    std::cout << std::format("[cerberus] listening on {}:{}\n", cfg_.bind_address, cfg_.port);
+    hq_println(std::format("[cerberus] listening on {}:{}", cfg_.bind_address, cfg_.port));
     impl_->running.store(true, std::memory_order_release);
 
     discover_devices_();
@@ -596,7 +606,7 @@ int InferenceServer::start() {
             if (errno == EINTR) continue;
             if (errno == EBADF) break;
 #endif
-            std::cout << std::format("[cerberus] accept() error\n");
+            hq_println(std::format("[cerberus] accept() error"));
             continue;
         }
 
@@ -641,8 +651,8 @@ int InferenceServer::start() {
 
     auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(
         std::chrono::steady_clock::now() - impl_->stats.start_time).count();
-    std::cout << std::format("[cerberus] shutdown — {} req in {} s\n",
-               impl_->stats.requests_served.load(), elapsed);
+    hq_println(std::format("[cerberus] shutdown — {} req in {} s",
+               impl_->stats.requests_served.load(), elapsed));
     return 0;
 }
 
@@ -743,8 +753,8 @@ const ServerStats& InferenceServer::get_stats() const noexcept {
 
 HttpResponse InferenceServer::dispatch_(const HttpRequest& req) {
     if (cfg_.verbose_logging)
-        std::cout << std::format("[cerberus] {} {}\n",
-                   static_cast<int>(req.method), req.path);
+        hq_println(std::format("[cerberus] {} {}",
+                   static_cast<int>(req.method), req.path));
 
     if (req.method == HttpMethod::GET && req.path == "/health")
         return handle_health_(req);

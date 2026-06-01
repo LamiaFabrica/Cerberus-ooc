@@ -38,8 +38,19 @@
 #ifdef UM790_HAS_HIP
 #include <hip/hip_runtime_api.h>
 #include <format>
-#include <iostream>
 #endif
+
+extern "C" std::size_t hq_safe_write(int fd, const char* data, std::size_t len);
+
+namespace {
+    inline void hq_print(std::string msg) {
+        hq_safe_write(1, msg.data(), msg.size());
+    }
+    inline void hq_println(std::string msg) {
+        hq_safe_write(1, msg.data(), msg.size());
+        hq_safe_write(1, "\n", 1);
+    }
+}
 
 // =============================================================================
 // Internal state
@@ -456,11 +467,11 @@ cerberus_status_t cerberus_get_utilization(
                 *utilization_percent = clamp_util(load_pct);
                 return CERBERUS_OK;
             } else {
-                std::cout << std::format("[cerberus] WARNING CPU utilization unavailable on this platform.\n");
+                hq_println(std::format("[cerberus] WARNING CPU utilization unavailable on this platform."));
                 return CERBERUS_NOT_INITIALIZED;
             }
 #else
-            std::cout << std::format("[cerberus] WARNING CPU utilization unavailable on non-Linux platforms.\n");
+            hq_println(std::format("[cerberus] WARNING CPU utilization unavailable on non-Linux platforms."));
             return CERBERUS_NOT_INITIALIZED;
 #endif
         }
@@ -473,8 +484,8 @@ cerberus_status_t cerberus_get_utilization(
                         *utilization_percent = clamp_util(*util);
                         return CERBERUS_OK;
                     } else {
-                        std::cout << std::format("[cerberus] WARNING GPU utilization query failed: {}\n",
-                                   util.error().message);
+                        hq_println(std::format("[cerberus] WARNING GPU utilization query failed: {}",
+                                   util.error().message));
                         return CERBERUS_DEVICE_NOT_FOUND;
                     }
                 } catch (...) {
@@ -548,7 +559,7 @@ cerberus_status_t cerberus_get_load_balance_hint(
     }
 #else
     cpu_util = 0.0f;
-    std::cout << std::format("[cerberus] WARNING CPU utilization unavailable on this platform — load balance hint may be inaccurate.\n");
+    hq_println(std::format("[cerberus] WARNING CPU utilization unavailable on this platform — load balance hint may be inaccurate."));
 #endif
 
     if (gs.shared_npu)

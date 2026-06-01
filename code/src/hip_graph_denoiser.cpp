@@ -40,15 +40,25 @@
 #endif
 #include <span>
 #include <string>
-#include <iostream>
 #include <vector>
 
 #include <onnxruntime_cxx_api.h>
 
 #ifdef __HIP_PLATFORM_AMD__
 #include <hip/hip_runtime_api.h>
-#include <iostream>
 #endif
+
+extern "C" std::size_t hq_safe_write(int fd, const char* data, std::size_t len);
+
+namespace {
+    inline void hq_print(std::string msg) {
+        hq_safe_write(1, msg.data(), msg.size());
+    }
+    inline void hq_println(std::string msg) {
+        hq_safe_write(1, msg.data(), msg.size());
+        hq_safe_write(1, "\n", 1);
+    }
+}
 
 namespace hq {
 
@@ -168,8 +178,8 @@ HIPGraphDenoiser::HIPGraphDenoiser(const GraphConfig& cfg)
     : hip_state_{std::make_unique<HipGraphState>()}
     , cfg_{cfg} {
     available_ = is_available();
-    std::cout << std::format("[HIPGraphDenoiser] created (available={}, capture_enabled={})\n",
-               available_, cfg_.enable_capture);
+    hq_println(std::format("[HIPGraphDenoiser] created (available={}, capture_enabled={})",
+               available_, cfg_.enable_capture));
 }
 
 HIPGraphDenoiser::~HIPGraphDenoiser() noexcept {
@@ -202,8 +212,8 @@ bool HIPGraphDenoiser::is_available() const noexcept {
 
 void HIPGraphDenoiser::set_scheduler(DEISScheduler* scheduler) {
     scheduler_ = scheduler;
-    std::cout << std::format("[HIPGraphDenoiser] scheduler attached={}\n",
-               scheduler_ != nullptr);
+    hq_println(std::format("[HIPGraphDenoiser] scheduler attached={}",
+               scheduler_ != nullptr));
 }
 
 // ===========================================================================
@@ -246,9 +256,9 @@ HIPGraphDenoiser::allocate_device_buffers_() {
             static_cast<int>(err)}};
     }
 
-    std::cout << std::format("[HIPGraphDenoiser] Buffers: latents={}B noise_pred={}B "
-               "ddim_params={}B (persistent pinned host)\n",
-               latent_bytes, latent_bytes, sizeof(DdimDeviceParams));
+    hq_println(std::format("[HIPGraphDenoiser] Buffers: latents={}B noise_pred={}B "
+               "ddim_params={}B (persistent pinned host)",
+               latent_bytes, latent_bytes, sizeof(DdimDeviceParams)));
     return {};
 #else
     return std::unexpected{GraphErrorInfo{GraphError::HipError,
@@ -436,13 +446,13 @@ HIPGraphDenoiser::capture(hq::tensor::FloatTensor4D latents,
 
         herr = hipStreamCreate(&hip_state_->stream);
         if (herr != hipSuccess) {
-            std::cout << std::format("[HIPGraphDenoiser] Stream create failed, fallback\n");
+            hq_println("[HIPGraphDenoiser] Stream create failed, fallback");
             goto fallback_step0;
         }
         hip_state_->owns_stream = true;
 
         if (auto r = allocate_device_buffers_(); !r) {
-            std::cout << std::format("[HIPGraphDenoiser] Alloc failed, fallback\n");
+            hq_println("[HIPGraphDenoiser] Alloc failed, fallback");
             hip_state_->reset();
             goto fallback_step0;
         }
@@ -491,7 +501,7 @@ HIPGraphDenoiser::capture(hq::tensor::FloatTensor4D latents,
         herr = hipStreamBeginCapture(hip_state_->stream,
                                       hipStreamCaptureModeGlobal);
         if (herr != hipSuccess) {
-            std::cout << std::format("[HIPGraphDenoiser] BeginCapture failed, fallback\n");
+            hq_println("[HIPGraphDenoiser] BeginCapture failed, fallback");
             goto graph_fail_and_fallback;
         }
 
@@ -513,7 +523,7 @@ HIPGraphDenoiser::capture(hq::tensor::FloatTensor4D latents,
         herr = hipStreamEndCapture(hip_state_->stream, &hip_state_->graph);
         if (herr != hipSuccess || !hip_state_->graph) {
     graph_fail_and_fallback:
-            std::cout << std::format("[HIPGraphDenoiser] Graph capture failed, fallback\n");
+            hq_println("[HIPGraphDenoiser] Graph capture failed, fallback");
             hip_state_->graph = nullptr;
             hip_state_->reset();
             goto fallback_done;
@@ -522,7 +532,7 @@ HIPGraphDenoiser::capture(hq::tensor::FloatTensor4D latents,
         herr = hipGraphInstantiate(&hip_state_->exec, hip_state_->graph,
                                     nullptr, nullptr, 0);
         if (herr != hipSuccess) {
-            std::cout << std::format("[HIPGraphDenoiser] Instantiate failed, fallback\n");
+            hq_println("[HIPGraphDenoiser] Instantiate failed, fallback");
             hip_state_->exec = nullptr;
             hip_state_->reset();
             goto fallback_done;
@@ -534,8 +544,8 @@ HIPGraphDenoiser::capture(hq::tensor::FloatTensor4D latents,
 
         std::size_t n_nodes = 0;
         hipGraphGetNodes(hip_state_->graph, nullptr, &n_nodes);
-        std::cout << std::format("[HIPGraphDenoiser] Captured {} nodes (DDIM+D2H, step 0 done)\n",
-                   n_nodes);
+        hq_println(std::format("[HIPGraphDenoiser] Captured {} nodes (DDIM+D2H, step 0 done)",
+                   n_nodes));
         return {};
     }
 
@@ -685,16 +695,16 @@ HIPGraphDenoiser::execute_full(hq::tensor::FloatTensor4D latents,
         if (captured_) {
             auto rep = replay(latents, embeddings, onnx_session, memory_info);
             if (!rep) {
-                std::cout << std::format("[HIPGraphDenoiser] Replay step {} failed, fallback\n", step);
-                captured_ = false;
-                hip_state_->reset();
-                auto fb = execute_step_fallback_(latents_raw, embeddings,
-                                                  onnx_session, memory_info,
-                                                  latent_shape, step,
-                                                  cfg_scale_,
-                                                  std::span<const float>{uncond_embeddings_});
-                if (!fb) return fb;
-            }
+                    hq_println(std::format("[HIPGraphDenoiser] Replay step {} failed, fallback", step));
+                    captured_ = false;
+                    hip_state_->reset();
+                    auto fb = execute_step_fallback_(latents_raw, embeddings,
+                                                      onnx_session, memory_info,
+                                                      latent_shape, step,
+                                                      cfg_scale_,
+                                                      std::span<const float>{uncond_embeddings_});
+                    if (!fb) return fb;
+                }
         } else {
             auto fb = execute_step_fallback_(latents_raw, embeddings,
                                               onnx_session, memory_info,
@@ -705,8 +715,8 @@ HIPGraphDenoiser::execute_full(hq::tensor::FloatTensor4D latents,
         }
     }
 
-    std::cout << std::format("[HIPGraphDenoiser] Done: {} steps, {} replayed\n",
-               cfg_.num_steps, steps_replayed_);
+    hq_println(std::format("[HIPGraphDenoiser] Done: {} steps, {} replayed",
+               cfg_.num_steps, steps_replayed_));
     return {};
 }
 
@@ -850,8 +860,8 @@ HIPGraphDenoiser::execute_step_fallback_(float* latents,
         // 1. Conditional pass
         auto cond_result = run_pass(timestep_val, embeddings);
         if (!cond_result) {
-            std::cout << std::format("[HIPGraphDenoiser] CFG cond pass failed at step {}\n",
-                       step);
+            hq_println(std::format("[HIPGraphDenoiser] CFG cond pass failed at step {}",
+                       step));
             return std::unexpected{cond_result.error()};
         }
         std::vector<float> noise_cond = std::move(*cond_result);
@@ -859,8 +869,8 @@ HIPGraphDenoiser::execute_step_fallback_(float* latents,
         // 2. Unconditional pass
         auto uncond_result = run_pass(timestep_val, uncond_embeddings);
         if (!uncond_result) {
-            std::cout << std::format("[HIPGraphDenoiser] CFG uncond pass failed at step {}\n",
-                       step);
+            hq_println(std::format("[HIPGraphDenoiser] CFG uncond pass failed at step {}",
+                       step));
             return std::unexpected{uncond_result.error()};
         }
         std::vector<float> noise_uncond = std::move(*uncond_result);

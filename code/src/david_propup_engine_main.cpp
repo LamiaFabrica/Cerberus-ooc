@@ -4,9 +4,12 @@
 ///
 /// Entry point for the David Propup Engine — run all validators and
 /// print the aggregate report.
+///
+/// CRITICAL: Do NOT include <iostream>. Under MinGW UCRT, std::cout/std::cerr
+/// TLS teardown segfaults when stdout is redirected to a pipe or file.
+/// All output goes through hq_safe_write() which bypasses the C++ streams.
 
 #include "hq/david_propup_engine.hpp"
-#include <iostream>
 
 int main() {
     auto report = hq::propup::run_all_propups();
