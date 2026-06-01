@@ -85,9 +85,23 @@ using hq::cerberus::GraphNode;
 using hq::cerberus::GraphTensor;
 using hq::cerberus::CerberusRuntime;
 
-// Unified file-scope using directives — replaces 37 redundant local declarations
-using namespace hq;
-using namespace hq::npu;
+// Targeted using-declarations — replaces broad using-namespace directives
+using hq::propup::PropupResult;
+using hq::propup::PropupReport;
+using hq::npu::IntelNpuTelemetry;
+using hq::npu::KernelNode;
+using hq::npu::KernelGraph;
+using hq::npu::TensorDesc;
+using hq::npu::CompiledKernel;
+using hq::npu::TargetConfig;
+using hq::npu::CpuPostProcessor;
+using hq::npu::NpuBackendFactory;
+using hq::npu::INpuBackend;
+using hq::TieredMemoryManager;
+using hq::TieredMemoryConfig;
+using hq::MemoryTier;
+using hq::AtheneaProbeReport;
+using hq::CerberusExecutionCoordinator;
 
 namespace {
 
@@ -529,7 +543,7 @@ hq::propup::PropupResult hq::propup::propup_decision_engine_fusion(std::ostream*
     GraphNode mul_node;
     mul_node.id   = 0;
     mul_node.name = "mul_1";
-    mul_node.op   = npu::KernelNode::Op::Mul;
+    mul_node.op   = hq::npu::KernelNode::Op::Mul;
     mul_node.inputs  = {"x"};
     mul_node.outputs = {"mul_out"};
     mul_node.constant_data = {2.0f, 2.0f, 2.0f, 2.0f}; // scale factor
@@ -538,7 +552,7 @@ hq::propup::PropupResult hq::propup::propup_decision_engine_fusion(std::ostream*
     GraphNode add_node;
     add_node.id   = 1;
     add_node.name = "add_1";
-    add_node.op   = npu::KernelNode::Op::Add;
+    add_node.op   = hq::npu::KernelNode::Op::Add;
     add_node.inputs  = {"mul_out"};
     add_node.outputs = {"y"};
     add_node.constant_data = {1.0f, 1.0f, 1.0f, 1.0f}; // bias
@@ -581,10 +595,10 @@ hq::propup::PropupResult hq::propup::propup_decision_engine_fusion(std::ostream*
     CerberusExecutionCoordinator coord(mgr);
 
     // Build a real kernel graph from the fused plan
-    npu::KernelGraph kg;
+    hq::npu::KernelGraph kg;
     for (std::int32_t nid : plan.front().node_ids) {
         if (auto idx_opt = graph.node_index(nid)) {
-            npu::KernelNode kn;
+            hq::npu::KernelNode kn;
             kn.name    = graph.nodes[*idx_opt].name;
             kn.op      = graph.nodes[*idx_opt].op;
             kn.inputs  = graph.nodes[*idx_opt].inputs;
@@ -1111,7 +1125,7 @@ hq::propup::PropupResult hq::propup::propup_athenea_probe_report_owns_telemetry_
 }
 
 // Final NPU surface language hygiene regression propup (catches any reintroduction of the 7 forbidden terms in production NPU/probe/telemetry/backend code).
-hq::propup::PropupResult hq::propup::propup_npu_surface_language_hygiene(std::ostream* log = nullptr) {
+hq::propup::PropupResult hq::propup::propup_npu_surface_language_hygiene(std::ostream* log) {
     (void)log;
     const std::string name = "propup_npu_surface_language_hygiene";
     auto t0 = now_ms();
