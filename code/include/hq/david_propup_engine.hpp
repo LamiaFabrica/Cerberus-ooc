@@ -195,6 +195,25 @@ PropupResult propup_jwt_expired_detected(std::ostream* log = nullptr);
 // ===========================================================================
 
 // ===========================================================================
+// HIP Graph Denoiser propups
+// ===========================================================================
+
+/// @brief Prop up: HIPGraphDenoiser construction and availability query.
+PropupResult propup_hip_graph_denoiser_construction(std::ostream* log = nullptr);
+
+/// @brief Prop up: HIPGraphDenoiser rejects null input buffers safely.
+PropupResult propup_hip_graph_denoiser_null_rejection(std::ostream* log = nullptr);
+
+/// @brief Prop up: HIPGraphDenoiser capture/replay state machine is consistent.
+PropupResult propup_hip_graph_denoiser_state_machine(std::ostream* log = nullptr);
+
+/// @brief Prop up: HIPGraphDenoiser execute_full rejects mismatched dimensions.
+PropupResult propup_hip_graph_denoiser_dimension_validation(std::ostream* log = nullptr);
+
+/// @brief Prop up: HIPGraphDenoiser scheduler attachment and coefficient query.
+PropupResult propup_hip_graph_denoiser_scheduler_attachment(std::ostream* log = nullptr);
+
+// ===========================================================================
 // Full test suite — runs all validators and returns aggregate report
 // ===========================================================================
 // COMMAND / ANBP / METRO / SLIPSTREAM EDGE CASES
