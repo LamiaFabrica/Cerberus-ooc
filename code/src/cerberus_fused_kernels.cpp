@@ -64,19 +64,27 @@ static void micro_kernel_4x4(
     std::size_t kc, std::size_t mr, std::size_t nr, std::size_t nc) {
     float c_reg[MR * NR] = {};
 
-    for (std::size_t k = 0; k < kc; ++k) {
-        for (std::size_t i = 0; i < mr; ++i) {
-            for (std::size_t j = 0; j < nr; ++j) {
-                c_reg[i * NR + j] += A_panel[i * kc + k] * B_panel[k * nc + j];
-            }
-        }
-    }
+    std::ranges::for_each(
+        std::views::iota(std::size_t{0}, kc),
+        [&](std::size_t k) {
+            std::ranges::for_each(
+                std::views::cartesian_product(
+                    std::views::iota(std::size_t{0}, mr),
+                    std::views::iota(std::size_t{0}, nr)),
+                [&](auto ij) {
+                    auto [i, j] = ij;
+                    c_reg[i * NR + j] += A_panel[i * kc + k] * B_panel[k * nc + j];
+                });
+        });
 
-    for (std::size_t i = 0; i < mr; ++i) {
-        for (std::size_t j = 0; j < nr; ++j) {
+    std::ranges::for_each(
+        std::views::cartesian_product(
+            std::views::iota(std::size_t{0}, mr),
+            std::views::iota(std::size_t{0}, nr)),
+        [&](auto ij) {
+            auto [i, j] = ij;
             C_block[i * ldc + j] += c_reg[i * NR + j];
-        }
-    }
+        });
 }
 
 std::expected<void, std::string> kernel_matmul_blocked(
@@ -100,19 +108,25 @@ std::expected<void, std::string> kernel_matmul_blocked(
 
                 // Pack B panel: [kc x nc] row-major
                 std::vector<float> B_panel(kc * nc);
-                for (std::size_t kk = 0; kk < kc; ++kk) {
-                    for (std::size_t jj = 0; jj < nc; ++jj) {
+                std::ranges::for_each(
+                    std::views::cartesian_product(
+                        std::views::iota(std::size_t{0}, kc),
+                        std::views::iota(std::size_t{0}, nc)),
+                    [&](auto idx) {
+                        auto [kk, jj] = idx;
                         B_panel[kk * nc + jj] = B[(k + kk) * N + (j + jj)];
-                    }
-                }
+                    });
 
                 // Pack A panel: [mc x kc] row-major
                 std::vector<float> A_panel(mc * kc);
-                for (std::size_t ii = 0; ii < mc; ++ii) {
-                    for (std::size_t kk = 0; kk < kc; ++kk) {
+                std::ranges::for_each(
+                    std::views::cartesian_product(
+                        std::views::iota(std::size_t{0}, mc),
+                        std::views::iota(std::size_t{0}, kc)),
+                    [&](auto idx) {
+                        auto [ii, kk] = idx;
                         A_panel[ii * kc + kk] = A[(i + ii) * K + (k + kk)];
-                    }
-                }
+                    });
 
                 // Micro-kernel loop
                 for (std::size_t ii = 0; ii < mc; ii += MR) {

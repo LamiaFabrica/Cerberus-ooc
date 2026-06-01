@@ -30,15 +30,20 @@ std::expected<void, std::string> kernel_matmul(
     if (M == 0 || N == 0 || K == 0) return std::unexpected{"empty dimension"};
 
     // Naïve O(M×N×K), sufficient for correctness validation
-    for (std::size_t m = 0; m < M; ++m) {
-        for (std::size_t n = 0; n < N; ++n) {
+    std::ranges::for_each(
+        std::views::cartesian_product(
+            std::views::iota(std::size_t{0}, M),
+            std::views::iota(std::size_t{0}, N)),
+        [&](auto mn) {
+            auto [m, n] = mn;
             float acc = 0.0f;
-            for (std::size_t k = 0; k < K; ++k) {
-                acc += A[m * K + k] * B[k * N + n];
-            }
+            std::ranges::for_each(
+                std::views::iota(std::size_t{0}, K),
+                [&](std::size_t k) {
+                    acc += A[m * K + k] * B[k * N + n];
+                });
             C[m * N + n] = acc;
-        }
-    }
+        });
     return {};
 }
 
@@ -137,21 +142,23 @@ std::expected<void, std::string> kernel_softmax(
     const float* in, float* out,
     std::size_t rows, std::size_t cols) {
     if (!in || !out) return std::unexpected{"null pointer"};
-    for (std::size_t r = 0; r < rows; ++r) {
-        auto row_in  = std::span(in  + r * cols, cols);
-        auto row_out = std::span(out + r * cols, cols);
+    std::ranges::for_each(
+        std::views::iota(std::size_t{0}, rows),
+        [&](std::size_t r) {
+            auto row_in  = std::span(in  + r * cols, cols);
+            auto row_out = std::span(out + r * cols, cols);
 
-        float mx = *std::ranges::max_element(row_in);
+            float mx = *std::ranges::max_element(row_in);
 
-        std::ranges::transform(row_in, row_out.begin(),
-            [mx](float x) { return std::exp(x - mx); });
+            std::ranges::transform(row_in, row_out.begin(),
+                [mx](float x) { return std::exp(x - mx); });
 
-        float sum = 0.0f;
-        std::ranges::for_each(row_out, [&sum](float x) { sum += x; });
+            float sum = 0.0f;
+            std::ranges::for_each(row_out, [&sum](float x) { sum += x; });
 
-        std::ranges::transform(row_out, row_out.begin(),
-            [sum](float x) { return x / sum; });
-    }
+            std::ranges::transform(row_out, row_out.begin(),
+                [sum](float x) { return x / sum; });
+        });
     return {};
 }
 
@@ -175,25 +182,27 @@ std::expected<void, std::string> kernel_layernorm(
     const float* in, float* out,
     std::size_t rows, std::size_t cols, float eps) {
     if (!in || !out) return std::unexpected{"null pointer"};
-    for (std::size_t r = 0; r < rows; ++r) {
-        auto row_in  = std::span(in  + r * cols, cols);
-        auto row_out = std::span(out + r * cols, cols);
+    std::ranges::for_each(
+        std::views::iota(std::size_t{0}, rows),
+        [&](std::size_t r) {
+            auto row_in  = std::span(in  + r * cols, cols);
+            auto row_out = std::span(out + r * cols, cols);
 
-        float mean = 0.0f;
-        std::ranges::for_each(row_in, [&mean](float x) { mean += x; });
-        mean /= static_cast<float>(cols);
+            float mean = 0.0f;
+            std::ranges::for_each(row_in, [&mean](float x) { mean += x; });
+            mean /= static_cast<float>(cols);
 
-        float var = 0.0f;
-        std::ranges::for_each(row_in, [&var, mean](float x) {
-            float d = x - mean;
-            var += d * d;
+            float var = 0.0f;
+            std::ranges::for_each(row_in, [&var, mean](float x) {
+                float d = x - mean;
+                var += d * d;
+            });
+            var /= static_cast<float>(cols);
+
+            float inv_std = 1.0f / std::sqrt(var + eps);
+            std::ranges::transform(row_in, row_out.begin(),
+                [mean, inv_std](float x) { return (x - mean) * inv_std; });
         });
-        var /= static_cast<float>(cols);
-
-        float inv_std = 1.0f / std::sqrt(var + eps);
-        std::ranges::transform(row_in, row_out.begin(),
-            [mean, inv_std](float x) { return (x - mean) * inv_std; });
-    }
     return {};
 }
 
@@ -213,23 +222,34 @@ std::expected<void, std::string> kernel_conv2d(
     std::size_t OH = H - KH + 1;
     std::size_t OW = W - KW + 1;
 
-    for (std::size_t oc = 0; oc < OC; ++oc) {
-        for (std::size_t oh = 0; oh < OH; ++oh) {
-            for (std::size_t ow = 0; ow < OW; ++ow) {
-                float acc = 0;
-                for (std::size_t kh = 0; kh < KH; ++kh) {
-                    for (std::size_t kw = 0; kw < KW; ++kw) {
-                        for (std::size_t c = 0; c < C; ++c) {
-                            float iv = input[(oh + kh) * W * C + (ow + kw) * C + c];
-                            float wv = weight[kh * KW * C * OC + kw * C * OC + c * OC + oc];
-                            acc += iv * wv;
-                        }
-                    }
+    std::ranges::fill(std::span(output, OH * OW * OC), 0.0f);
+
+    std::ranges::for_each(
+        std::views::cartesian_product(
+            std::views::iota(std::size_t{0}, OC),
+            std::views::iota(std::size_t{0}, OH),
+            std::views::iota(std::size_t{0}, OW),
+            std::views::iota(std::size_t{0}, KH),
+            std::views::iota(std::size_t{0}, KW),
+            std::views::iota(std::size_t{0}, C)),
+        [&](auto idx) {
+            auto [oc, oh, ow, kh, kw, c] = idx;
+            float iv = input[(oh + kh) * W * C + (ow + kw) * C + c];
+            float wv = weight[kh * KW * C * OC + kw * C * OC + c * OC + oc];
+            output[oh * OW * OC + ow * OC + oc] += iv * wv;
+        });
+
+    if (bias) {
+        std::ranges::for_each(
+            std::views::cartesian_product(
+                std::views::iota(std::size_t{0}, OH),
+                std::views::iota(std::size_t{0}, OW)),
+            [&](auto hwoff) {
+                auto [oh, ow] = hwoff;
+                for (std::size_t oc = 0; oc < OC; ++oc) {
+                    output[oh * OW * OC + ow * OC + oc] += bias[oc];
                 }
-                if (bias) acc += bias[oc];
-                output[oh * OW * OC + ow * OC + oc] = acc;
-            }
-        }
+            });
     }
     return {};
 }

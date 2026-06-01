@@ -109,17 +109,21 @@ std::expected<void, std::string> kernel_matmul_int8(
 
     std::vector<std::int32_t> C_acc(M * N, 0);
 
-    // Naïve uint8_t GEMM with zero-point compensation
-    for (std::size_t m = 0; m < M; ++m) {
-        for (std::size_t n = 0; n < N; ++n) {
+    std::ranges::for_each(
+        std::views::cartesian_product(
+            std::views::iota(std::size_t{0}, M),
+            std::views::iota(std::size_t{0}, N)),
+        [&](auto mn) {
+            auto [m, n] = mn;
             std::int32_t acc = 0;
-            for (std::size_t k = 0; k < K; ++k) {
-                acc += (static_cast<std::int32_t>(A[m * K + k]) - q.zero_point_a) *
-                       (static_cast<std::int32_t>(B[k * N + n]) - q.zero_point_b);
-            }
+            std::ranges::for_each(
+                std::views::iota(std::size_t{0}, K),
+                [&](std::size_t k) {
+                    acc += (static_cast<std::int32_t>(A[m * K + k]) - q.zero_point_a) *
+                           (static_cast<std::int32_t>(B[k * N + n]) - q.zero_point_b);
+                });
             C_acc[m * N + n] = acc;
-        }
-    }
+        });
 
     float dequant_scale = q.scale_a * q.scale_b;
     dequantize_tensor(C_acc.data(), C_out, M * N, dequant_scale);
