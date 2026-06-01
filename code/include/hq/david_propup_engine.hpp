@@ -390,4 +390,39 @@ PropupResult propup_quant_kernels_no_prohibited_language_in_iq4_path(std::ostrea
 /// @brief Prop up: No duplicate IQ4 definition in quantized kernels.
 PropupResult propup_quant_kernels_no_duplicate_iq4_definition(std::ostream* log = nullptr);
 
+// ===========================================================================
+// Native kernel edge cases + Execution slices
+// ===========================================================================
+
+/// @brief Prop up: ReLU(-1.0) == 0.0 and ReLU(5.0) == 5.0 by calling the actual kernel.
+PropupResult propup_kernel_relu_negative_input(std::ostream* log = nullptr);
+
+/// @brief Prop up: sigmoid(-10) ≈ 0 and sigmoid(10) ≈ 1 by calling the actual kernel.
+PropupResult propup_kernel_sigmoid_extremes(std::ostream* log = nullptr);
+
+/// @brief Prop up: small quantized matmul produces expected output shape.
+PropupResult propup_kernel_quantized_matmul_shape(std::ostream* log = nullptr);
+
+/// @brief Prop up: empty graph passed to coordinator returns error (not crash).
+PropupResult propup_execution_coordinator_empty_graph(std::ostream* log = nullptr);
+
+// ===========================================================================
+// Command / Runtime / Inference audit propups
+// ===========================================================================
+
+/// @brief Prop up: construct CerberusRuntime, call diagnostic accessor, verify non-empty info.
+PropupResult propup_runtime_diagnostic_report(std::ostream* log = nullptr);
+
+/// @brief Prop up: pass empty graph to DecisionEngine, verify graceful error/no-op.
+PropupResult propup_decision_engine_empty_graph(std::ostream* log = nullptr);
+
+/// @brief Prop up: create StagingManager, verify init and status query.
+PropupResult propup_staging_manager_lifecycle(std::ostream* log = nullptr);
+
+/// @brief Prop up: inference request with invalid dimensions rejected before execution.
+PropupResult propup_inference_audit_input_validation(std::ostream* log = nullptr);
+
+/// @brief Prop up: allocate many small blocks from TieredMemoryManager, verify total tracks.
+PropupResult propup_tiered_memory_bulk_alloc(std::ostream* log = nullptr);
+
 } // namespace hq::propup

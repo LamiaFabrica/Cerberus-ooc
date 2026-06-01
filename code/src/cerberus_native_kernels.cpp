@@ -30,20 +30,15 @@ std::expected<void, std::string> kernel_matmul(
     if (M == 0 || N == 0 || K == 0) return std::unexpected{"empty dimension"};
 
     // Naïve O(M×N×K), sufficient for correctness validation
-    std::ranges::for_each(
-        std::views::cartesian_product(
-            std::views::iota(std::size_t{0}, M),
-            std::views::iota(std::size_t{0}, N)),
-        [&](auto mn) {
-            auto [m, n] = mn;
+    for (std::size_t m = 0; m < M; ++m) {
+        for (std::size_t n = 0; n < N; ++n) {
             float acc = 0.0f;
-            std::ranges::for_each(
-                std::views::iota(std::size_t{0}, K),
-                [&](std::size_t k) {
-                    acc += A[m * K + k] * B[k * N + n];
-                });
+            for (std::size_t k = 0; k < K; ++k) {
+                acc += A[m * K + k] * B[k * N + n];
+            }
             C[m * N + n] = acc;
-        });
+        }
+    }
     return {};
 }
 
@@ -55,13 +50,9 @@ std::expected<void, std::string> kernel_add(
     const float* a, const float* b, float* out,
     std::size_t elems) {
     if (!a || !b || !out) return std::unexpected{"null pointer"};
-    std::ranges::transform(
-        std::views::zip(std::span(a, elems), std::span(b, elems)),
-        out,
-        [](auto p) {
-            auto [x, y] = p;
-            return x + y;
-        });
+    for (std::size_t i = 0; i < elems; ++i) {
+        out[i] = a[i] + b[i];
+    }
     return {};
 }
 
@@ -69,13 +60,9 @@ std::expected<void, std::string> kernel_mul(
     const float* a, const float* b, float* out,
     std::size_t elems) {
     if (!a || !b || !out) return std::unexpected{"null pointer"};
-    std::ranges::transform(
-        std::views::zip(std::span(a, elems), std::span(b, elems)),
-        out,
-        [](auto p) {
-            auto [x, y] = p;
-            return x * y;
-        });
+    for (std::size_t i = 0; i < elems; ++i) {
+        out[i] = a[i] * b[i];
+    }
     return {};
 }
 
