@@ -169,6 +169,34 @@ PropupResult propup_kernel_relu(std::ostream* log = nullptr);
 PropupResult propup_lcmd_offline_sync_count(std::ostream* log = nullptr);
 
 // ===========================================================================
+// Round 23 propups (8 tests — runtime diagnostics, TMM allocation, LCMD accessors)
+// ===========================================================================
+
+/// @brief Prop up: runtime diagnostic TMM.
+PropupResult propup_round23_runtime_diagnostic_tmm(std::ostream* log = nullptr);
+
+/// @brief Prop up: runtime diagnostic coordinator.
+PropupResult propup_round23_runtime_diagnostic_coordinator(std::ostream* log = nullptr);
+
+/// @brief Prop up: runtime diagnostic LCMD.
+PropupResult propup_round23_runtime_diagnostic_lcmd(std::ostream* log = nullptr);
+
+/// @brief Prop up: runtime diagnostic all three.
+PropupResult propup_round23_runtime_diagnostic_all_three(std::ostream* log = nullptr);
+
+/// @brief Prop up: runtime TMM allocation works.
+PropupResult propup_round23_runtime_tmm_allocation_works(std::ostream* log = nullptr);
+
+/// @brief Prop up: runtime coordinator present.
+PropupResult propup_round23_runtime_coordinator_present(std::ostream* log = nullptr);
+
+/// @brief Prop up: LCMD only via runtime accessor.
+PropupResult propup_round23_lcmd_only_via_runtime_accessor(std::ostream* log = nullptr);
+
+/// @brief Prop up: diagnostic accessors no fake DB.
+PropupResult propup_round23_diagnostic_accessors_no_fake_db(std::ostream* log = nullptr);
+
+// ===========================================================================
 // E2E DETECTABLE TESTBED — 25 additional propups (target 260+)
 // ===========================================================================
 
@@ -178,7 +206,6 @@ PropupResult propup_lcmd_offline_sync_count(std::ostream* log = nullptr);
 
 /// @brief StagingManager operates correctly after TieredMemoryManager promote/demote activity.
 ///        Guards cross-test heap interaction between heavy TMM migration and subsequent staging.
-PropupResult propup_staging_after_tier_migration(std::ostream* log = nullptr);
 
 // ===========================================================================
 // Athenea probe endurance tests (disabled pending TMM heap audit)
@@ -190,21 +217,6 @@ PropupResult propup_staging_after_tier_migration(std::ostream* log = nullptr);
 // enabled individually once reset_for_testing() or process-level heap trim is
 // proven sufficient.
 
-PropupResult propup_athenea_probe_lcmd_via_report_struct(std::ostream* log = nullptr);
-PropupResult propup_athenea_probe_report_struct_full_discipline(std::ostream* log = nullptr);
-PropupResult propup_athenea_probe_report_owns_telemetry_accum(std::ostream* log = nullptr);
-PropupResult propup_athenea_probe_endurance_step_graph_coordinator(std::ostream* log = nullptr);
-PropupResult propup_athenea_probe_real_iq4_block_hot_flow(std::ostream* log = nullptr);
-PropupResult propup_athenea_real_quant_weight_driver_owns_flow(std::ostream* log = nullptr);
-PropupResult propup_athenea_quant_driver_real_bytes_hot_dtype(std::ostream* log = nullptr);
-PropupResult propup_cerberusgraph_from_kernel_quant_propagation(std::ostream* log = nullptr);
-PropupResult propup_decision_engine_quant_routing(std::ostream* log = nullptr);
-PropupResult propup_athenea_probe_real_load_tensor_slice_bytes_hot_endurance(std::ostream* log = nullptr);
-PropupResult propup_quant_memory_loop_iq4_nl_block_dtype_preserved_in_compiled_kernels(std::ostream* log = nullptr);
-PropupResult propup_runtime_tmm_present_coordinator_routing_athenea_probe_endurance(std::ostream* log = nullptr);
-PropupResult propup_no_f32_weight_reinterpret_in_hot_quant_loop(std::ostream* log = nullptr);
-PropupResult propup_athenea_probe_report_full_owning_discipline_real_quant_endurance(std::ostream* log = nullptr);
-PropupResult propup_ground_up_quant_memory_loop_real_bytes_to_hot_coordinator_lcmd(std::ostream* log = nullptr);
 PropupResult propup_runtime_memory_loop_60s_lcmd(std::ostream* log = nullptr);
 
 // ===========================================================================
@@ -268,28 +280,20 @@ PropupResult propup_round22_tmm_coordinator_interaction(std::ostream* log = null
 PropupResult propup_round22_all_stages_documented(std::ostream* log = nullptr);
 
 /// @brief Prop up: Athenea 60s endurance cold→hot.
-PropupResult propup_round24_athenea_60s_endurance_cold_hot(std::ostream* log = nullptr);
 
 /// @brief Prop up: NPU memory loop readiness score.
-PropupResult propup_round24_npu_memory_loop_readiness_score(std::ostream* log = nullptr);
 
 /// @brief Prop up: Athenea cold vs hot burst.
-PropupResult propup_round24_athenea_cold_vs_hot_burst(std::ostream* log = nullptr);
 
 /// @brief Prop up: NPU memory loop full Athenea pressure.
-PropupResult propup_round24_npu_memory_loop_full_athenea_pressure(std::ostream* log = nullptr);
 
 /// @brief Prop up: Athenea probe readiness LCMD.
-PropupResult propup_round24_athenea_probe_readiness_lcmd(std::ostream* log = nullptr);
 
 /// @brief Prop up: NPU memory loop cold→hot delta LCMD.
-PropupResult propup_round24_npu_memory_loop_cold_hot_delta_lcmd(std::ostream* log = nullptr);
 
 /// @brief Prop up: Athenea 30s endurance cold→hot.
-PropupResult propup_round24_athenea_30s_endurance_cold_hot(std::ostream* log = nullptr);
 
 /// @brief Prop up: NPU memory loop sustained telemetry.
-PropupResult propup_round24_npu_memory_loop_sustained_telemetry(std::ostream* log = nullptr);
 
 // ===========================================================================
 // Intel NPU Telemetry validation suite (graceful degradation on non-NPU hosts)

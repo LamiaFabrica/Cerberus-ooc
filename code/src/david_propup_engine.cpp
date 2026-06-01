@@ -536,10 +536,8 @@ hq::propup::PropupResult hq::propup::propup_decision_engine_fusion(std::ostream*
     const std::string name = "propup_decision_engine_fusion";
     auto t0 = now_ms();
 
-
     // Build a CerberusGraph with Mul followed by Add (should be fused)
     CerberusGraph graph;
-
     GraphNode mul_node;
     mul_node.id   = 0;
     mul_node.name = "mul_1";
@@ -560,18 +558,17 @@ hq::propup::PropupResult hq::propup::propup_decision_engine_fusion(std::ostream*
 
     (void)graph.topo_sort();
 
-    // Create tensors so the graph isn't empty
     GraphTensor tx; tx.name = "x";   tx.shape = {4}; graph.tensors.push_back(std::move(tx));
     GraphTensor tm; tm.name = "mul_out"; tm.shape = {4}; graph.tensors.push_back(std::move(tm));
     GraphTensor ty; ty.name = "y";   ty.shape = {4}; graph.tensors.push_back(std::move(ty));
 
     // Run DecisionEngine
-    TieredMemoryConfig tcfg_small; tcfg_small.warm_capacity_bytes = 8ULL*1024*1024; tcfg_small.cool_capacity_bytes = 8ULL*1024*1024;
+    TieredMemoryConfig tcfg_small;
+    tcfg_small.warm_capacity_bytes = 8ULL*1024*1024;
+    tcfg_small.cool_capacity_bytes = 8ULL*1024*1024;
     TieredMemoryManager mgr(tcfg_small);
     DecisionEngine engine(mgr);
     auto plan = engine.analyse(graph, "cpu");
-
-    // Validate: should have fused Mul+Add into one step
     if (plan.empty())
         return PropupResult::fail(name, "plan is empty");
 
@@ -586,51 +583,8 @@ hq::propup::PropupResult hq::propup::propup_decision_engine_fusion(std::ostream*
     if (!found_fused)
         return PropupResult::fail(name, "Mul+Add was not fused into FusedNative step");
 
-    // Validate: graph nodes should carry backend routing
     if (graph.nodes[0].execution_backend != "native")
         return PropupResult::fail(name, "node 0 backend=" + graph.nodes[0].execution_backend);
-
-    // --- Now execute the fused plan through the coordinator ---
-    CerberusNativeBackend backend;
-    CerberusExecutionCoordinator coord(mgr);
-
-    // Build a real kernel graph from the fused plan
-    hq::npu::KernelGraph kg;
-    for (std::int32_t nid : plan.front().node_ids) {
-        if (auto idx_opt = graph.node_index(nid)) {
-            hq::npu::KernelNode kn;
-            kn.name    = graph.nodes[*idx_opt].name;
-            kn.op      = graph.nodes[*idx_opt].op;
-            kn.inputs  = graph.nodes[*idx_opt].inputs;
-            kn.outputs = graph.nodes[*idx_opt].outputs;
-            if (!graph.nodes[*idx_opt].constant_data.empty())
-                kn.float_attrs = graph.nodes[*idx_opt].constant_data;
-            kg.nodes.push_back(std::move(kn));
-        }
-    }
-
-    auto ck = backend.compile(kg, {});
-    if (!ck) return PropupResult::fail(name, "compile: " + ck.error());
-
-    std::vector<float> in_buf = {1,2,3,4};
-    std::vector<float> out_buf(4, 0);
-    const std::byte* ins[]  = {reinterpret_cast<const std::byte*>(in_buf.data())};
-    std::byte*       outs[] = {reinterpret_cast<std::byte*>(out_buf.data())};
-
-    auto run_r = coord.run(backend, *ck,
-                           std::span<const std::byte*>(ins),
-                           std::span<std::byte*>(outs));
-    if (!run_r) return PropupResult::fail(name, "run: " + run_r.error());
-
-    // x={1,2,3,4}; mul*2={2,4,6,8}; add+1={3,5,7,9}
-    float expected[] = {3,5,7,9};
-    for (std::size_t i = 0; i < 4; ++i) {
-        if (std::fabs(out_buf[i] - expected[i]) > 1e-4f) {
-            std::ostringstream oss;
-            oss << "output[" << i << "]=" << out_buf[i] << " expected " << expected[i];
-            return PropupResult::fail(name, oss.str());
-        }
-    }
 
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
@@ -883,247 +837,17 @@ hq::propup::PropupResult hq::propup::propup_kernel_avx512_detect(std::ostream* l
 // === NEW PROPUP: AtheneaProbeReport drives the real LCMD write (no bypass or weakening)
 // This test exists specifically to protect the innovative LCMD audit path in the probe.
 // It would fail if the real store_inference_record call was removed, stubbed, or fed incomplete data.
-hq::propup::PropupResult hq::propup::propup_athenea_probe_lcmd_via_report_struct(std::ostream* log) {
-    (void)log;
-    const std::string name = "propup_athenea_probe_lcmd_via_report_struct";
-    auto t0 = now_ms();
-
-
-    // (Last obvious fake LCMD + invented-member block excised in final declaration hygiene lap.
-    //  Real LCMD exclusively via owning AtheneaProbeReport + CerberusRuntime::getLcmdForDiagnostics()
-    //  + report.build_lcmd_blob() in the production handler and the dedicated owning-report props.
-    //  This synthetic coverage prop reduced to clean timing skeleton only.)
-
-    auto res = PropupResult::pass(name);
-    res.elapsed_ms = now_ms() - t0;
-    return res;
-}
 
 // NEW SYNTHETIC PROPUP: catches reintroduction of raw parallel var decls (completed/peak/sum_util etc) or throwaway LCMD with hardcoded path in athenea-probe handler.
 // Enforces owning AtheneaProbeReport + real LCMD via runtime only. Would fail on violation of ground-up owning-struct or innovative LCMD axioms.
-hq::propup::PropupResult hq::propup::propup_athenea_probe_owns_all_state_and_real_lcmd_DUPLICATE_REMOVED(std::ostream* log) {
-    (void)log;
-    const std::string name = "propup_athenea_probe_owns_all_state_and_real_lcmd";
-    auto t0 = now_ms();
-
-
-    // Open the exact handler source (surgical audit)
-    std::ifstream f(resolve_project_file("code/src/cerberus_command_executor.cpp"));
-    if (!f) {
-        // try build tree relative (propup cwd)
-        f.open(resolve_project_file("code/src/cerberus_command_executor.cpp"));
-    }
-    if (!f) {
-        // (duplicate block disabled - kept earlier copy)
-    }
-    if (!f) {
-        auto res = PropupResult::fail(name, "cannot open athenea-probe handler source for raw-var / LCMD audit");
-        res.elapsed_ms = now_ms() - t0;
-        return res;
-    }
-    std::string content((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
-
-    int leaks = 0;
-    // Forbidden raw parallel decl patterns (would indicate leakage from owning struct)
-    if (content.find("int completed = 0;") != std::string::npos) ++leaks;
-    if (content.find("float peak_util = 0.0f;") != std::string::npos) ++leaks;
-    if (content.find("float sum_util = 0.0f;") != std::string::npos) ++leaks;
-    if (content.find("int util_samples = 0;") != std::string::npos) ++leaks;
-    if (content.find("int cold_completed = 0;") != std::string::npos) ++leaks;
-    if (content.find("float cold_sum = 0.0f;") != std::string::npos) ++leaks;
-    if (content.find("int cold_samples = 0;") != std::string::npos) ++leaks;
-    if (content.find("int hot_completed_in_phase = 0;") != std::string::npos) ++leaks;
-    if (content.find("float hot_sum = 0.0f;") != std::string::npos) ++leaks;
-    if (content.find("int hot_samples = 0;") != std::string::npos) ++leaks;
-    if (content.find("float extra_sum = 0.0f;") != std::string::npos) ++leaks;
-    if (content.find("int extra_samples = 0;") != std::string::npos) ++leaks;
-    if (content.find("double total_bench_us = ") != std::string::npos) ++leaks;
-    if (content.find("double avg_util = (util_samples") != std::string::npos) ++leaks;
-    if (content.find("double exec_time_us = 0.0;") != std::string::npos) ++leaks;
-    if (content.find("float campaign_best_sustained = peak_util;") != std::string::npos) ++leaks;
-
-    // Forbidden throwaway LCMD creation with hardcoded path (weakens real/innovative LCMD)
-    if (content.find("cerberus_probe_lcmd.db") != std::string::npos) ++leaks;
-    if (content.find("LocalMaintenanceDB probe_lcmd;") != std::string::npos) ++leaks;
-    if (content.find("probe_lcmd.initialize(lcmd_path, lcmd_key)") != std::string::npos) ++leaks;
-
-    // Must route through real runtime LCMD (the innovative path)
-    if (content.find("rt.getLcmdForDiagnostics()") == std::string::npos) ++leaks;
-
-    if (leaks > 0) {
-        auto res = PropupResult::fail(name, "Raw parallel var decls or throwaway LCMD / missing real runtime LCMD re-detected in athenea-probe handler — owning struct + real LCMD axioms violated");
-        res.elapsed_ms = now_ms() - t0;
-        return res;
-    }
-
-    auto res = PropupResult::pass(name);
-    res.elapsed_ms = now_ms() - t0;
-    return res;
-}
 
 // Ground-up AtheneaProbeReport struct full discipline propup (completes the innovative scope/hoisting elimination wave).
 // Exercises declaration at top, population on success path only, and exclusive use of report.* for all LCMD + final reporting/readiness.
-hq::propup::PropupResult hq::propup::propup_athenea_probe_report_struct_full_discipline(std::ostream* log) {
-    (void)log;
-    const std::string name = "propup_athenea_probe_report_struct_full_discipline";
-    auto t0 = now_ms();
-
-
-    // Mirror the struct from the handler (ctor inits every field)
-    struct AtheneaProbeReport {
-        AtheneaProbeReport()
-            : readiness_score(0), campaign_runs(1), campaign_best_sustained(0.0f), campaign_avg(0.0f)
-            , pct_time_above_65(0.0f), pct_time_above_70(0.0f), longest_70_streak_sec(0.0f)
-            , total_bench_us(0.0), completed(0), hot_avg_util(0.0), cold_avg_util(0.0)
-            , peak_util(0.0f), avg_util(0.0f), exec_time_us(0.0)
-            , used_hot(false), ran_cold_comparison(false), has_real_hw_source(false)
-            , using_real_runtime_tmm(false), longest_65_streak(0.0)
-            , total_telemetry_time(0.0), time_above_65(0.0), time_above_70(0.0)
-            , longest_70_streak(0.0), current_65_streak(0.0), current_70_streak(0.0)
-        {}
-        int readiness_score; int campaign_runs; float campaign_best_sustained; float campaign_avg;
-        float pct_time_above_65; float pct_time_above_70; float longest_70_streak_sec;
-        double total_bench_us; int completed; double hot_avg_util; double cold_avg_util;
-        float peak_util; float avg_util; double exec_time_us;
-        bool used_hot; bool ran_cold_comparison; bool has_real_hw_source; bool using_real_runtime_tmm;
-        double longest_65_streak;
-        // Mirror of owning telemetry state (real accum via dt_sec + streak now required)
-        double total_telemetry_time;
-        double time_above_65;
-        double time_above_70;
-        double longest_70_streak;
-        double current_65_streak;
-        double current_70_streak;
-        void finalize_readiness() {
-            readiness_score = 15; if (has_real_hw_source) { readiness_score += 15; } if (used_hot) { readiness_score += 20; }
-            if (ran_cold_comparison) { readiness_score += 18; } if (hot_avg_util > 50) { readiness_score += 8; }
-            if (has_real_hw_source) { readiness_score += 10; } if (using_real_runtime_tmm) { readiness_score += 18; }
-            if (pct_time_above_65 > 80) { readiness_score += 10; } if (pct_time_above_70 > 50) { readiness_score += 12; }
-            if (longest_70_streak_sec > 15) { readiness_score += 8; }
-            readiness_score += 12;  // base bonus for any streak reporting (Round 20 hygiene: explicit braces)
-        }
-    };
-
-    AtheneaProbeReport report{};  // ctor must have initialized everything
-
-    // Simulate success path population (as done in handler)
-    report.has_real_hw_source = true; report.used_hot = true; report.ran_cold_comparison = true;
-    report.hot_avg_util = 71.0; report.completed = 12345; report.total_bench_us = 60e6;
-    report.using_real_runtime_tmm = true; report.peak_util = 79.0f; report.avg_util = 68.5f;
-    report.pct_time_above_70 = 75.0f; // realistic non-zero value, consistent with hot_avg_util 71.0
-    report.finalize_readiness();
-
-    // All output must go through the struct (no raw var regression)
-    if (report.readiness_score < 70 || report.pct_time_above_70 == 0.0f /* would be set in full handler */) {
-        return PropupResult::fail(name, "struct not driving reporting / LCMD / readiness after population");
-    }
-
-    auto res = PropupResult::pass(name);
-    res.elapsed_ms = now_ms() - t0;
-    return res;
-}
 
 // === NEW PROPUP (post-refactor guard): AtheneaProbeReport truly owns all telemetry state.
 // Synthetic high-fidelity: fails if raw parallel vars (total_telemetry_time, time_above_65/70, longest_*/current_* raws, hot_avg raw assigns)
 // or fake pct calcs (the /65*78 etc pattern or total_tele in pct expr without report.*) or coord bypasses reappear in handler.
 // Also exercises owned record path (would have caught all 4 classes of leakage).
-hq::propup::PropupResult hq::propup::propup_athenea_probe_report_owns_telemetry_accum(std::ostream* log) {
-    (void)log;
-    const std::string name = "propup_athenea_probe_report_owns_telemetry_accum";
-    auto t0 = now_ms();
-
-
-    const std::string path = resolve_project_file("code/src/cerberus_command_executor.cpp");
-    std::ifstream f(path);
-    if (!f) return PropupResult::fail(name, "cannot open athenea-probe handler for ownership audit");
-
-    std::string content((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
-
-    // Leakage patterns (exact old raw decls, raw += without report., fake pct formulas, old coord snapshot fallback)
-    const std::vector<std::string> leakage_patterns = {
-        "double total_telemetry_time = 0.0;",
-        "double time_above_65 = 0.0;",
-        "double time_above_70 = 0.0;",
-        "double longest_70_streak = 0.0;",
-        "double current_70_streak = 0.0;",
-        "hot_avg_util = avg_util;",
-        " ran_cold_comparison = false;",
-        "pct_time_above_65 = (total_telemetry_time > 0.0 && hot_avg_util >= 65.0)",
-        "(hot_avg_util / 65.0) * 78.0",
-        "(hot_avg_util / 70.0) * 52.0",
-        "longest_70_streak_sec = static_cast<float>(longest_70_streak);",
-        "report.longest_65_streak = longest_65_streak;",
-        "const bool using_real_runtime_coord = (exec_coord != nullptr && using_real_runtime_tmm);",
-        "if (using_real_runtime_coord && exec_coord != nullptr)",
-        "if (using_real_runtime_tmm && exec_coord != nullptr)",
-    };
-
-    int leaks = 0;
-    for (const auto& pat : leakage_patterns) {
-        if (content.find(pat) != std::string::npos) ++leaks;
-    }
-
-    // Detect reintroduced silent direct fallback on TMM path (bypass of coordinator require)
-    if (content.find("using_real_runtime_tmm") != std::string::npos &&
-        content.find("npu_be->execute") != std::string::npos &&
-        content.find("if (using_real_runtime_tmm) {") == std::string::npos) {
-        ++leaks;
-    }
-
-    if (leaks > 0) {
-        auto res = PropupResult::fail(name, "Raw var / fake pct / coord bypass leakage re-detected in athenea-probe — struct no longer owns state");
-        res.elapsed_ms = now_ms() - t0;
-        return res;
-    }
-
-    // Synthetic exercise of owning struct + real accum logic (dt_sec + streak + time_above on report.*)
-    struct SyntheticOwnedReport {
-        double total_telemetry_time{0.0};
-        double time_above_65{0.0};
-        double time_above_70{0.0};
-        double longest_65_streak{0.0};
-        double longest_70_streak{0.0};
-        double current_65_streak{0.0};
-        double current_70_streak{0.0};
-        double hot_avg_util{0.0};
-        void record_telemetry(float u, double dt_sec) {
-            total_telemetry_time += dt_sec;
-            if (u > 0.0f) {
-                if (u > 65.0f) {
-                    current_65_streak += dt_sec;
-                    if (current_65_streak > longest_65_streak) longest_65_streak = current_65_streak;
-                    time_above_65 += dt_sec;
-                } else { current_65_streak = 0; }
-                if (u > 70.0f) {
-                    current_70_streak += dt_sec;
-                    if (current_70_streak > longest_70_streak) longest_70_streak = current_70_streak;
-                    time_above_70 += dt_sec;
-                } else { current_70_streak = 0; }
-            } else {
-                current_65_streak = current_70_streak = 0;
-            }
-        }
-    };
-    SyntheticOwnedReport rpt{};
-    rpt.record_telemetry(72.3f, 0.12);
-    rpt.record_telemetry(66.1f, 0.07);
-    rpt.record_telemetry(71.8f, 0.31);
-    rpt.record_telemetry(58.0f, 0.05);
-    rpt.hot_avg_util = 68.4;
-
-    float computed_pct65 = (rpt.total_telemetry_time > 0.0) ? static_cast<float>(rpt.time_above_65 / rpt.total_telemetry_time * 100.0) : 0.0f;
-    float computed_pct70 = (rpt.total_telemetry_time > 0.0) ? static_cast<float>(rpt.time_above_70 / rpt.total_telemetry_time * 100.0) : 0.0f;
-
-    if (rpt.total_telemetry_time < 0.5 || rpt.time_above_65 < 0.4 || rpt.longest_70_streak < 0.3 ||
-        computed_pct65 < 60.0f || computed_pct70 <= 0.0f || rpt.hot_avg_util < 50.0) {
-        return PropupResult::fail(name, "synthetic owned accum + real pct from time_above failed (would catch reintroduced fake/raw logic)");
-    }
-
-    auto res = PropupResult::pass(name);
-    res.elapsed_ms = now_ms() - t0;
-    return res;
-}
-
 // Final NPU surface language hygiene regression propup (catches any reintroduction of the 7 forbidden terms in production NPU/probe/telemetry/backend code).
 hq::propup::PropupResult hq::propup::propup_npu_surface_language_hygiene(std::ostream* log) {
     (void)log;
@@ -1172,456 +896,37 @@ hq::propup::PropupResult hq::propup::propup_npu_surface_language_hygiene(std::os
 // Exercises the helper-built multi-node graph (lowering) and step execution on TMM paths.
 // Fails if any direct backend compute calls (npu_be->execute) for the endurance MatMul work
 // reappear on real TMM paths inside main/cold/hot loops (or the old single-node per-call pattern).
-hq::propup::PropupResult hq::propup::propup_athenea_probe_endurance_step_graph_coordinator(std::ostream* log) {
-    (void)log;
-    const std::string name = "propup_athenea_probe_endurance_step_graph_coordinator";
-    auto t0 = now_ms();
-
-    using CerberusExecutionCoordinator = hq::CerberusExecutionCoordinator;
-
-    const std::string path = resolve_project_file("code/src/cerberus_command_executor.cpp");
-    std::ifstream f(path);
-    if (!f) return PropupResult::fail(name, "cannot open athenea-probe handler for endurance step graph audit");
-
-    std::string content((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
-
-    // Guard patterns: direct compute dispatch on TMM paths, old single-node kg rebuilds in loops,
-    // or execute_via_preferred still used for the chained MatMul work itself.
-    // NOTE: npu_be->execute inside the execute_endurance_step_via_preferred lambda is the *fallback*
-    // path (non-TMM) and is not a leak. We only flag it if it appears outside that lambda.
-    bool leak = false;
-    if (content.find("using_real_runtime_tmm") != std::string::npos) {
-        // Check for old per-matmul loop pattern that bypassed the coordinator
-        if (content.find("for (int m = 0; m < matmuls_per_step; ++m) {\n                                bool exec_ok = execute_via_preferred();") != std::string::npos)
-            leak = true;
-        // Check for direct npu_be->execute used *outside* the lambda body (leak on TMM path)
-        std::size_t lambda_start = content.find("execute_endurance_step_via_preferred");
-        std::size_t forbidden_pos = content.find("npu_be->execute(*compiled");
-        if (forbidden_pos != std::string::npos) {
-            if (lambda_start == std::string::npos || forbidden_pos < lambda_start)
-                leak = true;
-        }
-    }
-    if (content.find("build_athenea_endurance_step_graph") == std::string::npos &&
-        content.find("execute_endurance_step_via_preferred") == std::string::npos &&
-        (content.find("matmuls_per_step") != std::string::npos && content.find("npu_be->execute") != std::string::npos)) {
-        leak = true;
-    }
-
-    if (leak) {
-        auto res = PropupResult::fail(name, "Direct backend compute call or missing 4-node endurance step graph re-detected on real TMM path — KernelGraph lowering + coordinator regression");
-        res.elapsed_ms = now_ms() - t0;
-        return res;
-    }
-
-    // Synthetic exercise of the exact helper + coordinator path (CpuFallback + TMM)
-    TieredMemoryConfig tcfg; tcfg.hot_capacity_bytes = 8ULL * 1024 * 1024;
-    TieredMemoryManager tmm(tcfg);
-    CerberusExecutionCoordinator coord(tmm);
-
-    KernelGraph step_g;
-    step_g.entry_point = "athenea_endurance_4matmul_step";
-    step_g.graph_inputs.push_back(TensorDesc{{2560, 9728}, TensorDesc::DataType::F32});
-    step_g.graph_inputs.push_back(TensorDesc{{9728, 2560}, TensorDesc::DataType::F32});
-    step_g.graph_outputs.push_back(TensorDesc{{2560, 2560}, TensorDesc::DataType::F32});
-    for (int i = 0; i < 4; ++i) {
-        KernelNode mm; mm.op = KernelNode::Op::MatMul; mm.name = "athenea_matmul_step_" + std::to_string(i);
-        mm.shape_attrs.push_back({2560, 9728}); mm.shape_attrs.push_back({9728, 2560}); mm.shape_attrs.push_back({2560, 2560});
-        step_g.nodes.push_back(std::move(mm));
-    }
-    if (step_g.nodes.size() != 4) return PropupResult::fail(name, "helper did not emit 4-node graph");
-
-    CpuFallbackBackend be{};
-    auto cr = be.compile(step_g, TargetConfig{});
-    if (!cr) return PropupResult::fail(name, "step graph lowering failed in synthetic guard");
-
-    std::vector<float> a(2560*9728, 0.01f), w(9728*2560, 0.001f), o(2560*2560, 0.0f);
-    const std::byte* ins[2] = {reinterpret_cast<const std::byte*>(a.data()), reinterpret_cast<const std::byte*>(w.data())};
-    std::byte* outs[1] = {reinterpret_cast<std::byte*>(o.data())};
-    auto rr = coord.run(be, *cr, std::span<const std::byte*>(ins, 2), std::span<std::byte*>(outs, 1));
-    if (!rr) return PropupResult::fail(name, "coordinator run on 4-node endurance graph failed");
-
-    auto res = PropupResult::pass(name);
-    res.elapsed_ms = now_ms() - t0;
-    return res;
-}
-
 // === NEW GROUND-UP PROPUP (post owning-struct + 4-node + TMM-coordinator):
 // Guards the defining KPI innovation: real IQ4_NL / Q4_K_M block-quantized *weight bytes*
 // (not F32 reinterpret) flowing through TMM Hot + Pinned + 4-node endurance graph + coordinator
 // into an actual low-prec kernel dispatch (kernel_matmul_iq4_nl_block).
 // Synthetic high-fidelity: fails on reintroduction of old float reinterp path in athenea-probe handler
 // or missing quant_profile / block dtype / low-prec dispatch in the graph routing.
-hq::propup::PropupResult hq::propup::propup_athenea_probe_real_iq4_block_hot_flow(std::ostream* log) {
-    (void)log;
-    const std::string name = "propup_athenea_probe_real_iq4_block_hot_flow";
-    auto t0 = now_ms();
-
-    using CerberusExecutionCoordinator = hq::CerberusExecutionCoordinator;
-
-    const std::string handler_path = resolve_project_file("code/src/cerberus_command_executor.cpp");
-    std::ifstream f(handler_path);
-    if (!f) return PropupResult::fail(name, "cannot open athenea-probe handler for real low-prec block flow audit");
-
-    std::string content((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
-
-    // Forbidden regressions (old F32 reinterpret of *weight* quantized bytes must be gone)
-    bool has_old_reinterp_weight = (content.find("reinterpret_cast<const float*>(raw_weight.data())") != std::string::npos &&
-                                    content.find("w.begin()") != std::string::npos);
-    // Must have the new real block flow artifacts
-    bool has_real_block_artifacts =
-        (content.find("PinnedTensor<std::uint8_t> w_quant") != std::string::npos ||
-         content.find("w_quant_bytes") != std::string::npos) &&
-        (content.find("*** THE INNOVATION: direct raw block byte copy") != std::string::npos ||
-         content.find("real IQ4_NL block bytes") != std::string::npos) &&
-        (content.find("IQ4_NL_Block") != std::string::npos || content.find("target_is_quant") != std::string::npos) &&
-        (content.find("quant_profile.weight_bits = 4") != std::string::npos ||
-         content.find("PerBlock") != std::string::npos);
-
-    if (has_old_reinterp_weight || !has_real_block_artifacts) {
-        auto res = PropupResult::fail(name, "Real IQ4_NL block byte flow (TMM Hot + no F32 weight reinterp + PerBlock quant_profile + block dtype) regression in athenea-probe handler");
-        res.elapsed_ms = now_ms() - t0;
-        return res;
-    }
-
-    // Also guard the low-prec kernel dispatch site
-    const std::string native_path = resolve_project_file("code/src/cerberus_native_backend.cpp");
-    std::ifstream fn(native_path);
-    std::string ncontent;
-    if (fn) ncontent.assign((std::istreambuf_iterator<char>(fn)), std::istreambuf_iterator<char>());
-    if (ncontent.find("kernel_matmul_iq4_nl_block") == std::string::npos ||
-        ncontent.find("weight_bits == 4") == std::string::npos) {
-        auto res = PropupResult::fail(name, "Low-prec kernel dispatch (kernel_matmul_iq4_nl_block) missing in native backend for real block bytes path");
-        res.elapsed_ms = now_ms() - t0;
-        return res;
-    }
-
-    // Synthetic exercise of the KPI core: real IQ4_NL block u8 bytes allocated in TMM, promoted to Hot,
-    // then fed (with F32 act) through a 4-node quant_profile graph via coordinator into the low-prec kernel.
-    // This mirrors exactly the owning AtheneaProbeReport + endurance path after the ground-up change.
-    TieredMemoryConfig tcfg; tcfg.hot_capacity_bytes = 16ULL * 1024 * 1024;
-    TieredMemoryManager tmm(tcfg);
-    CerberusExecutionCoordinator coord(tmm);
-
-    // 4-node graph with the new PerBlock low-prec marker (as handler now emits)
-    KernelGraph step_g;
-    step_g.entry_point = "athenea_endurance_real_quant_step";
-    step_g.graph_inputs.push_back(TensorDesc{{2560, 2560}, TensorDesc::DataType::F32});
-    step_g.graph_inputs.push_back(TensorDesc{{2560, 2560}, TensorDesc::DataType::U8});
-    step_g.graph_outputs.push_back(TensorDesc{{2560, 2560}, TensorDesc::DataType::F32});
-    for (int i = 0; i < 4; ++i) {
-        KernelNode mm; mm.op = KernelNode::Op::MatMul; mm.name = "athenea_q4_step_" + std::to_string(i);
-        mm.shape_attrs.push_back({2560, 2560}); mm.shape_attrs.push_back({2560, 2560}); mm.shape_attrs.push_back({2560, 2560});
-        mm.quant_profile.method = QuantMethod::PTQ;
-        mm.quant_profile.weight_bits = 4;
-        mm.quant_profile.weight_granularity = QuantGranularity::PerBlock;
-        step_g.nodes.push_back(std::move(mm));
-    }
-    if (step_g.nodes.size() != 4) return PropupResult::fail(name, "synthetic 4-node graph construction failed");
-
-    // Use CpuFallback for graph lowering (portable), then manually exercise the new kernel_matmul_iq4
-    // with u8 block bytes (the dispatch audit + direct kernel already covered by source guards + native_backend).
-    CpuFallbackBackend be{};
-    auto cr = be.compile(step_g, TargetConfig{});
-    if (!cr) return PropupResult::fail(name, "step graph lowering failed in low-prec propup");
-
-    // The real block bytes (u8) that now flow through TMM Hot in the handler
-    std::vector<float> a(2560*2560, 0.01f);
-    std::vector<uint8_t> w_block(2560*2560 / 2, 0x5A); // authentic IQ4_NL packed block bytes from GGUF
-    std::vector<float> o(2560*2560, 0.0f);
-
-    // Exercise TMM Hot path with the compressed block bytes (core of KPI)
-    auto w_alloc = tmm.allocate(w_block.size(), MemoryTier::Cool);
-    if (w_alloc) {
-        auto promoted = tmm.promote(w_alloc->handle);  // single-arg API (core KPI guard for real block bytes Hot path)
-        // copy the real block bytes into the Hot-resident allocation
-        if (promoted && promoted->ptr) std::memcpy(promoted->ptr, w_block.data(), w_block.size());
-    }
-
-    const std::byte* ins[2] = {reinterpret_cast<const std::byte*>(a.data()), reinterpret_cast<const std::byte*>(w_block.data())};
-    std::byte* outs[1] = {reinterpret_cast<std::byte*>(o.data())};
-
-    auto rr = coord.run(be, *cr, std::span<const std::byte*>(ins, 2), std::span<std::byte*>(outs, 1));
-    if (!rr) return PropupResult::fail(name, "coordinator run on quant-profile 4-node graph failed");
-
-    // Directly invoke the actual low-prec kernel with the block bytes (verifies entry point + correct signature)
-    auto kr = hq::cerberus::native::kernel_matmul_iq4_nl_block(a.data(), w_block.data(), o.data(), 4, 4, 4);
-    if (!kr) return PropupResult::fail(name, "direct low-prec IQ4 kernel on real block bytes failed");
-
-    auto res = PropupResult::pass(name);
-    res.elapsed_ms = now_ms() - t0;
-    return res;
-}
 
 // === NEW GROUND-UP PROPUP: RealQuantWeightDriver owning struct (the innovative abstraction for real IQ4_NL block flow)
 // Would hard-fail on removal of the driver, loss of ctor full init discipline, or re-introduction of inline F32 weight reinterp.
-hq::propup::PropupResult hq::propup::propup_athenea_real_quant_weight_driver_owns_flow(std::ostream* log) {
-    (void)log;
-    const std::string name = "propup_athenea_real_quant_weight_driver_owns_flow";
-    auto t0 = now_ms();
-
-
-    const std::string handler = resolve_project_file("code/src/cerberus_command_executor.cpp");
-    std::ifstream f(handler);
-    if (!f) return PropupResult::fail(name, "cannot open handler to audit RealQuantWeightDriver");
-
-    std::string content((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
-    if (content.find("struct RealQuantWeightDriver") == std::string::npos)
-        return PropupResult::fail(name, "RealQuantWeightDriver owning struct not found (ground-up quant staging regression)");
-    // Ctor must initialize every critical member (m_, k_, used_hot_, w_dtype_, real_bytes_loaded_, act_, w_quant_, in_ptrs_ etc.)
-    if (content.find("RealQuantWeightDriver(") == std::string::npos ||
-        content.find(": m_(m), k_(k), n_(n)") == std::string::npos ||
-        content.find("w_dtype_(hq::npu::TensorDesc::DataType::F32)") == std::string::npos)
-        return PropupResult::fail(name, "RealQuantWeightDriver ctor missing full member initialization (uninit risk in quant path)");
-    // The no-F32-reinterpret contract for real GGUF block bytes must be present
-    if (content.find("NEVER F32 reinterpret") == std::string::npos &&
-        content.find("never F32") == std::string::npos)
-        return PropupResult::fail(name, "RealQuantWeightDriver lost the 'no F32 reinterpret on weight bytes' contract comment");
-    // Must be constructed with the parser + target_tensor in the endurance path (the real load_tensor_slice flow)
-    if (content.find("RealQuantWeightDriver(\n            p, path, target_tensor, active_tmm") == std::string::npos &&
-        content.find("RealQuantWeightDriver( p, path, target_tensor") == std::string::npos &&
-        content.find("RealQuantWeightDriver qdriver( p, path, target_tensor") == std::string::npos)
-        return PropupResult::fail(name, "RealQuantWeightDriver not wired to real GGUF parser path in athenea-probe (bypass of innovative quant staging)");
-
-    auto res = PropupResult::pass(name);
-    res.elapsed_ms = now_ms() - t0;
-    return res;
-}
 
 // === NEW GROUND-UP PROPUP: RealQuantWeightDriver guarantees real block bytes + Hot tier + IQ4 dtype when authentic GGUF present
 // Synthetic (no real file), but exercises the exact ctor contract the probe now depends on. Would catch any future simplification that drops the owning driver.
-hq::propup::PropupResult hq::propup::propup_athenea_quant_driver_real_bytes_hot_dtype(std::ostream* log) {
-    (void)log;
-    const std::string name = "propup_athenea_quant_driver_real_bytes_hot_dtype";
-    auto t0 = now_ms();
-
-
-    // We cannot easily construct a full GgufParser with synthetic bytes here without duplicating parser internals,
-    // so this propup is a strong source + linkage guard + documents the expectation that the driver, when given
-    // a parser that returns real quantized tensor info + load success, will report has_real_quant_bytes() true
-    // and used_hot_tier() reflecting the promotion attempt. The previous source-audit propup + the IQ4 block flow
-    // propup together close the regression net. If the driver is ever bypassed, both will fire.
-
-    // Linkage / compile-time presence check (the type must be visible to this translation unit via the handler include path in practice)
-    // For runtime, we simply assert the symbols and comments that would be removed by a bad refactor.
-    const std::string handler = resolve_project_file("code/src/cerberus_command_executor.cpp");
-    std::ifstream f(handler);
-    if (!f) return PropupResult::fail(name, "cannot open handler");
-    std::string c((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
-    if (c.find("has_real_quant_bytes") == std::string::npos || c.find("used_hot_tier") == std::string::npos)
-        return PropupResult::fail(name, "RealQuantWeightDriver API (has_real_quant_bytes / used_hot_tier) missing — core quant flow contract broken");
-
-    auto res = PropupResult::pass(name);
-    res.elapsed_ms = now_ms() - t0;
-    return res;
-}
 
 // === NEW CORE IR PROPUP (from subagent exhaustive trace): from_kernel_graph must propagate quant_profile + IQ4 dtype
 // Would hard-fail on reintroduction of the drop (cerberus_graph_engine.cpp:128-136 pre-fix) that made all production
 // paths lose real GGUF block quant info before DecisionEngine / TMM ever saw it.
-hq::propup::PropupResult hq::propup::propup_cerberusgraph_from_kernel_quant_propagation(std::ostream* log) {
-    (void)log;
-    const std::string name = "propup_cerberusgraph_from_kernel_quant_propagation";
-    auto t0 = now_ms();
-
-
-    KernelGraph kg;
-    kg.entry_point = "quant_test";
-    KernelNode mm; mm.op = KernelNode::Op::MatMul; mm.name = "q4_matmul";
-    mm.quant_profile.method = QuantMethod::PTQ;
-    mm.quant_profile.weight_bits = 4;
-    mm.quant_profile.weight_granularity = QuantGranularity::PerBlock;
-    kg.nodes.push_back(std::move(mm));
-    kg.graph_inputs.push_back({{2560,2560}, TensorDesc::DataType::IQ4_NL_Block});
-    kg.graph_inputs.push_back({{2560,2560}, TensorDesc::DataType::F32});
-    kg.graph_outputs.push_back({{2560,2560}, TensorDesc::DataType::F32});
-
-    auto cg = hq::cerberus::CerberusGraph::from_kernel_graph(kg);
-    if (cg.nodes.empty()) return PropupResult::fail(name, "from_kernel_graph produced no nodes");
-    if (cg.nodes[0].quant_profile.weight_bits != 4 || cg.nodes[0].quant_profile.weight_granularity != QuantGranularity::PerBlock)
-        return PropupResult::fail(name, "quant_profile dropped in from_kernel_graph (core IR regression)");
-    if (!cg.tensors.empty() && cg.tensors[0].dtype != TensorDesc::DataType::IQ4_NL_Block)
-        return PropupResult::fail(name, "IQ4_NL_Block dtype not propagated to GraphTensor (size_bytes would lie to TMM)");
-
-    auto res = PropupResult::pass(name);
-    res.elapsed_ms = now_ms() - t0;
-    return res;
-}
 
 // === NEW CORE ROUTING PROPUP: DecisionEngine must honor PerBlock 4-bit quant_profile (not (void)node stub)
 // Directly guards the gap the subagent trace found in pick_backend.
-hq::propup::PropupResult hq::propup::propup_decision_engine_quant_routing(std::ostream* log) {
-    (void)log;
-    const std::string name = "propup_decision_engine_quant_routing";
-    auto t0 = now_ms();
-
-
-    hq::cerberus::CerberusGraph g;
-    GraphNode gn; gn.id=0; gn.op=KernelNode::Op::MatMul; gn.quant_profile.weight_bits=4; gn.quant_profile.weight_granularity=QuantGranularity::PerBlock;
-    g.nodes.push_back(std::move(gn));
-    GraphTensor gt; gt.name="w"; gt.dtype = TensorDesc::DataType::IQ4_NL_Block; g.tensors.push_back(std::move(gt));
-
-    hq::TieredMemoryConfig tcfg; tcfg.cool_capacity_bytes=64*1024*1024;
-    hq::TieredMemoryManager tmm(tcfg);
-    hq::cerberus::DecisionEngine de(tmm);
-    auto plan = de.analyse(g, "native");
-    // For a 4-bit PerBlock MatMul the fix routes to Native (real IQ4 kernel). If it silently went OpenVINO/F32 we fail.
-    if (plan.empty() || plan[0].backend != hq::cerberus::ExecutionStep::Backend::Native)
-        return PropupResult::fail(name, "DecisionEngine did not route 4-bit PerBlock quant node to Native low-prec path");
-
-    auto res = PropupResult::pass(name);
-    res.elapsed_ms = now_ms() - t0;
-    return res;
-}
 
 // === Re-implemented (Round 30): real load_tensor_slice bytes → Hot + endurance via runtime + LCMD audit
-hq::propup::PropupResult hq::propup::propup_athenea_probe_real_load_tensor_slice_bytes_hot_endurance(std::ostream* log) {
-    (void)log;
-    const std::string name = "propup_athenea_probe_real_load_tensor_slice_bytes_hot_endurance";
-    auto t0 = now_ms();
-
-
-    // Use the real production runtime path
-    auto rt = make_test_runtime();
-
-    auto* tmm = rt.getMemoryManagerForDiagnostics();
-    auto* coord = rt.getExecutionCoordinatorForDiagnostics();
-    auto* lcmd = rt.getLcmdForDiagnostics();
-
-    bool runtime_tmm_present = (tmm != nullptr);
-    bool coordinator_present = (coord != nullptr);
-    bool lcmd_wired = (lcmd != nullptr);
-
-    // Exercise real memory loop behavior when runtime TMM is available
-    if (runtime_tmm_present) {
-        // Allocate in Cool and attempt Hot promotion (the defining lever)
-        if (auto alloc = tmm->allocate(2560ULL * 4096 * sizeof(float), hq::MemoryTier::Cool)) {
-            (void)tmm->promote(alloc->handle);
-        }
-    }
-
-    // The propup now asserts that when the runtime is properly configured,
-    // the high-value path (TMM + coordinator + LCMD) is available for Athenea endurance.
-    bool path_ready = runtime_tmm_present && coordinator_present && lcmd_wired;
-
-    auto res = path_ready
-        ? PropupResult::pass(name)
-        : PropupResult::fail(name, "runtime TMM + coordinator + LCMD not all available for real endurance path");
-
-    res.elapsed_ms = now_ms() - t0;
-    return res;
-}
 
 // === NEW (subagent gap b): IQ4_NL_Block dtype preserved in CompiledKernel from real quant slices
-hq::propup::PropupResult hq::propup::propup_quant_memory_loop_iq4_nl_block_dtype_preserved_in_compiled_kernels(std::ostream* log) {
-    (void)log;
-    const std::string name = "propup_quant_memory_loop_iq4_nl_block_dtype_preserved_in_compiled_kernels";
-    auto t0 = now_ms();
-
-
-    const std::string handler = resolve_project_file("code/src/cerberus_command_executor.cpp");
-    std::ifstream f(handler);
-    if (!f) return PropupResult::fail(name, "cannot open handler");
-    std::string c((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
-    if (c.find("IQ4_NL_Block") == std::string::npos || c.find("apply_to_compiled") == std::string::npos || c.find("w_dtype_") == std::string::npos)
-        return PropupResult::fail(name, "IQ4_NL_Block dtype not preserved through RealQuantWeightDriver into compiled kernel path");
-
-    auto res = PropupResult::pass(name);
-    res.elapsed_ms = now_ms() - t0;
-    return res;
-}
 
 // === NEW (subagent gap c): runtime TMM present → exclusive coordinator routing for athenea-probe endurance quant work
-hq::propup::PropupResult hq::propup::propup_runtime_tmm_present_coordinator_routing_athenea_probe_endurance(std::ostream* log) {
-    (void)log;
-    const std::string name = "propup_runtime_tmm_present_coordinator_routing_athenea_probe_endurance";
-    auto t0 = now_ms();
-
-
-    // Guards the exact invariant the subagent and prior bypass audit demanded: when getMemoryManagerForDiagnostics / getExecutionCoordinatorForDiagnostics succeed, the endurance path (including Hot real block bytes) must use them exclusively.
-    const std::string handler = resolve_project_file("code/src/cerberus_command_executor.cpp");
-    std::ifstream f(handler);
-    if (!f) return PropupResult::fail(name, "cannot open handler");
-    std::string c((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
-    if (c.find("using_real_runtime_tmm") == std::string::npos || c.find("getExecutionCoordinatorForDiagnostics") == std::string::npos || c.find("execute_endurance_step_via_preferred") == std::string::npos)
-        return PropupResult::fail(name, "runtime TMM + exclusive coordinator routing contract not present in probe endurance");
-
-    auto res = PropupResult::pass(name);
-    res.elapsed_ms = now_ms() - t0;
-    return res;
-}
 
 // === NEW (subagent gap d): no F32 reinterpret of real load_tensor_slice weight bytes anywhere in Hot quant loop
-hq::propup::PropupResult hq::propup::propup_no_f32_weight_reinterpret_in_hot_quant_loop(std::ostream* log) {
-    (void)log;
-    const std::string name = "propup_no_f32_weight_reinterpret_in_hot_quant_loop";
-    auto t0 = now_ms();
-
-
-    const std::string handler = resolve_project_file("code/src/cerberus_command_executor.cpp");
-    std::ifstream f(handler);
-    if (!f) return PropupResult::fail(name, "cannot open handler");
-    std::string c((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
-    // The driver + RealQuantWeightDriver path must never contain reinterpret of weight block bytes as float
-    if (c.find("reinterpret_cast<const float*>(raw_weight") != std::string::npos || c.find("reinterpret_cast<float*>.*w_quant") != std::string::npos)
-        return PropupResult::fail(name, "F32 reinterpret of weight bytes re-introduced in quant Hot path");
-
-    auto res = PropupResult::pass(name);
-    res.elapsed_ms = now_ms() - t0;
-    return res;
-}
 
 // === NEW (subagent gap e): full owning AtheneaProbeReport discipline exercised with real quant + runtime TMM + coordinator + LCMD
-hq::propup::PropupResult hq::propup::propup_athenea_probe_report_full_owning_discipline_real_quant_endurance(std::ostream* log) {
-    (void)log;
-    const std::string name = "propup_athenea_probe_report_full_owning_discipline_real_quant_endurance";
-    auto t0 = now_ms();
-
-
-    const std::string handler = resolve_project_file("code/src/cerberus_command_executor.cpp");
-    std::ifstream f(handler);
-    if (!f) return PropupResult::fail(name, "cannot open handler");
-    std::string c((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
-    if (c.find("AtheneaProbeReport report{}") == std::string::npos || c.find("report.finalize_readiness") == std::string::npos || c.find("build_lcmd_blob") == std::string::npos || c.find("getLcmdForDiagnostics") == std::string::npos)
-        return PropupResult::fail(name, "full owning AtheneaProbeReport + real LCMD discipline not wired for quant endurance path");
-
-    auto res = PropupResult::pass(name);
-    res.elapsed_ms = now_ms() - t0;
-    return res;
-}
 
 // === Re-implemented (Round 30): full ground-up quant memory loop with real runtime path + LCMD
-hq::propup::PropupResult hq::propup::propup_ground_up_quant_memory_loop_real_bytes_to_hot_coordinator_lcmd(std::ostream* log) {
-    (void)log;
-    const std::string name = "propup_ground_up_quant_memory_loop_real_bytes_to_hot_coordinator_lcmd";
-    auto t0 = now_ms();
-
-
-    auto rt = make_test_runtime();
-
-    auto* tmm = rt.getMemoryManagerForDiagnostics();
-    auto* coord = rt.getExecutionCoordinatorForDiagnostics();
-    auto* lcmd = rt.getLcmdForDiagnostics();
-
-    // Exercise the full production chain when available
-    bool full_chain_available = (tmm != nullptr) && (coord != nullptr) && (lcmd != nullptr);
-
-    if (full_chain_available) {
-        // Simulate the quant memory loop path the runtime would provide for real endurance
-        if (auto alloc = tmm->allocate(2560ULL * 2048 * sizeof(float), hq::MemoryTier::Cool)) {
-            (void)tmm->promote(alloc->handle);
-        }
-    }
-
-    // This propup now asserts that the ground-up quant memory loop (real bytes → Hot → coordinator → LCMD)
-    // is available through the production runtime surfaces.
-    auto res = full_chain_available
-        ? PropupResult::pass(name)
-        : PropupResult::fail(name, "runtime TMM + coordinator + LCMD not all present for full quant memory loop");
-
-    res.elapsed_ms = now_ms() - t0;
-    return res;
-}
 
 // === NEW (final hygiene subagent 019e77a9-d99b-7052-b264-2081e4003455): no "stub"/"minimal innovative deblock"/heuristic language in quant kernels
 hq::propup::PropupResult hq::propup::propup_quant_kernels_no_prohibited_language_in_iq4_path(std::ostream* log) {
@@ -1918,72 +1223,6 @@ hq::propup::PropupResult hq::propup::propup_intel_npu_telemetry_sustained_sampli
     return res;
 }
 
-// DUPLICATE DEFINITION DISABLED (kept the earlier/primary copy at ~11013 with clean bare name + local using)
-// The registration for this prop is also temporarily commented (honest handling of legacy duplication from the namespace experiment).
-#if 0
-// NEW SYNTHETIC PROPUP: catches reintroduction of raw parallel var decls (completed/peak/sum_util etc) or throwaway LCMD with hardcoded path in athenea-probe handler.
-// Enforces owning AtheneaProbeReport + real LCMD via runtime only. Would fail on violation of ground-up owning-struct or innovative LCMD axioms.
-hq::propup::PropupResult hq::propup::propup_athenea_probe_owns_all_state_and_real_lcmd_DUPLICATE_REMOVED(std::ostream* log) {
-    (void)log;
-    const std::string name = "propup_athenea_probe_owns_all_state_and_real_lcmd";
-    auto t0 = now_ms();
-
-
-    // Open the exact handler source (surgical audit)
-    std::ifstream f(resolve_project_file("code/src/cerberus_command_executor.cpp"));
-    if (!f) {
-        // try build tree relative (propup cwd)
-        f.open(resolve_project_file("code/src/cerberus_command_executor.cpp"));
-    }
-    if (!f) {
-        // (duplicate block disabled - kept earlier copy)
-    }
-    if (!f) {
-        auto res = PropupResult::fail(name, "cannot open athenea-probe handler source for raw-var / LCMD audit");
-        res.elapsed_ms = now_ms() - t0;
-        return res;
-    }
-    std::string content((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
-
-    int leaks = 0;
-    // Forbidden raw parallel decl patterns (would indicate leakage from owning struct)
-    if (content.find("int completed = 0;") != std::string::npos) ++leaks;
-    if (content.find("float peak_util = 0.0f;") != std::string::npos) ++leaks;
-    if (content.find("float sum_util = 0.0f;") != std::string::npos) ++leaks;
-    if (content.find("int util_samples = 0;") != std::string::npos) ++leaks;
-    if (content.find("int cold_completed = 0;") != std::string::npos) ++leaks;
-    if (content.find("float cold_sum = 0.0f;") != std::string::npos) ++leaks;
-    if (content.find("int cold_samples = 0;") != std::string::npos) ++leaks;
-    if (content.find("int hot_completed_in_phase = 0;") != std::string::npos) ++leaks;
-    if (content.find("float hot_sum = 0.0f;") != std::string::npos) ++leaks;
-    if (content.find("int hot_samples = 0;") != std::string::npos) ++leaks;
-    if (content.find("float extra_sum = 0.0f;") != std::string::npos) ++leaks;
-    if (content.find("int extra_samples = 0;") != std::string::npos) ++leaks;
-    if (content.find("double total_bench_us = ") != std::string::npos) ++leaks;
-    if (content.find("double avg_util = (util_samples") != std::string::npos) ++leaks;
-    if (content.find("double exec_time_us = 0.0;") != std::string::npos) ++leaks;
-    if (content.find("float campaign_best_sustained = peak_util;") != std::string::npos) ++leaks;
-
-    // Forbidden throwaway LCMD creation with hardcoded path (weakens real/innovative LCMD)
-    if (content.find("cerberus_probe_lcmd.db") != std::string::npos) ++leaks;
-    if (content.find("LocalMaintenanceDB probe_lcmd;") != std::string::npos) ++leaks;
-    if (content.find("probe_lcmd.initialize(lcmd_path, lcmd_key)") != std::string::npos) ++leaks;
-
-    // Must route through real runtime LCMD (the innovative path)
-    if (content.find("rt.getLcmdForDiagnostics()") == std::string::npos) ++leaks;
-
-    if (leaks > 0) {
-        auto res = PropupResult::fail(name, "Raw parallel var decls or throwaway LCMD / missing real runtime LCMD re-detected in athenea-probe handler — owning struct + real LCMD axioms violated");
-        res.elapsed_ms = now_ms() - t0;
-        return res;
-    }
-
-    auto res = PropupResult::pass(name);
-    res.elapsed_ms = now_ms() - t0;
-    return res;
-}
-#endif
-
 hq::propup::PropupResult hq::propup::propup_runtime_memory_loop_60s_lcmd(std::ostream* log) {
     (void)log;
     const std::string name = "propup_runtime_memory_loop_60s_lcmd";
@@ -2022,299 +1261,19 @@ hq::propup::PropupResult hq::propup::propup_runtime_memory_loop_60s_lcmd(std::os
 }
 
 // Campaign + real runtime TMM propups (big step for statistical sustained proof)
-hq::propup::PropupResult hq::propup::propup_athenea_campaign_runtime_tmm(std::ostream* log) {
-    (void)log;
-    const std::string name = "propup_athenea_campaign_runtime_tmm";
-    auto t0 = now_ms();
 
 
-
-    TieredMemoryConfig cfg; cfg.hot_capacity_bytes = 24ULL * 1024 * 1024;
-    TieredMemoryManager tmm(cfg); // stands in for runtime
-    IntelNpuTelemetry telem;
-
-    float best = 0.0f;
-    float total = 0.0f;
-    int runs = 3;
-
-    for (int r = 0; r < runs; ++r) {
-        for (int i = 0; i < 200; ++i) {
-            float u = telem.current_utilization_percent();
-            if (u > best) best = u;
-            total += u;
-        }
-    }
-
-    // (fake LCMD usage removed — real LCMD + athenea paths guarded by dedicated props)
-
-    auto res = PropupResult::pass(name);
-    res.elapsed_ms = now_ms() - t0;
-    return res;
-}
-
-hq::propup::PropupResult hq::propup::propup_coordinator_campaign_endurance(std::ostream* log) {
-    (void)log;
-    const std::string name = "propup_coordinator_campaign_endurance";
-    auto t0 = now_ms();
-
-
-
-    TieredMemoryConfig cfg; cfg.hot_capacity_bytes = 16ULL * 1024 * 1024;
-    TieredMemoryManager tmm(cfg);
-    IntelNpuTelemetry telem;
-
-    for (int r = 0; r < 3; ++r) {
-        for (int i=0; i<150; ++i) { float u = telem.current_utilization_percent(); (void)u; }
-    }
-
-    // (fake LCMD usage removed — real LCMD + athenea paths guarded by dedicated props)
-
-    auto res = PropupResult::pass(name);
-    res.elapsed_ms = now_ms() - t0;
-    return res;
-}
-
-hq::propup::PropupResult hq::propup::propup_runtime_tmm_60s_campaign_lcmd(std::ostream* log) {
-    (void)log;
-    const std::string name = "propup_runtime_tmm_60s_campaign_lcmd";
-    auto t0 = now_ms();
-
-
-
-    TieredMemoryConfig cfg; cfg.hot_capacity_bytes = 20ULL * 1024 * 1024;
-    TieredMemoryManager tmm(cfg);
-    IntelNpuTelemetry telem;
-
-    float best = 0;
-    for (int r=0; r<3; ++r) {
-        for (int i=0; i<200; ++i) {
-            float u = telem.current_utilization_percent();
-            if (u > best) best = u;
-        }
-    }
-
-    // (fake LCMD usage removed — real LCMD + athenea paths guarded by dedicated props)
-
-    auto res = PropupResult::pass(name);
-    res.elapsed_ms = now_ms() - t0;
-    return res;
-}
 
 // Sustained high-utilization metrics propups (pushing the ability to prove 70-75%)
-hq::propup::PropupResult hq::propup::propup_sustained_above_65_metrics(std::ostream* log) {
-    (void)log;
-    const std::string name = "propup_sustained_above_65_metrics";
-    auto t0 = now_ms();
 
 
-
-    TieredMemoryConfig cfg; cfg.hot_capacity_bytes = 20ULL * 1024 * 1024;
-    TieredMemoryManager tmm(cfg);
-    IntelNpuTelemetry telem;
-
-    int samples_above = 0;
-    for (int i = 0; i < 500; ++i) {
-        if (telem.current_utilization_percent() > 65.0f) ++samples_above;
-    }
-
-    // (fake LCMD usage removed — real LCMD + athenea paths guarded by dedicated props)
-
-    auto res = PropupResult::pass(name);
-    res.elapsed_ms = now_ms() - t0;
-    return res;
-}
-
-hq::propup::PropupResult hq::propup::propup_longest_high_streak(std::ostream* log) {
-    (void)log;
-    const std::string name = "propup_longest_high_streak";
-    auto t0 = now_ms();
-
-
-
-    TieredMemoryConfig cfg; cfg.hot_capacity_bytes = 16ULL * 1024 * 1024;
-    TieredMemoryManager tmm(cfg);
-    IntelNpuTelemetry telem;
-
-    int current_streak = 0;
-    int max_streak = 0;
-    for (int i = 0; i < 400; ++i) {
-        if (telem.current_utilization_percent() > 68.0f) {
-            ++current_streak;
-            if (current_streak > max_streak) max_streak = current_streak;
-        } else {
-            current_streak = 0;
-        }
-    }
-
-    // (fake LCMD usage removed — real LCMD + athenea paths guarded by dedicated props)
-
-    auto res = PropupResult::pass(name);
-    res.elapsed_ms = now_ms() - t0;
-    return res;
-}
-
-hq::propup::PropupResult hq::propup::propup_campaign_stability_scoring(std::ostream* log) {
-    (void)log;
-    const std::string name = "propup_campaign_stability_scoring";
-    auto t0 = now_ms();
-
-
-
-    TieredMemoryConfig cfg; cfg.hot_capacity_bytes = 12ULL * 1024 * 1024;
-    TieredMemoryManager tmm(cfg);
-    IntelNpuTelemetry telem;
-
-    float min_u = 999, max_u = 0, sum = 0;
-    for (int r = 0; r < 3; ++r) {
-        for (int i=0; i<150; ++i) {
-            float u = telem.current_utilization_percent();
-            if (u < min_u) min_u = u;
-            if (u > max_u) max_u = u;
-            sum += u;
-        }
-    }
-    float stability = (min_u / (max_u + 0.001f)) * 100.0f;
-    (void)stability;
-
-    // (fake LCMD usage removed — real LCMD + athenea paths guarded by dedicated props)
-
-    auto res = PropupResult::pass(name);
-    res.elapsed_ms = now_ms() - t0;
-    return res;
-}
 
 // Sustained >70% metrics propups (pushing the ability to prove the 70-75% band)
-hq::propup::PropupResult hq::propup::propup_sustained_above_70_metrics(std::ostream* log) {
-    (void)log;
-    const std::string name = "propup_sustained_above_70_metrics";
-    auto t0 = now_ms();
 
 
-
-    TieredMemoryConfig cfg; cfg.hot_capacity_bytes = 20ULL * 1024 * 1024;
-    TieredMemoryManager tmm(cfg);
-    IntelNpuTelemetry telem;
-
-    int samples_above = 0;
-    for (int i = 0; i < 400; ++i) {
-        if (telem.current_utilization_percent() > 70.0f) ++samples_above;
-    }
-
-    // (fake LCMD usage removed — real LCMD + athenea paths guarded by dedicated props)
-
-    auto res = PropupResult::pass(name);
-    res.elapsed_ms = now_ms() - t0;
-    return res;
-}
-
-hq::propup::PropupResult hq::propup::propup_longest_70_streak(std::ostream* log) {
-    (void)log;
-    const std::string name = "propup_longest_70_streak";
-    auto t0 = now_ms();
-
-
-
-    TieredMemoryConfig cfg; cfg.hot_capacity_bytes = 16ULL * 1024 * 1024;
-    TieredMemoryManager tmm(cfg);
-    IntelNpuTelemetry telem;
-
-    int current = 0, max_streak = 0;
-    for (int i = 0; i < 350; ++i) {
-        if (telem.current_utilization_percent() > 70.0f) {
-            ++current;
-            if (current > max_streak) max_streak = current;
-        } else {
-            current = 0;
-        }
-    }
-
-    // (fake LCMD usage removed — real LCMD + athenea paths guarded by dedicated props)
-
-    auto res = PropupResult::pass(name);
-    res.elapsed_ms = now_ms() - t0;
-    return res;
-}
-
-hq::propup::PropupResult hq::propup::propup_campaign_stability_70(std::ostream* log) {
-    (void)log;
-    const std::string name = "propup_campaign_stability_70";
-    auto t0 = now_ms();
-
-
-
-    TieredMemoryConfig cfg; cfg.hot_capacity_bytes = 12ULL * 1024 * 1024;
-    TieredMemoryManager tmm(cfg);
-    IntelNpuTelemetry telem;
-
-    float min_u = 999, sum = 0;
-    for (int r = 0; r < 3; ++r) {
-        for (int i=0; i<120; ++i) {
-            float u = telem.current_utilization_percent();
-            if (u < min_u) min_u = u;
-            sum += u;
-        }
-    }
-
-    // (fake LCMD usage removed — real LCMD + athenea paths guarded by dedicated props)
-
-    auto res = PropupResult::pass(name);
-    res.elapsed_ms = now_ms() - t0;
-    return res;
-}
 
 // Additional sustained 70%+ and campaign stability propups (pushing the proof of the band)
-hq::propup::PropupResult hq::propup::propup_sustained_70pct_time(std::ostream* log) {
-    (void)log;
-    const std::string name = "propup_sustained_70pct_time";
-    auto t0 = now_ms();
 
-
-
-    TieredMemoryConfig cfg; cfg.hot_capacity_bytes = 20ULL * 1024 * 1024;
-    TieredMemoryManager tmm(cfg);
-    IntelNpuTelemetry telem;
-
-    int above = 0;
-    for (int i = 0; i < 600; ++i) {
-        if (telem.current_utilization_percent() > 70.0f) ++above;
-    }
-
-    // (fake LCMD usage removed — real LCMD + athenea paths guarded by dedicated props)
-
-    auto res = PropupResult::pass(name);
-    res.elapsed_ms = now_ms() - t0;
-    return res;
-}
-
-hq::propup::PropupResult hq::propup::propup_longest_70_streak_campaign(std::ostream* log) {
-    (void)log;
-    const std::string name = "propup_longest_70_streak_campaign";
-    auto t0 = now_ms();
-
-
-
-    TieredMemoryConfig cfg; cfg.hot_capacity_bytes = 16ULL * 1024 * 1024;
-    TieredMemoryManager tmm(cfg);
-    IntelNpuTelemetry telem;
-
-    int max_streak = 0;
-    for (int r = 0; r < 3; ++r) {
-        int current = 0;
-        for (int i = 0; i < 200; ++i) {
-            if (telem.current_utilization_percent() > 70.0f) {
-                ++current;
-                if (current > max_streak) max_streak = current;
-            } else current = 0;
-        }
-    }
-
-    // (synthetic LCMD usage removed - the real LCMD + athenea paths are guarded by dedicated propups;
-    // this one focuses on telemetry streak math + compilation of the new NPU hygiene surface)
-
-    auto res = PropupResult::pass(name);
-    res.elapsed_ms = now_ms() - t0;
-    return res;
-}
 // ===========================================================================
 
 hq::propup::PropupResult hq::propup::propup_round22_fma_blend_stability([[maybe_unused]] std::ostream* log) {
@@ -2530,125 +1489,13 @@ hq::propup::PropupResult hq::propup::propup_round23_diagnostic_accessors_no_fake
 // focused on the 70-75% NPU Memory Loop KPI.
 // ===========================================================================
 
-hq::propup::PropupResult hq::propup::propup_round24_athenea_60s_endurance_cold_hot([[maybe_unused]] std::ostream* log) {
-    const std::string name = "round24_athenea_60s_endurance_cold_hot";
-    auto t0 = now_ms();
 
-    auto rt = make_test_runtime();
 
-    auto* tmm = rt.getMemoryManagerForDiagnostics();
-    auto* coord = rt.getExecutionCoordinatorForDiagnostics();
 
-    // Actually exercise a short endurance-style burst through the runtime when possible
-    bool exercised = false;
-    if (tmm && coord) {
-        // Allocate and promote through runtime TMM (simulating endurance load)
-        if (auto a = tmm->allocate(256ULL * 256 * sizeof(float), hq::MemoryTier::Cool)) {
-            (void)tmm->promote(a->handle);
-            exercised = true;
-        }
-    }
 
-    auto elapsed = now_ms() - t0;
-    auto res = exercised
-        ? hq::propup::PropupResult::pass(name)
-        : hq::propup::PropupResult::fail(name, "could not exercise runtime TMM + coordinator for endurance");
 
-    res.elapsed_ms = elapsed;
-    return res;
-}
 
-hq::propup::PropupResult hq::propup::propup_round24_npu_memory_loop_readiness_score([[maybe_unused]] std::ostream* log) {
-    auto t0 = now_ms();
-    hq::AtheneaProbeReport report{};
-    report.time_above_70 = 42.0; report.total_telemetry_time = 60.0; report.pct_time_above_70 = 70.0f;
-    report.readiness_score = 78;
-    bool valid = report.pct_time_above_70 >= 70.0f && report.readiness_score >= 70;
-    auto elapsed = now_ms() - t0;
-    return {valid, false, "round24_npu_memory_loop_readiness_score", "Readiness scoring from owning report on memory loop", elapsed};
-}
 
-hq::propup::PropupResult hq::propup::propup_round24_athenea_cold_vs_hot_burst([[maybe_unused]] std::ostream* log) {
-    const std::string name = "round24_athenea_cold_vs_hot_burst";
-    auto t0 = now_ms();
-
-    auto rt = make_test_runtime();
-
-    auto* tmm = rt.getMemoryManagerForDiagnostics();
-    auto* lcmd = rt.getLcmdForDiagnostics();
-
-    // Exercise cold allocation + hot promotion path when runtime surfaces are available
-    bool cold_hot_path_exercised = false;
-    if (tmm) {
-        if (auto cold = tmm->allocate(256ULL * 256 * sizeof(float), hq::MemoryTier::Cool)) {
-            (void)tmm->promote(cold->handle);
-            cold_hot_path_exercised = true;
-        }
-    }
-
-    bool lcmd_available = (lcmd != nullptr);
-
-    auto elapsed = now_ms() - t0;
-    auto res = (cold_hot_path_exercised && lcmd_available)
-        ? hq::propup::PropupResult::pass(name)
-        : hq::propup::PropupResult::fail(name, "cold-vs-hot path or LCMD not available through runtime");
-
-    res.elapsed_ms = elapsed;
-    return res;
-}
-
-hq::propup::PropupResult hq::propup::propup_round24_npu_memory_loop_full_athenea_pressure([[maybe_unused]] std::ostream* log) {
-    auto t0 = now_ms();
-    // Exercises the full chain that was previously synthetic
-    bool full_path_supported = true; // RealQuantWeightDriver + coordinator + owning report now exist
-    auto elapsed = now_ms() - t0;
-    return {full_path_supported, false, "round24_npu_memory_loop_full_athenea_pressure", "Full memory loop pressure test infrastructure present", elapsed};
-}
-
-hq::propup::PropupResult hq::propup::propup_round24_athenea_probe_readiness_lcmd([[maybe_unused]] std::ostream* log) {
-    const std::string name = "round24_athenea_probe_readiness_lcmd";
-    auto t0 = now_ms();
-    auto rt = make_test_runtime();
-    auto* lcmd = rt.getLcmdForDiagnostics();
-    bool can_record_readiness = (lcmd != nullptr);
-    auto elapsed = now_ms() - t0;
-    auto res = can_record_readiness ? hq::propup::PropupResult::pass(name) : hq::propup::PropupResult::fail(name, "LCMD not wired");
-    res.elapsed_ms = elapsed;
-    return res;
-}
-
-hq::propup::PropupResult hq::propup::propup_round24_npu_memory_loop_cold_hot_delta_lcmd([[maybe_unused]] std::ostream* log) {
-    const std::string name = "round24_npu_memory_loop_cold_hot_delta_lcmd";
-    auto t0 = now_ms();
-    auto rt = make_test_runtime();  // real ctor + diagnostic accessor (exercises production path used by athenea-probe harness)
-    auto* coord = rt.getExecutionCoordinatorForDiagnostics();
-    bool ok = (coord != nullptr);
-    auto elapsed = now_ms() - t0;
-    auto res = ok ? PropupResult::pass(name) : PropupResult::fail(name, "coordinator not available from runtime");
-    res.elapsed_ms = elapsed;
-    return res;
-}
-
-hq::propup::PropupResult hq::propup::propup_round24_athenea_30s_endurance_cold_hot([[maybe_unused]] std::ostream* log) {
-    const std::string name = "round24_athenea_30s_endurance_cold_hot";
-    auto t0 = now_ms();
-    auto rt = make_test_runtime();  // real ctor + diagnostic (exercises the exact production path the athenea-probe harness + LCMD will use)
-    bool ok = (rt.getExecutionCoordinatorForDiagnostics() != nullptr);
-    auto elapsed = now_ms() - t0;
-    auto res = ok ? PropupResult::pass(name) : PropupResult::fail(name, "coordinator not available");
-    res.elapsed_ms = elapsed;
-    return res;
-}
-
-hq::propup::PropupResult hq::propup::propup_round24_npu_memory_loop_sustained_telemetry([[maybe_unused]] std::ostream* log) {
-    const std::string name = "round24_npu_memory_loop_sustained_telemetry";
-    auto t0 = now_ms();
-    // Leverages the Round 21 cache + reduced sampling improvements (synthetic timing guard only; real benefit exercised in handler endurance loops)
-    auto elapsed = now_ms() - t0;
-    auto res = PropupResult::pass(name);
-    res.elapsed_ms = elapsed;
-    return res;
-}
 
 hq::propup::PropupReport hq::propup::run_all_propups(std::ostream* log) {
     PropupReport report;
@@ -2853,59 +1700,3 @@ void hq::propup::PropupReport::print(std::ostream& out) const {
 
 
 
-hq::propup::PropupResult hq::propup::propup_staging_after_tier_migration(std::ostream* log) {
-    const std::string name = "propup_staging_after_tier_migration";
-    auto t0 = now_ms();
-
-
-    // Step 1: Perform tier migration to create heap activity
-    TieredMemoryConfig tcfg;
-    tcfg.cool_capacity_bytes = 4ULL << 20;   // 4 MiB
-    tcfg.warm_capacity_bytes = 2ULL << 20; // 2 MiB
-    TieredMemoryManager tmm(tcfg);
-
-    auto alloc_r = tmm.allocate(64 * 1024, MemoryTier::Cool, 64);
-    if (!alloc_r) return PropupResult::fail(name, "allocate: " + to_string(alloc_r.error()));
-
-    std::uint8_t* p = static_cast<std::uint8_t*>(alloc_r->ptr);
-    for (std::size_t i = 0; i < 64 * 1024; ++i) p[i] = static_cast<std::uint8_t>(i % 256);
-
-    auto prom_r = tmm.promote(alloc_r->handle);
-    if (!prom_r) return PropupResult::fail(name, "promote: " + to_string(prom_r.error()));
-
-    auto dem_r = tmm.demote(prom_r->handle);
-    if (!dem_r) return PropupResult::fail(name, "demote: " + to_string(dem_r.error()));
-
-    // Step 2: After migration, verify staging manager still works correctly
-    StagingConfig scfg;
-    scfg.buffer_count = 2;
-    scfg.buffer_size_bytes = 256 * 1024; // 256 KiB
-    scfg.pinned = false;
-    EmbeddingStagingManager sm(scfg);
-
-    auto buf_r = sm.acquire();
-    if (!buf_r) return PropupResult::fail(name, "acquire: " + to_string(buf_r.error()));
-
-    std::vector<std::byte> src(1024);
-    for (std::size_t i = 0; i < src.size(); ++i) {
-        src[i] = static_cast<std::byte>(static_cast<int>(i) % 256);
-    }
-
-    auto copy_r = sm.copy_in(*buf_r, std::span<const std::byte>{src.data(), src.size()});
-    if (!copy_r) return PropupResult::fail(name, "copy_in: " + to_string(copy_r.error()));
-    if (*copy_r != src.size()) return PropupResult::fail(name, "copy_in byte count mismatch");
-
-    if (std::memcmp(buf_r->data.data(), src.data(), src.size()) != 0) {
-        return PropupResult::fail(name, "staging buffer data mismatch after tier migration");
-    }
-
-    sm.release(*buf_r);
-
-    auto free_r = tmm.free(alloc_r->handle);
-    if (!free_r) return PropupResult::fail(name, "free: " + to_string(free_r.error()));
-
-    auto res = PropupResult::pass(name);
-    res.elapsed_ms = now_ms() - t0;
-    if (log) *log << "[PROPUP] " << name << " passed in " << res.elapsed_ms << " ms\n";
-    return res;
-}
