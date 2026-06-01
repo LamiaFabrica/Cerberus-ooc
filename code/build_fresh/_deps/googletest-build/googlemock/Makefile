@@ -56,10 +56,10 @@ RM = "C:\Program Files\CMake\bin\cmake.exe" -E rm -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = "C:\McMaker Projects\Projects\Cerberus - Copy\code"
+CMAKE_SOURCE_DIR = "C:\McMaker Projects\Projects\Cerberus - Main\code"
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = "C:\McMaker Projects\Projects\Cerberus - Copy\code\build_fresh"
+CMAKE_BINARY_DIR = "C:\McMaker Projects\Projects\Cerberus - Main\code\build_fresh"
 
 #=============================================================================
 # Targets provided globally by CMake.
@@ -161,9 +161,9 @@ install/strip/fast: preinstall/fast
 
 # The main all target
 all: cmake_check_build_system
-	cd /d C:\MCMAKE~1\Projects\CERBER~1\code\BUILD_~1 && $(CMAKE_COMMAND) -E cmake_progress_start "C:\McMaker Projects\Projects\Cerberus - Copy\code\build_fresh\CMakeFiles" "C:\McMaker Projects\Projects\Cerberus - Copy\code\build_fresh\_deps\googletest-build\googlemock\\CMakeFiles\progress.marks"
+	cd /d C:\MCMAKE~1\Projects\CERBER~1\code\BUILD_~1 && $(CMAKE_COMMAND) -E cmake_progress_start "C:\McMaker Projects\Projects\Cerberus - Main\code\build_fresh\CMakeFiles" "C:\McMaker Projects\Projects\Cerberus - Main\code\build_fresh\_deps\googletest-build\googlemock\\CMakeFiles\progress.marks"
 	cd /d C:\MCMAKE~1\Projects\CERBER~1\code\BUILD_~1 && $(MAKE) $(MAKESILENT) -f CMakeFiles\Makefile2 _deps/googletest-build/googlemock/all
-	$(CMAKE_COMMAND) -E cmake_progress_start "C:\McMaker Projects\Projects\Cerberus - Copy\code\build_fresh\CMakeFiles" 0
+	$(CMAKE_COMMAND) -E cmake_progress_start "C:\McMaker Projects\Projects\Cerberus - Main\code\build_fresh\CMakeFiles" 0
 .PHONY : all
 
 # The main clean target

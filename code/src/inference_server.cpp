@@ -26,6 +26,7 @@
 #include <string>
 #include <string_view>
 #include <vector>
+#include <iostream>
 
 #ifdef _WIN32
 #  include <winsock2.h>
@@ -63,8 +64,8 @@ struct InferenceServer::Impl {
     ServerStats stats;
 
     // Privacy surface (optional but required for full inference history feature)
-    std::shared_ptr<hq::cerberus::LocalMaintenanceDB> lcmd;
-    std::shared_ptr<hq::cerberus::UserSecurity>       user_security;
+    std::shared_ptr<hq::cerberus::privacy::LocalMaintenanceDB> lcmd;
+    std::shared_ptr<hq::cerberus::privacy::UserSecurity>       user_security;
     std::string                                       rbpc_node_id{"local"};
 
     void close_listen() noexcept {
@@ -291,7 +292,7 @@ DeviceLoadBalancer::DeviceChoice DeviceLoadBalancer::pick_device() {
                     last_gpu_temp_ = telem->temperature_celsius;
                     gpu_available_ = true;
                     if (verbose_)
-                        std::print("[lb] GPU {}: {}% {}C\n",
+                        std::cout << std::format("[lb] GPU {}: {}% {}C\n",
                                    gpu_monitor_->device_index(),
                                    last_gpu_util_, last_gpu_temp_);
                     if (telem->utilization_percent < 95.0f)
@@ -313,7 +314,7 @@ DeviceLoadBalancer::DeviceChoice DeviceLoadBalancer::pick_device() {
                     last_hailo_temp_ = stats->temperature_celsius;
                     hailo_available_ = true;
                     if (verbose_)
-                        std::print("[lb] Hailo {}: {}% {}C\n",
+                        std::cout << std::format("[lb] Hailo {}: {}% {}C\n",
                                    hailo_monitor_->device_id(),
                                    last_hailo_util_, last_hailo_temp_);
                     if (stats->nn_core_utilization < 90.0f
@@ -329,7 +330,7 @@ DeviceLoadBalancer::DeviceChoice DeviceLoadBalancer::pick_device() {
     }
 
     if (verbose_)
-        std::print("[lb] picked {} ({}%)\n", best.device_name, best.utilization_percent);
+        std::cout << std::format("[lb] picked {} ({}%)\n", best.device_name, best.utilization_percent);
     return best;
 }
 
@@ -544,7 +545,7 @@ int InferenceServer::start() {
     // Open listening socket
     impl_->listen_fd = static_cast<int>(::socket(AF_INET, SOCK_STREAM, 0));
     if (impl_->listen_fd < 0) {
-        std::print("[cerberus] socket() failed: {}\n", strerror(errno));
+        std::cout << std::format("[cerberus] socket() failed: {}\n", strerror(errno));
         return 1;
     }
 
@@ -556,26 +557,26 @@ int InferenceServer::start() {
     addr.sin_family = AF_INET;
     addr.sin_port   = htons(cfg_.port);
     if (inet_pton(AF_INET, cfg_.bind_address.c_str(), &addr.sin_addr) != 1) {
-        std::print("[cerberus] inet_pton failed\n");
+        std::cout << std::format("[cerberus] inet_pton failed\n");
         impl_->close_listen();
         return 1;
     }
 
     if (::bind(impl_->listen_fd,
                reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) < 0) {
-        std::print("[cerberus] bind({}:{}) failed\n",
+        std::cout << std::format("[cerberus] bind({}:{}) failed\n",
                    cfg_.bind_address, cfg_.port);
         impl_->close_listen();
         return 1;
     }
 
     if (::listen(impl_->listen_fd, LISTEN_BACKLOG) < 0) {
-        std::print("[cerberus] listen() failed\n");
+        std::cout << std::format("[cerberus] listen() failed\n");
         impl_->close_listen();
         return 1;
     }
 
-    std::print("[cerberus] listening on {}:{}\n", cfg_.bind_address, cfg_.port);
+    std::cout << std::format("[cerberus] listening on {}:{}\n", cfg_.bind_address, cfg_.port);
     impl_->running.store(true, std::memory_order_release);
 
     discover_devices_();
@@ -595,7 +596,7 @@ int InferenceServer::start() {
             if (errno == EINTR) continue;
             if (errno == EBADF) break;
 #endif
-            std::print("[cerberus] accept() error\n");
+            std::cout << std::format("[cerberus] accept() error\n");
             continue;
         }
 
@@ -640,7 +641,7 @@ int InferenceServer::start() {
 
     auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(
         std::chrono::steady_clock::now() - impl_->stats.start_time).count();
-    std::print("[cerberus] shutdown — {} req in {} s\n",
+    std::cout << std::format("[cerberus] shutdown — {} req in {} s\n",
                impl_->stats.requests_served.load(), elapsed);
     return 0;
 }
@@ -742,7 +743,7 @@ const ServerStats& InferenceServer::get_stats() const noexcept {
 
 HttpResponse InferenceServer::dispatch_(const HttpRequest& req) {
     if (cfg_.verbose_logging)
-        std::print("[cerberus] {} {}\n",
+        std::cout << std::format("[cerberus] {} {}\n",
                    static_cast<int>(req.method), req.path);
 
     if (req.method == HttpMethod::GET && req.path == "/health")
@@ -766,6 +767,7 @@ HttpResponse InferenceServer::dispatch_(const HttpRequest& req) {
 }
 
 HttpResponse InferenceServer::handle_inference_history_(const HttpRequest& req) {
+    (void)req;
     impl_->stats.inference_history_requests.fetch_add(1, std::memory_order_relaxed);
 
     if (!impl_->lcmd) {
@@ -884,6 +886,7 @@ HttpResponse InferenceServer::handle_inference_clear_(const HttpRequest& req) {
 }
 
 HttpResponse InferenceServer::handle_inference_stats_(const HttpRequest& req) {
+    (void)req;
     impl_->stats.inference_stats_requests.fetch_add(1, std::memory_order_relaxed);
 
     if (!impl_->lcmd) {

@@ -3,9 +3,9 @@
 # No other meaning or use of this file is supported.
 
 method=git
-command=C:/Program Files/CMake/bin/cmake.exe;-DCMAKE_MESSAGE_LOG_LEVEL=VERBOSE;-P;C:/McMaker Projects/Projects/Cerberus - Copy/code/build_fresh/_deps/googletest-subbuild/googletest-populate-prefix/tmp/googletest-populate-gitclone.cmake
-source_dir=C:/McMaker Projects/Projects/Cerberus - Copy/code/build_fresh/_deps/googletest-src
-work_dir=C:/McMaker Projects/Projects/Cerberus - Copy/code/build_fresh/_deps
+command=C:/Program Files/CMake/bin/cmake.exe;-DCMAKE_MESSAGE_LOG_LEVEL=VERBOSE;-P;C:/McMaker Projects/Projects/Cerberus - Main/code/build_fresh/_deps/googletest-subbuild/googletest-populate-prefix/tmp/googletest-populate-gitclone.cmake
+source_dir=C:/McMaker Projects/Projects/Cerberus - Main/code/build_fresh/_deps/googletest-src
+work_dir=C:/McMaker Projects/Projects/Cerberus - Main/code/build_fresh/_deps
 repository=https://github.com/google/googletest.git
 remote=origin
 init_submodules=TRUE

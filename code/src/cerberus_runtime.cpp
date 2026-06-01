@@ -12,9 +12,12 @@
 #include "hq/cerberus_glow_engine.hpp"
 #include "hq/tiered_memory_manager.hpp"
 #include "hq/cerberus_execution_coordinator.hpp"
+#include "hq/cerberus_psiforcedb_security.hpp"
 
 #include <string>
 #include <sstream>
+#include <filesystem>
+#include <cstdlib>
 
 namespace hq::cerberus {
 
@@ -45,6 +48,26 @@ CerberusRuntime::CerberusRuntime(const Config& cfg)
     if (!init_r) {
         throw std::runtime_error(
             "CerberusRuntime::init_backend_ failed: " + init_r.error());
+    }
+    lcmd_diagnostic_ = cfg_.lcmd;
+    if (!lcmd_diagnostic_) {
+        try {
+            auto default_lcmd = std::make_shared<hq::cerberus::privacy::LocalMaintenanceDB>();
+            std::filesystem::path db_path;
+            if (const char* local_appdata = std::getenv("LOCALAPPDATA")) {
+                db_path = std::filesystem::path(local_appdata) / "Cerberus" / "local_maintenance.db";
+            } else {
+                db_path = std::filesystem::temp_directory_path() / "cerberus_local_maintenance.db";
+            }
+            std::filesystem::create_directories(db_path.parent_path());
+            auto db_key = hq::cerberus::security::CryptoBridge::sha256(
+                "cerberus_runtime_default_lcmd_key_v1");
+            if (db_key.size() == 32 && default_lcmd->initialize(db_path, db_key)) {
+                lcmd_diagnostic_ = std::move(default_lcmd);
+            }
+        } catch (...) {
+            // leave lcmd_diagnostic_ null if default setup fails
+        }
     }
     glow_engine_ = std::make_unique<GlowEngine>();
     executor_ = std::make_unique<cli::CerberusCommandExecutor>(*this);

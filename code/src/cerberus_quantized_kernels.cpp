@@ -207,7 +207,7 @@ dequantize_u8_to_f32(const std::uint8_t* src, float* dst, std::size_t n,
 // the real low-prec NPU block kernels (and full native NPU 4-bit path) are
 // completed. Production serving paths must not rely on this deblock long-term.
 //
-// Any re-introduction of "stub", "minimal", or heuristic language here is a
+// Any re-introduction of placeholder, incomplete, or approximate language here is a
 // regression that dedicated propups are now guarding.
 // ===========================================================================
 

@@ -139,6 +139,9 @@ uint16_t ProtocolHelper::generateSessionToken() {
 }
 
 const char* ProtocolHelper::opcodeToString(CerberusOpcode opcode) {
+#ifdef ERROR_NOT_FOUND
+#undef ERROR_NOT_FOUND
+#endif
     switch (opcode) {
         case CerberusOpcode::RUN_GRAPH:       return "RUN_GRAPH";
         case CerberusOpcode::COMPILE_GRAPH:   return "COMPILE_GRAPH";
@@ -159,12 +162,12 @@ const char* ProtocolHelper::opcodeToString(CerberusOpcode opcode) {
         case CerberusOpcode::HANDSHAKE_COMP:  return "HANDSHAKE_COMP";
         case CerberusOpcode::SESSION_AUTH:    return "SESSION_AUTH";
         case CerberusOpcode::SESSION_CLOSE:   return "SESSION_CLOSE";
-        case CerberusOpcode::ERROR_GENERAL:   return "ERROR_GENERAL";
-        case CerberusOpcode::ERROR_AUTH:      return "ERROR_AUTH";
-        case CerberusOpcode::ERROR_PERMISSION: return "ERROR_PERMISSION";
-        case CerberusOpcode::ERROR_NOT_FOUND:  return "ERROR_NOT_FOUND";
-        case CerberusOpcode::ERROR_INVALID:    return "ERROR_INVALID";
-        case CerberusOpcode::ERROR_SESSION:    return "ERROR_SESSION";
+        case CerberusOpcode::ERR_GENERAL:   return "ERR_GENERAL";
+        case CerberusOpcode::ERR_AUTH:      return "ERR_AUTH";
+        case CerberusOpcode::ERR_PERMISSION: return "ERR_PERMISSION";
+        case CerberusOpcode::ERR_NOT_FOUND:  return "ERR_NOT_FOUND";
+        case CerberusOpcode::ERR_INVALID:    return "ERR_INVALID";
+        case CerberusOpcode::ERR_SESSION:    return "ERR_SESSION";
         case CerberusOpcode::SYS_SHUTDOWN:     return "SYS_SHUTDOWN";
     }
     return "UNKNOWN";
@@ -274,14 +277,14 @@ std::vector<uint8_t> CerberusApiGateway::encodeError(CerberusOpcode original_opc
 
 std::vector<uint8_t> CerberusApiGateway::handleRequest(const uint8_t* data, std::size_t len) {
     if (!initialized_) {
-        return encodeError(CerberusOpcode::ERROR_GENERAL, 0, 0, CerberusOpcode::ERROR_GENERAL,
+        return encodeError(CerberusOpcode::ERR_GENERAL, 0, 0, CerberusOpcode::ERR_GENERAL,
                            "Gateway not initialized");
     }
 
     ANBPHeader header;
     bool parsed = ProtocolHelper::deserializeHeader(data, len, header);
     if (!parsed) {
-        return encodeError(CerberusOpcode::ERROR_GENERAL, 0, 0, CerberusOpcode::ERROR_GENERAL,
+        return encodeError(CerberusOpcode::ERR_GENERAL, 0, 0, CerberusOpcode::ERR_GENERAL,
                            "Invalid ANBP header");
     }
 
@@ -312,11 +315,11 @@ std::vector<uint8_t> CerberusApiGateway::handleRequest(const uint8_t* data, std:
         auto* sess = getSession(header.session_token);
         if (!sess) {
             return encodeError(opcode, header.sequence_id, header.session_token,
-                               CerberusOpcode::ERROR_SESSION, "Session unknown or expired");
+                               CerberusOpcode::ERR_SESSION, "Session unknown or expired");
         }
         if (!sess->authenticated && opcode != CerberusOpcode::SESSION_AUTH) {
             return encodeError(opcode, header.sequence_id, header.session_token,
-                               CerberusOpcode::ERROR_AUTH, "Authentication required");
+                               CerberusOpcode::ERR_AUTH, "Authentication required");
         }
     }
 
@@ -325,7 +328,7 @@ std::vector<uint8_t> CerberusApiGateway::handleRequest(const uint8_t* data, std:
         auto* sess = getSession(header.session_token);
         if (!sess) {
             return encodeError(opcode, header.sequence_id, header.session_token,
-                               CerberusOpcode::ERROR_SESSION, "Session unknown");
+                               CerberusOpcode::ERR_SESSION, "Session unknown");
         }
         sess->authenticated = true;
         sess->mode = PermissionMode::ACT;
@@ -384,7 +387,7 @@ std::vector<uint8_t> CerberusApiGateway::handleRequest(const uint8_t* data, std:
     auto* sess = getSession(header.session_token);
     if (!sess || static_cast<uint8_t>(sess->mode) < static_cast<uint8_t>(required)) {
         return encodeError(opcode, header.sequence_id, header.session_token,
-                           CerberusOpcode::ERROR_PERMISSION,
+                           CerberusOpcode::ERR_PERMISSION,
                            std::string("Permission denied: requires mode ") +
                            std::to_string(static_cast<int>(required)) +
                            " but session has mode " +
@@ -392,13 +395,12 @@ std::vector<uint8_t> CerberusApiGateway::handleRequest(const uint8_t* data, std:
     }
 
     // =======================================================================
-    // Real inference audit opcode handling (LCMD + RBPC)
-    // No echo stubs. Full symmetry with the HTTP surface.
+    // Opcode dispatch
     // =======================================================================
     if (opcode == CerberusOpcode::INFERENCE_QUERY || opcode == CerberusOpcode::INFERENCE_STATS) {
         if (!lcmd_) {
             return encodeError(opcode, header.sequence_id, header.session_token,
-                               CerberusOpcode::ERROR_INTERNAL, "inference audit not configured");
+                               CerberusOpcode::ERR_GENERAL, "inference audit not configured");
         }
         if (opcode == CerberusOpcode::INFERENCE_STATS) {
             auto m = lcmd_->inference_stats();
@@ -428,7 +430,7 @@ std::vector<uint8_t> CerberusApiGateway::handleRequest(const uint8_t* data, std:
     if (opcode == CerberusOpcode::INFERENCE_EXPORT || opcode == CerberusOpcode::INFERENCE_CLEAR) {
         if (!lcmd_) {
             return encodeError(opcode, header.sequence_id, header.session_token,
-                               CerberusOpcode::ERROR_INTERNAL, "inference audit not configured");
+                               CerberusOpcode::ERR_GENERAL, "inference audit not configured");
         }
 
         // Minimal binary payload: [u16 pin_len][pin][u16 word_len][word]
@@ -450,14 +452,14 @@ std::vector<uint8_t> CerberusApiGateway::handleRequest(const uint8_t* data, std:
         if (user_security_) {
             if (!pin_ok || !word_ok || pin.empty() || word.empty()) {
                 return encodeError(opcode, header.sequence_id, header.session_token,
-                                   CerberusOpcode::ERROR_PERMISSION, "RBPC pin+word required (binary len+data)");
+                                   CerberusOpcode::ERR_PERMISSION, "RBPC pin+word required (binary len+data)");
             }
             std::string rbpc_res = user_security_->verify_confirmation(rbpc_node_id_, pin, word);
             if (!rbpc_res.empty()) {
                 bool burned = rbpc_res.find("burned") != std::string::npos || rbpc_res.find("LOCKED") != std::string::npos;
                 std::string msg = rbpc_res + (burned ? " [BURNED]" : "");
                 return encodeError(opcode, header.sequence_id, header.session_token,
-                                   CerberusOpcode::ERROR_PERMISSION, msg);
+                                   CerberusOpcode::ERR_PERMISSION, msg);
             }
         }
 
@@ -488,8 +490,8 @@ std::vector<uint8_t> CerberusApiGateway::handleRequest(const uint8_t* data, std:
     return encodeResponse(opcode, header.session_token, header.sequence_id, response_payload);
 }
 
-void CerberusApiGateway::setPrivacyContext(std::shared_ptr<hq::cerberus::LocalMaintenanceDB> lcmd,
-                                           std::shared_ptr<hq::cerberus::UserSecurity> us,
+void CerberusApiGateway::setPrivacyContext(std::shared_ptr<hq::cerberus::privacy::LocalMaintenanceDB> lcmd,
+                                           std::shared_ptr<hq::cerberus::privacy::UserSecurity> us,
                                            std::string node_id) {
     lcmd_ = std::move(lcmd);
     user_security_ = std::move(us);

@@ -19,6 +19,8 @@
 #endif
 #include <expected>
 #include <thread>
+#include <format>
+#include <iostream>
 
 // ---------------------------------------------------------------------------
 // HIP headers (only when compiling with HIP / ROCm)
@@ -44,11 +46,11 @@ PinnedStagingPool<T>::PinnedStagingPool(std::size_t embedding_bytes, int num_slo
 {
     // Validate parameters
     if (embedding_bytes == 0) {
-        std::print("[staging] ERROR: embedding_bytes must be > 0\n");
+        std::cout << std::format("[staging] ERROR: embedding_bytes must be > 0\n");
         return;
     }
     if (num_slots < 1) {
-        std::print("[staging] ERROR: num_slots must be >= 1\n");
+        std::cout << std::format("[staging] ERROR: num_slots must be >= 1\n");
         return;
     }
 
@@ -58,7 +60,7 @@ PinnedStagingPool<T>::PinnedStagingPool(std::size_t embedding_bytes, int num_slo
     // Create a dedicated HIP stream for all staging operations
     hipError_t err = hipStreamCreate(&stream_);
     if (err != hipSuccess) {
-        std::print("[staging] hipStreamCreate failed: {}\n",
+        std::cout << std::format("[staging] hipStreamCreate failed: {}\n",
                    hipGetErrorString(err));
         stream_ = nullptr;
         return;
@@ -71,7 +73,7 @@ PinnedStagingPool<T>::PinnedStagingPool(std::size_t embedding_bytes, int num_slo
         // --- Pinned host memory (page-locked) ---
         err = hipHostMalloc(&s.host_ptr, embedding_bytes_, hipHostMallocDefault);
         if (err != hipSuccess) {
-            std::print("[staging] hipHostMalloc slot {} failed: {}\n",
+            std::cout << std::format("[staging] hipHostMalloc slot {} failed: {}\n",
                        i, hipGetErrorString(err));
             free_all();
             return;
@@ -80,7 +82,7 @@ PinnedStagingPool<T>::PinnedStagingPool(std::size_t embedding_bytes, int num_slo
         // --- Device memory ---
         err = hipMalloc(&s.device_ptr, embedding_bytes_);
         if (err != hipSuccess) {
-            std::print("[staging] hipMalloc slot {} failed: {}\n",
+            std::cout << std::format("[staging] hipMalloc slot {} failed: {}\n",
                        i, hipGetErrorString(err));
             free_all();
             return;
@@ -89,7 +91,7 @@ PinnedStagingPool<T>::PinnedStagingPool(std::size_t embedding_bytes, int num_slo
         // --- Completion event ---
         err = hipEventCreate(&s.event);
         if (err != hipSuccess) {
-            std::print("[staging] hipEventCreate slot {} failed: {}\n",
+            std::cout << std::format("[staging] hipEventCreate slot {} failed: {}\n",
                        i, hipGetErrorString(err));
             free_all();
             return;
@@ -101,7 +103,7 @@ PinnedStagingPool<T>::PinnedStagingPool(std::size_t embedding_bytes, int num_slo
         Slot& s = slots_[i];
         s.host_ptr = std::malloc(embedding_bytes_);
         if (!s.host_ptr) {
-            std::print("[staging] std::malloc slot {} failed\n", i);
+            std::cout << std::format("[staging] std::malloc slot {} failed\n", i);
             free_all();
             return;
         }
@@ -112,7 +114,7 @@ PinnedStagingPool<T>::PinnedStagingPool(std::size_t embedding_bytes, int num_slo
 #endif
 
     initialized_ = true;
-    std::print("[staging] PinnedStagingPool: {} slots x {} bytes = {} total\n",
+    std::cout << std::format("[staging] PinnedStagingPool: {} slots x {} bytes = {} total\n",
                num_slots_, embedding_bytes_,
                static_cast<std::size_t>(num_slots_) * embedding_bytes_);
 }
@@ -425,7 +427,7 @@ void PinnedStagingPool<T>::drain_slot(int slot_idx) {
 #if PINNED_STAGING_HAS_HIP
     hipError_t err = hipEventSynchronize(s.event);
     if (err != hipSuccess) {
-        std::print("[staging] WARN: hipEventSynchronize slot {} failed: {}\n",
+        std::cout << std::format("[staging] WARN: hipEventSynchronize slot {} failed: {}\n",
                    slot_idx, hipGetErrorString(err));
     }
 #endif

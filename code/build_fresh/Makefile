@@ -56,10 +56,10 @@ RM = "C:\Program Files\CMake\bin\cmake.exe" -E rm -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = "C:\McMaker Projects\Projects\Cerberus - Copy\code"
+CMAKE_SOURCE_DIR = "C:\McMaker Projects\Projects\Cerberus - Main\code"
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = "C:\McMaker Projects\Projects\Cerberus - Copy\code\build_fresh"
+CMAKE_BINARY_DIR = "C:\McMaker Projects\Projects\Cerberus - Main\code\build_fresh"
 
 #=============================================================================
 # Targets provided globally by CMake.
@@ -161,9 +161,9 @@ install/strip/fast: preinstall/fast
 
 # The main all target
 all: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start "C:\McMaker Projects\Projects\Cerberus - Copy\code\build_fresh\CMakeFiles" "C:\McMaker Projects\Projects\Cerberus - Copy\code\build_fresh\\CMakeFiles\progress.marks"
+	$(CMAKE_COMMAND) -E cmake_progress_start "C:\McMaker Projects\Projects\Cerberus - Main\code\build_fresh\CMakeFiles" "C:\McMaker Projects\Projects\Cerberus - Main\code\build_fresh\\CMakeFiles\progress.marks"
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\Makefile2 all
-	$(CMAKE_COMMAND) -E cmake_progress_start "C:\McMaker Projects\Projects\Cerberus - Copy\code\build_fresh\CMakeFiles" 0
+	$(CMAKE_COMMAND) -E cmake_progress_start "C:\McMaker Projects\Projects\Cerberus - Main\code\build_fresh\CMakeFiles" 0
 .PHONY : all
 
 # The main clean target
@@ -267,6 +267,19 @@ cerberus_register: cmake_check_build_system
 cerberus_register/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\cerberus_register.dir\build.make CMakeFiles/cerberus_register.dir/build
 .PHONY : cerberus_register/fast
+
+#=============================================================================
+# Target rules for targets named test_lcmd_e2e
+
+# Build rule for target.
+test_lcmd_e2e: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\Makefile2 test_lcmd_e2e
+.PHONY : test_lcmd_e2e
+
+# fast build rule for target.
+test_lcmd_e2e/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\test_lcmd_e2e.dir\build.make CMakeFiles/test_lcmd_e2e.dir/build
+.PHONY : test_lcmd_e2e/fast
 
 #=============================================================================
 # Target rules for targets named cerberus_npu
@@ -1330,6 +1343,30 @@ src/inference_server.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\cerberus_server.dir\build.make CMakeFiles/cerberus_server.dir/src/inference_server.cpp.s
 .PHONY : src/inference_server.cpp.s
 
+src/intel_npu_telemetry.obj: src/intel_npu_telemetry.cpp.obj
+.PHONY : src/intel_npu_telemetry.obj
+
+# target to build an object file
+src/intel_npu_telemetry.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\um790_pipeline.dir\build.make CMakeFiles/um790_pipeline.dir/src/intel_npu_telemetry.cpp.obj
+.PHONY : src/intel_npu_telemetry.cpp.obj
+
+src/intel_npu_telemetry.i: src/intel_npu_telemetry.cpp.i
+.PHONY : src/intel_npu_telemetry.i
+
+# target to preprocess a source file
+src/intel_npu_telemetry.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\um790_pipeline.dir\build.make CMakeFiles/um790_pipeline.dir/src/intel_npu_telemetry.cpp.i
+.PHONY : src/intel_npu_telemetry.cpp.i
+
+src/intel_npu_telemetry.s: src/intel_npu_telemetry.cpp.s
+.PHONY : src/intel_npu_telemetry.s
+
+# target to generate assembly for a file
+src/intel_npu_telemetry.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\um790_pipeline.dir\build.make CMakeFiles/um790_pipeline.dir/src/intel_npu_telemetry.cpp.s
+.PHONY : src/intel_npu_telemetry.cpp.s
+
 src/logger.obj: src/logger.cpp.obj
 .PHONY : src/logger.obj
 
@@ -1642,6 +1679,30 @@ tests/test_all.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\um790_test.dir\build.make CMakeFiles/um790_test.dir/tests/test_all.cpp.s
 .PHONY : tests/test_all.cpp.s
 
+tests/test_lcmd_e2e.obj: tests/test_lcmd_e2e.cpp.obj
+.PHONY : tests/test_lcmd_e2e.obj
+
+# target to build an object file
+tests/test_lcmd_e2e.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\test_lcmd_e2e.dir\build.make CMakeFiles/test_lcmd_e2e.dir/tests/test_lcmd_e2e.cpp.obj
+.PHONY : tests/test_lcmd_e2e.cpp.obj
+
+tests/test_lcmd_e2e.i: tests/test_lcmd_e2e.cpp.i
+.PHONY : tests/test_lcmd_e2e.i
+
+# target to preprocess a source file
+tests/test_lcmd_e2e.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\test_lcmd_e2e.dir\build.make CMakeFiles/test_lcmd_e2e.dir/tests/test_lcmd_e2e.cpp.i
+.PHONY : tests/test_lcmd_e2e.cpp.i
+
+tests/test_lcmd_e2e.s: tests/test_lcmd_e2e.cpp.s
+.PHONY : tests/test_lcmd_e2e.s
+
+# target to generate assembly for a file
+tests/test_lcmd_e2e.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\test_lcmd_e2e.dir\build.make CMakeFiles/test_lcmd_e2e.dir/tests/test_lcmd_e2e.cpp.s
+.PHONY : tests/test_lcmd_e2e.cpp.s
+
 # Help Target
 help:
 	@echo The following are some of the valid targets for this Makefile:
@@ -1665,6 +1726,7 @@ help:
 	@echo ... gmock_main
 	@echo ... gtest
 	@echo ... gtest_main
+	@echo ... test_lcmd_e2e
 	@echo ... test_smoke_ov
 	@echo ... um790_pipeline
 	@echo ... um790_run
@@ -1792,6 +1854,9 @@ help:
 	@echo ... src/inference_server.obj
 	@echo ... src/inference_server.i
 	@echo ... src/inference_server.s
+	@echo ... src/intel_npu_telemetry.obj
+	@echo ... src/intel_npu_telemetry.i
+	@echo ... src/intel_npu_telemetry.s
 	@echo ... src/logger.obj
 	@echo ... src/logger.i
 	@echo ... src/logger.s
@@ -1831,6 +1896,9 @@ help:
 	@echo ... tests/test_all.obj
 	@echo ... tests/test_all.i
 	@echo ... tests/test_all.s
+	@echo ... tests/test_lcmd_e2e.obj
+	@echo ... tests/test_lcmd_e2e.i
+	@echo ... tests/test_lcmd_e2e.s
 .PHONY : help
 
 

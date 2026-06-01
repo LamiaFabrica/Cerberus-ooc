@@ -22,7 +22,7 @@
 #endif
 
 #ifndef UM790_HAS_STD_PRINT
-#define UM790_HAS_STD_PRINT 1
+#define UM790_HAS_STD_PRINT 0
 #endif
 
 #ifndef UM790_HAS_STD_MDSPAN

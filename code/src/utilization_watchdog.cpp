@@ -12,6 +12,8 @@
 #include <cmath>
 #include <mutex>
 #include <thread>
+#include <format>
+#include <iostream>
 
 namespace hq {
 
@@ -34,7 +36,7 @@ UtilizationWatchdog::UtilizationWatchdog(WatchdogConfig cfg,
     }
     if (cfg_.thermal_throttle_threshold_c < 0.0f ||
         cfg_.thermal_throttle_threshold_c > 125.0f) {
-        std::print(
+        std::cout << std::format(
             "[watchdog] WARNING: thermal threshold {:.1f}C out of range [0, 125], "
             "clamping\n",
             cfg_.thermal_throttle_threshold_c);
@@ -184,7 +186,7 @@ UtilizationWatchdog::evaluate_device(ComputeUnit unit,
                     "[{}] step={} util={:.1f}% — max_recoveries ({}) exhausted, "
                     "treating as FATAL",
                     device_name(unit), step_num, util, cfg_.max_recoveries);
-                std::print("[watchdog] FATAL {}\n", reason);
+                std::cout << std::format("[watchdog] FATAL {}\n", reason);
                 if (on_alert_) on_alert_(unit, step_num, util, reason);
                 consecutive.store(0, std::memory_order_relaxed);
                 return RecoveryAction{.result=RecoveryResult::FATAL, .device=unit,
@@ -226,7 +228,7 @@ UtilizationWatchdog::evaluate_device(ComputeUnit unit,
                     "[{}] step={} util={:.1f}% — CRITICAL zone, max_recoveries "
                     "({}) exhausted, treating as FATAL",
                     device_name(unit), step_num, util, cfg_.max_recoveries);
-                std::print("[watchdog] FATAL {}\n", reason);
+                std::cout << std::format("[watchdog] FATAL {}\n", reason);
                 if (on_alert_) on_alert_(unit, step_num, util, reason);
                 return RecoveryAction{.result=RecoveryResult::FATAL, .device=unit,
                                       .step=step_num, .util_at_fault=util, .reason=reason};
@@ -259,7 +261,7 @@ UtilizationWatchdog::trigger_recovery(ComputeUnit unit,
     const std::uint32_t new_count =
         recovery_count.fetch_add(1, std::memory_order_relaxed) + 1;
     const float delay_ms = compute_backoff_ms(new_count);
-    std::print("[watchdog] [{}] step={} util={:.1f}% — recovery #{}/{} with "
+    std::cout << std::format("[watchdog] [{}] step={} util={:.1f}% — recovery #{}/{} with "
                "{:.0f}ms backoff\n",
                device_name(unit), step, util,
                new_count, cfg_.max_recoveries, delay_ms);
@@ -272,13 +274,13 @@ UtilizationWatchdog::trigger_recovery(ComputeUnit unit,
     }
     auto result = on_recovery_(unit, step, util);
     if (result) {
-        std::print("[watchdog] [{}] step={} — recovery result: {}\n",
+        std::cout << std::format("[watchdog] [{}] step={} — recovery result: {}\n",
                    device_name(unit), step,
                    result.value() == RecoveryResult::SUCCESS   ? "SUCCESS"
                    : result.value() == RecoveryResult::PARTIAL ? "PARTIAL"
                                                                : "FATAL");
     } else {
-        std::print("[watchdog] [{}] step={} — recovery FAILED: {}\n",
+        std::cout << std::format("[watchdog] [{}] step={} — recovery FAILED: {}\n",
                    device_name(unit), step, result.error());
     }
     return result;
@@ -306,7 +308,7 @@ bool UtilizationWatchdog::thermal_skip_recovery_(ComputeUnit unit,
             device_name(unit), step, util,
             is_critical ? "CRITICAL but" : "",
             temperature, cfg_.thermal_throttle_threshold_c);
-        std::print("[watchdog] {}\n", msg);
+        std::cout << std::format("[watchdog] {}\n", msg);
         if (on_alert_) on_alert_(unit, step, util, msg);
         return true;
     }
@@ -330,7 +332,7 @@ void UtilizationWatchdog::log_state_change(ComputeUnit unit,
 #else
     gmtime_r(&time_t_now, &utc);
 #endif
-    std::print(
+    std::cout << std::format(
         "[watchdog] {:04d}-{:02d}-{:02d}T{:02d}:{:02d}:{:02d}.{:03d}Z "
         "[{}] step={} state_change: {} -> {} util={:.1f}%\n",
         utc.tm_year + 1900, utc.tm_mon + 1, utc.tm_mday,
