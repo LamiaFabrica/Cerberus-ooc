@@ -26,13 +26,23 @@
 #endif
 #include <queue>
 #include <stop_token>
-#include <iostream>
 #include <thread>
 
 #ifdef UM790_HAS_HIP
 #include <hip/hip_runtime_api.h>
-#include <iostream>
 #endif
+
+extern "C" std::size_t hq_safe_write(int fd, const char* data, std::size_t len);
+
+namespace {
+    inline void hq_print(std::string msg) {
+        hq_safe_write(1, msg.data(), msg.size());
+    }
+    inline void hq_println(std::string msg) {
+        hq_safe_write(1, msg.data(), msg.size());
+        hq_safe_write(1, "\n", 1);
+    }
+}
 
 namespace hq::npu {
 
@@ -86,22 +96,22 @@ struct NpuDmaPipeline::Impl {
                 err = hipMalloc(&slot->dev.device_ptr,
                                 cfg.embedding_bytes);
                 if (err != hipSuccess) {
-                    std::cout << std::format("[NpuDmaPipeline] slot {} hipMalloc failed: {}\n",
-                               i, hipGetErrorString(err));
+                    hq_println(std::format("[NpuDmaPipeline] slot {} hipMalloc failed: {}",
+                               i, hipGetErrorString(err)));
                     slot->dev.device_ptr = nullptr;
                 }
 
                 err = hipStreamCreate(&slot->dev.dma_stream);
                 if (err != hipSuccess) {
-                    std::cout << std::format("[NpuDmaPipeline] slot {} hipStreamCreate failed: {}\n",
-                               i, hipGetErrorString(err));
+                    hq_println(std::format("[NpuDmaPipeline] slot {} hipStreamCreate failed: {}",
+                               i, hipGetErrorString(err)));
                     slot->dev.dma_stream = nullptr;
                 }
 
                 err = hipEventCreate(&slot->dev.dma_done);
                 if (err != hipSuccess) {
-                    std::cout << std::format("[NpuDmaPipeline] slot {} hipEventCreate failed: {}\n",
-                               i, hipGetErrorString(err));
+                    hq_println(std::format("[NpuDmaPipeline] slot {} hipEventCreate failed: {}",
+                               i, hipGetErrorString(err)));
                     slot->dev.dma_done = nullptr;
                 }
             }
@@ -111,10 +121,10 @@ struct NpuDmaPipeline::Impl {
         }
 
         if (!encoder) {
-            std::cout << std::format("[NpuDmaPipeline] WARNING: No encoder provided. "
-                       "Pipeline will fail encode requests until an encoder is set.\n");
+            hq_println(std::format("[NpuDmaPipeline] WARNING: No encoder provided. "
+                       "Pipeline will fail encode requests until an encoder is set."));
         } else {
-            std::cout << std::format("[NpuDmaPipeline] Active encoder: {}\n", encoder->name());
+            hq_println(std::format("[NpuDmaPipeline] Active encoder: {}", encoder->name()));
         }
     }
 
@@ -170,16 +180,16 @@ struct NpuDmaPipeline::Impl {
 
         if (err != hipSuccess) {
             slot->state.store(NpuDmaSlot::State::FAILED, std::memory_order_release);
-            std::cout << std::format("[NpuDmaPipeline] DMA H2D slot {} failed: {}\n",
-                       slot_idx, hipGetErrorString(err));
+            hq_println(std::format("[NpuDmaPipeline] DMA H2D slot {} failed: {}",
+                       slot_idx, hipGetErrorString(err)));
             return;
         }
 
         err = hipEventRecord(slot->dev.dma_done, slot->dev.dma_stream);
         if (err != hipSuccess) {
             slot->state.store(NpuDmaSlot::State::FAILED, std::memory_order_release);
-            std::cout << std::format("[NpuDmaPipeline] DMA event record slot {} failed: {}\n",
-                       slot_idx, hipGetErrorString(err));
+            hq_println(std::format("[NpuDmaPipeline] DMA event record slot {} failed: {}",
+                       slot_idx, hipGetErrorString(err)));
             return;
         }
 
@@ -200,8 +210,8 @@ struct NpuDmaPipeline::Impl {
         auto encoded = encoder->encode(req);
         if (!encoded) {
             slot->state.store(NpuDmaSlot::State::FAILED, std::memory_order_release);
-            std::cout << std::format("[NpuDmaPipeline] Encode failed slot {}: {}\n",
-                       slot_idx, encoded.error());
+            hq_println(std::format("[NpuDmaPipeline] Encode failed slot {}: {}",
+                       slot_idx, encoded.error()));
             return;
         }
 
@@ -233,8 +243,8 @@ NpuDmaPipeline::NpuDmaPipeline(const Config& cfg,
     : config_{cfg}
     , impl_{std::make_unique<Impl>(cfg, encoder)}
 {
-    std::cout << std::format("[NpuDmaPipeline] Initialised: {} slots, {} bytes/slot\n",
-               config_.num_slots, config_.embedding_bytes);
+    hq_println(std::format("[NpuDmaPipeline] Initialised: {} slots, {} bytes/slot",
+               config_.num_slots, config_.embedding_bytes));
 }
 
 NpuDmaPipeline::~NpuDmaPipeline() noexcept = default;
@@ -243,8 +253,8 @@ NpuDmaPipeline& NpuDmaPipeline::operator=(NpuDmaPipeline&&) noexcept = default;
 
 void NpuDmaPipeline::set_encoder(INpuEncoder* encoder) {
     impl_->encoder = encoder;
-    std::cout << std::format("[NpuDmaPipeline] Encoder set to: {}\n",
-               encoder ? encoder->name() : "nullptr");
+    hq_println(std::format("[NpuDmaPipeline] Encoder set to: {}",
+               encoder ? encoder->name() : "nullptr"));
 }
 
 std::expected<std::size_t, std::string>

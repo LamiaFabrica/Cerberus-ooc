@@ -13,7 +13,18 @@
 #include <mutex>
 #include <thread>
 #include <format>
-#include <iostream>
+
+extern "C" std::size_t hq_safe_write(int fd, const char* data, std::size_t len);
+
+namespace {
+    inline void hq_print(std::string_view msg) {
+        hq_safe_write(1, msg.data(), msg.size());
+    }
+    inline void hq_println(std::string_view msg) {
+        hq_safe_write(1, msg.data(), msg.size());
+        hq_safe_write(1, "\n", 1);
+    }
+}
 
 namespace hq {
 
@@ -25,21 +36,21 @@ UtilizationWatchdog::UtilizationWatchdog(WatchdogConfig cfg,
     , on_alert_{std::move(on_alert)}
 {
     if (cfg_.gpu_critical_threshold >= cfg_.gpu_low_threshold) {
-        std::fputs(std::format("[watchdog] WARN: gpu_critical_threshold ({:.1f}) should be "
-                   "below gpu_low_threshold ({:.1f})\n",
-                   cfg_.gpu_critical_threshold, cfg_.gpu_low_threshold).c_str(), stderr);
+        hq_println(std::format("[watchdog] WARN: gpu_critical_threshold ({:.1f}) should be "
+                   "below gpu_low_threshold ({:.1f})",
+                   cfg_.gpu_critical_threshold, cfg_.gpu_low_threshold));
     }
     if (cfg_.hailo_critical_threshold >= cfg_.hailo_low_threshold) {
-        std::fputs(std::format("[watchdog] WARN: hailo_critical_threshold ({:.1f}) should be "
-                   "below hailo_low_threshold ({:.1f})\n",
-                   cfg_.hailo_critical_threshold, cfg_.hailo_low_threshold).c_str(), stderr);
+        hq_println(std::format("[watchdog] WARN: hailo_critical_threshold ({:.1f}) should be "
+                   "below hailo_low_threshold ({:.1f})",
+                   cfg_.hailo_critical_threshold, cfg_.hailo_low_threshold));
     }
     if (cfg_.thermal_throttle_threshold_c < 0.0f ||
         cfg_.thermal_throttle_threshold_c > 125.0f) {
-        std::cout << std::format(
+        hq_println(std::format(
             "[watchdog] WARNING: thermal threshold {:.1f}C out of range [0, 125], "
-            "clamping\n",
-            cfg_.thermal_throttle_threshold_c);
+            "clamping",
+            cfg_.thermal_throttle_threshold_c));
         cfg_.thermal_throttle_threshold_c =
             std::clamp(cfg_.thermal_throttle_threshold_c, 0.0f, 125.0f);
     }
@@ -186,7 +197,7 @@ UtilizationWatchdog::evaluate_device(ComputeUnit unit,
                     "[{}] step={} util={:.1f}% — max_recoveries ({}) exhausted, "
                     "treating as FATAL",
                     device_name(unit), step_num, util, cfg_.max_recoveries);
-                std::cout << std::format("[watchdog] FATAL {}\n", reason);
+                hq_println(std::format("[watchdog] FATAL {}", reason));
                 if (on_alert_) on_alert_(unit, step_num, util, reason);
                 consecutive.store(0, std::memory_order_relaxed);
                 return RecoveryAction{.result=RecoveryResult::FATAL, .device=unit,
@@ -228,7 +239,7 @@ UtilizationWatchdog::evaluate_device(ComputeUnit unit,
                     "[{}] step={} util={:.1f}% — CRITICAL zone, max_recoveries "
                     "({}) exhausted, treating as FATAL",
                     device_name(unit), step_num, util, cfg_.max_recoveries);
-                std::cout << std::format("[watchdog] FATAL {}\n", reason);
+                hq_println(std::format("[watchdog] FATAL {}", reason));
                 if (on_alert_) on_alert_(unit, step_num, util, reason);
                 return RecoveryAction{.result=RecoveryResult::FATAL, .device=unit,
                                       .step=step_num, .util_at_fault=util, .reason=reason};
@@ -261,10 +272,10 @@ UtilizationWatchdog::trigger_recovery(ComputeUnit unit,
     const std::uint32_t new_count =
         recovery_count.fetch_add(1, std::memory_order_relaxed) + 1;
     const float delay_ms = compute_backoff_ms(new_count);
-    std::cout << std::format("[watchdog] [{}] step={} util={:.1f}% — recovery #{}/{} with "
-               "{:.0f}ms backoff\n",
+    hq_println(std::format("[watchdog] [{}] step={} util={:.1f}% — recovery #{}/{} with "
+               "{:.0f}ms backoff",
                device_name(unit), step, util,
-               new_count, cfg_.max_recoveries, delay_ms);
+               new_count, cfg_.max_recoveries, delay_ms));
     if (delay_ms > 0.0f) {
         std::this_thread::sleep_for(
             std::chrono::milliseconds(static_cast<std::int64_t>(delay_ms)));
@@ -274,14 +285,14 @@ UtilizationWatchdog::trigger_recovery(ComputeUnit unit,
     }
     auto result = on_recovery_(unit, step, util);
     if (result) {
-        std::cout << std::format("[watchdog] [{}] step={} — recovery result: {}\n",
+        hq_println(std::format("[watchdog] [{}] step={} — recovery result: {}",
                    device_name(unit), step,
                    result.value() == RecoveryResult::SUCCESS   ? "SUCCESS"
                    : result.value() == RecoveryResult::PARTIAL ? "PARTIAL"
-                                                               : "FATAL");
+                                                               : "FATAL"));
     } else {
-        std::cout << std::format("[watchdog] [{}] step={} — recovery FAILED: {}\n",
-                   device_name(unit), step, result.error());
+        hq_println(std::format("[watchdog] [{}] step={} — recovery FAILED: {}",
+                   device_name(unit), step, result.error()));
     }
     return result;
 }
@@ -308,7 +319,8 @@ bool UtilizationWatchdog::thermal_skip_recovery_(ComputeUnit unit,
             device_name(unit), step, util,
             is_critical ? "CRITICAL but" : "",
             temperature, cfg_.thermal_throttle_threshold_c);
-        std::cout << std::format("[watchdog] {}\n", msg);
+        std::string out = std::format("[watchdog] {}", msg);
+        hq_println(out);
         if (on_alert_) on_alert_(unit, step, util, msg);
         return true;
     }
@@ -332,13 +344,14 @@ void UtilizationWatchdog::log_state_change(ComputeUnit unit,
 #else
     gmtime_r(&time_t_now, &utc);
 #endif
-    std::cout << std::format(
+    std::string msg = std::format(
         "[watchdog] {:04d}-{:02d}-{:02d}T{:02d}:{:02d}:{:02d}.{:03d}Z "
-        "[{}] step={} state_change: {} -> {} util={:.1f}%\n",
+        "[{}] step={} state_change: {} -> {} util={:.1f}%",
         utc.tm_year + 1900, utc.tm_mon + 1, utc.tm_mday,
         utc.tm_hour, utc.tm_min, utc.tm_sec, ms,
         device_name(unit), step, state_name(old_state), state_name(new_state),
         util);
+    hq_println(msg);
     if (on_alert_) {
         std::string msg = std::format(
             "[{}] step={} state_change: {} -> {} util={:.1f}%",

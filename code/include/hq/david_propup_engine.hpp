@@ -435,6 +435,18 @@ PropupResult propup_runtime_diagnostic_report(std::ostream* log = nullptr);
 /// @brief Prop up: pass empty graph to DecisionEngine, verify graceful error/no-op.
 PropupResult propup_decision_engine_empty_graph(std::ostream* log = nullptr);
 
+/// @brief Prop up: simple op (Add) routes to Native when no NPU available.
+PropupResult propup_decision_engine_pick_backend_cpu_fallback(std::ostream* log = nullptr);
+
+/// @brief Prop up: MatMul routes to OpenVINO when real Intel NPU is available.
+PropupResult propup_decision_engine_pick_backend_npu_matmul(std::ostream* log = nullptr);
+
+/// @brief Prop up: IQ4_NL PerBlock quant profile routes to Native quantized kernel path.
+PropupResult propup_decision_engine_quant_profile_iq4(std::ostream* log = nullptr);
+
+/// @brief Prop up: unknown op type falls back to Native safely.
+PropupResult propup_decision_engine_unknown_op_fallback(std::ostream* log = nullptr);
+
 /// @brief Prop up: create StagingManager, verify init and status query.
 PropupResult propup_staging_manager_lifecycle(std::ostream* log = nullptr);
 
@@ -443,5 +455,81 @@ PropupResult propup_inference_audit_input_validation(std::ostream* log = nullptr
 
 /// @brief Prop up: allocate many small blocks from TieredMemoryManager, verify total tracks.
 PropupResult propup_tiered_memory_bulk_alloc(std::ostream* log = nullptr);
+
+// ===========================================================================
+// C ABI surface (cerberus_api.cpp) — zero-coverage high-risk
+// ===========================================================================
+
+/// @brief Prop up: cerberus_init / cerberus_shutdown lifecycle and double-free safety.
+PropupResult propup_c_api_init_shutdown_cycle(std::ostream* log = nullptr);
+
+/// @brief Prop up: cerberus_get_version returns non-empty string with expected prefix.
+PropupResult propup_c_api_version_string(std::ostream* log = nullptr);
+
+/// @brief Prop up: cerberus_create_session rejects invalid / null model path.
+PropupResult propup_c_api_load_model_rejects_invalid_path(std::ostream* log = nullptr);
+
+/// @brief Prop up: cerberus_run rejects null session handle.
+PropupResult propup_c_api_run_inference_rejects_null_handle(std::ostream* log = nullptr);
+
+/// @brief Prop up: cerberus_get_last_error returns consistent error after a failed operation.
+PropupResult propup_c_api_get_last_error_consistent(std::ostream* log = nullptr);
+
+// ===========================================================================
+// Cerberus Graph Engine — IR lowering validation
+// ===========================================================================
+
+/// @brief Prop up: build a simple 2-node graph (Add -> Mul) and verify node count.
+PropupResult propup_graph_engine_two_node_graph(std::ostream* log = nullptr);
+
+/// @brief Prop up: from_kernel_graph produces valid CerberusGraph with correct I/O descriptors.
+PropupResult propup_graph_engine_from_kernel_graph(std::ostream* log = nullptr);
+
+/// @brief Prop up: cycle in graph is detected/rejected by topo_sort.
+PropupResult propup_graph_engine_cycle_detection(std::ostream* log = nullptr);
+
+/// @brief Prop up: orphaned nodes (no connected inputs/outputs) are handled honestly.
+PropupResult propup_graph_engine_orphaned_nodes(std::ostream* log = nullptr);
+
+/// @brief Prop up: mismatched tensor dtypes between connected nodes are flagged.
+PropupResult propup_graph_engine_dtype_mismatch(std::ostream* log = nullptr);
+
+// ===========================================================================
+// Async Pipeline — coroutine-based multi-stage inference
+// ===========================================================================
+
+/// @brief Prop up: AsyncPipeline construct and destroy without crash.
+PropupResult propup_async_pipeline_construct_destroy(std::ostream* log = nullptr);
+
+/// @brief Prop up: coroutine-based stage chaining produces valid task.
+PropupResult propup_async_pipeline_stage_chaining(std::ostream* log = nullptr);
+
+/// @brief Prop up: std::stop_token can cancel an in-flight pipeline.
+PropupResult propup_async_pipeline_stop_token_cancel(std::ostream* log = nullptr);
+
+/// @brief Prop up: pipeline handles empty/invalid GenerationRequest gracefully.
+PropupResult propup_async_pipeline_empty_input(std::ostream* log = nullptr);
+
+/// @brief Prop up: pipeline latency measurement is non-negative and consistent.
+PropupResult propup_async_pipeline_latency_consistent(std::ostream* log = nullptr);
+
+// ===========================================================================
+// Boundary Contract — runtime pre/post/invariant checks (honest skip if missing)
+// ===========================================================================
+
+/// @brief Prop up: pre_condition passes on valid input.
+PropupResult propup_boundary_contract_pre_condition(std::ostream* log = nullptr);
+
+/// @brief Prop up: post_condition catches return value out of range.
+PropupResult propup_boundary_contract_post_condition(std::ostream* log = nullptr);
+
+/// @brief Prop up: invariant catches corrupted class state.
+PropupResult propup_boundary_contract_invariant(std::ostream* log = nullptr);
+
+/// @brief Prop up: nested contract scopes don't leak state.
+PropupResult propup_boundary_contract_nested_scope(std::ostream* log = nullptr);
+
+/// @brief Prop up: ContractViolation is triggered on violation.
+PropupResult propup_boundary_contract_violation_triggers(std::ostream* log = nullptr);
 
 } // namespace hq::propup

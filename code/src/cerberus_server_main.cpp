@@ -30,7 +30,6 @@
 
 #include <csignal>
 #include <format>
-#include <iostream>
 
 using namespace std::literals;
 
@@ -42,6 +41,16 @@ using namespace std::literals;
 
 namespace {
 std::atomic<hq::InferenceServer*> g_server{nullptr};
+
+extern "C" std::size_t hq_safe_write(int fd, const char* data, std::size_t len);
+
+inline void hq_print(std::string msg) {
+    hq_safe_write(1, msg.data(), msg.size());
+}
+inline void hq_println(std::string msg) {
+    hq_safe_write(1, msg.data(), msg.size());
+    hq_safe_write(1, "\n", 1);
+}
 }
 
 // ---------------------------------------------------------------------------
@@ -86,17 +95,17 @@ static void print_stats(const hq::ServerStats& s,
     uint64_t models  = s.model_lists.load();
     uint64_t errs    = s.errors.load();
 
-    std::cout << std::format("\n=== Cerberus Inference Server Stats ===\n");
-    std::cout << std::format("  Uptime:           {} s\n", uptime);
-    std::cout << std::format("  Requests served:  {}\n", reqs);
-    std::cout << std::format("  Chat completions: {}\n", chats);
-    std::cout << std::format("  Health checks:    {}\n", healths);
-    std::cout << std::format("  Model lists:      {}\n", models);
-    std::cout << std::format("  Errors:           {}\n", errs);
+    hq_println(std::format("\n=== Cerberus Inference Server Stats ==="));
+    hq_println(std::format("  Uptime:           {} s", uptime));
+    hq_println(std::format("  Requests served:  {}", reqs));
+    hq_println(std::format("  Chat completions: {}", chats));
+    hq_println(std::format("  Health checks:    {}", healths));
+    hq_println(std::format("  Model lists:      {}", models));
+    hq_println(std::format("  Errors:           {}", errs));
 
     double rps = (uptime > 0) ? static_cast<double>(reqs) / uptime : 0.0;
-    std::cout << std::format("  Throughput:       {:.2f} req/s\n", rps);
-    std::cout << std::format("========================================\n");
+    hq_println(std::format("  Throughput:       {:.2f} req/s", rps));
+    hq_println(std::format("========================================"));
 }
 
 // ---------------------------------------------------------------------------
@@ -142,18 +151,18 @@ struct CLIArgs {
         } else if (arg == "--disable-audit") {
             args.enable_audit = false;
         } else if (arg == "--help" || arg == "-h") {
-            std::cout << std::format("Usage: cerberus_server [options]\n\n");
-            std::cout << std::format("Options:\n");
-            std::cout << std::format("  --port <N>           Listen port (default 8080)\n");
-            std::cout << std::format("  --model-dir <dir>    Model directory (default ./models)\n");
-            std::cout << std::format("  --verbose, -v        Verbose request logging\n");
-            std::cout << std::format("  --lcmd <path>        Path to LCMD file (enables full inference audit)\n");
-            std::cout << std::format("  --lcmd-key <hex64>   32-byte hex key for LCMD\n");
-            std::cout << std::format("  --disable-audit      Disable inference history endpoints\n");
-            std::cout << std::format("  --help, -h           Show this help\n");
+            hq_println(std::format("Usage: cerberus_server [options]\n"));
+            hq_println(std::format("Options:"));
+            hq_println(std::format("  --port <N>           Listen port (default 8080)"));
+            hq_println(std::format("  --model-dir <dir>    Model directory (default ./models)"));
+            hq_println(std::format("  --verbose, -v        Verbose request logging"));
+            hq_println(std::format("  --lcmd <path>        Path to LCMD file (enables full inference audit)"));
+            hq_println(std::format("  --lcmd-key <hex64>   32-byte hex key for LCMD"));
+            hq_println(std::format("  --disable-audit      Disable inference history endpoints"));
+            hq_println(std::format("  --help, -h           Show this help"));
             std::exit(EXIT_SUCCESS);
         } else {
-            std::cout << std::format("Unknown option: {}\n", arg);
+            hq_println(std::format("Unknown option: {}", arg));
             std::exit(EXIT_FAILURE);
         }
     }
@@ -167,10 +176,10 @@ struct CLIArgs {
 int main(int argc, char** argv) {
     auto args = parse_args(argc, argv);
 
-    std::cout << std::format("=== Cerberus Inference Server v1.0.0 ===\n");
-    std::cout << std::format("Port:      {}\n", args.port);
-    std::cout << std::format("Model dir: {}\n", args.model_dir);
-    std::cout << std::format("Verbose:   {}\n\n", args.verbose ? "yes" : "no");
+    hq_println(std::format("=== Cerberus Inference Server v1.0.0 ==="));
+    hq_println(std::format("Port:      {}", args.port));
+    hq_println(std::format("Model dir: {}", args.model_dir));
+    hq_println(std::format("Verbose:   {}\n", args.verbose ? "yes" : "no"));
 
     hq::ServerConfig cfg;
     cfg.port            = args.port;
@@ -189,11 +198,11 @@ int main(int argc, char** argv) {
         try {
             std::filesystem::create_directories(std::filesystem::path(args.lcmd_path).parent_path());
         } catch (const std::exception& e) {
-            std::cout << std::format("[server] WARNING: Could not create LCMD parent directory: {}\n", e.what());
+            hq_println(std::format("[server] WARNING: Could not create LCMD parent directory: {}", e.what()));
         }
 
         if (lcmd->initialize(args.lcmd_path, args.lcmd_key)) {
-            std::cout << std::format("[server] LCMD initialized successfully (inference audit enabled)\n");
+            hq_println(std::format("[server] LCMD initialized successfully (inference audit enabled)"));
 
             user_sec = std::make_shared<hq::cerberus::privacy::UserSecurity>();
 
@@ -202,7 +211,7 @@ int main(int argc, char** argv) {
             bool fresh = !rbpc.has_value();
 
             if (fresh) {
-                std::cout << std::format("[server] NOTICE: This appears to be a new or empty LCMD.\n");
+                hq_println(std::format("[server] NOTICE: This appears to be a new or empty LCMD."));
 
                 // Auto-create minimal RBPC state for immediate audit usability
                 // Use a server-derived master secret from the LCMD key itself.
@@ -214,9 +223,9 @@ int main(int argc, char** argv) {
 
                 auto pin_opt = user_sec->generate_pin("server-default", server_master);
                 if (pin_opt) {
-                    std::cout << std::format("[server]         Auto-generated one-time PIN for this server node: %s\n", pin_opt->c_str());
-                    std::cout << std::format("[server]         !!! WRITE THIS DOWN NOW - it will not be shown again !!!\n");
-                    std::cout << std::format("[server]         Use this PIN + a memorable word (register one via cerberus_register) for export/clear.\n");
+                    hq_println(std::format("[server]         Auto-generated one-time PIN for this server node: %s", pin_opt->c_str()));
+                    hq_println(std::format("[server]         !!! WRITE THIS DOWN NOW - it will not be shown again !!!"));
+                    hq_println(std::format("[server]         Use this PIN + a memorable word (register one via cerberus_register) for export/clear."));
 
                     // Persist the newly generated RBPC state into the LCMD immediately
                     // so it survives server restart without requiring external registration.
@@ -226,16 +235,16 @@ int main(int argc, char** argv) {
                     }
                 }
 
-                std::cout << std::format("[server]         For full RBPC setup (recommended for production), run:\n");
-                std::cout << std::format("[server]           cerberus_register --lcmd \"%s\" --lcmd-key <64-hex-chars>\n", args.lcmd_path.c_str());
+                hq_println(std::format("[server]         For full RBPC setup (recommended for production), run:"));
+                hq_println(std::format("[server]           cerberus_register --lcmd \"%s\" --lcmd-key <64-hex-chars>", args.lcmd_path.c_str()));
             }
         } else {
-            std::cout << std::format("[server] WARNING: Failed to open LCMD — audit endpoints will be limited\n");
+            hq_println(std::format("[server] WARNING: Failed to open LCMD — audit endpoints will be limited"));
             lcmd.reset();
         }
     } else if (args.enable_audit) {
-        std::cout << std::format("[server] LCMD not configured — inference history endpoints will return 503\n");
-        std::cout << std::format("[server] Use --lcmd <path> --lcmd-key <64-hex> to enable full audit\n");
+        hq_println(std::format("[server] LCMD not configured — inference history endpoints will return 503"));
+        hq_println(std::format("[server] Use --lcmd <path> --lcmd-key <64-hex> to enable full audit"));
     }
 
     if (lcmd) {
@@ -258,7 +267,7 @@ int main(int argc, char** argv) {
         print_stats(server.get_stats(), end);
 
     } catch (const std::exception& e) {
-        std::cout << std::format("[cerberus] fatal: {}\n", e.what());
+        hq_println(std::format("[cerberus] fatal: {}", e.what()));
         return EXIT_FAILURE;
     }
 

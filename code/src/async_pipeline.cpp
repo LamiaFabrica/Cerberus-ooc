@@ -27,10 +27,21 @@
 
 #ifdef UM790_HAS_HIP
 #include <hip/hip_runtime_api.h>
-#include <iostream>
 #endif
 
+extern "C" std::size_t hq_safe_write(int fd, const char* data, std::size_t len);
+
 namespace hq::async {
+
+namespace {
+    inline void hq_print(std::string_view msg) {
+        hq_safe_write(1, msg.data(), msg.size());
+    }
+    inline void hq_println(std::string_view msg) {
+        hq_safe_write(1, msg.data(), msg.size());
+        hq_safe_write(1, "\n", 1);
+    }
+}
 
 using Clock = std::chrono::high_resolution_clock;
 
@@ -46,7 +57,7 @@ AsyncPipeline::AsyncPipeline(const PipelineConfig& cfg)
               .embedding_bytes = hq::npu::MAX_EMBEDDING_BYTES,
           })}
 {
-    std::cout << std::format("[AsyncPipeline] Initialized async pipeline for UM790 Pro\n");
+    hq_println(std::format("[AsyncPipeline] Initialized async pipeline for UM790 Pro"));
 }
 
 AsyncPipeline::~AsyncPipeline() noexcept {
@@ -65,24 +76,24 @@ task<GeneratedImage> AsyncPipeline::generate_async(GenerationRequest req) {
 
     if (req.width == 0 || req.height == 0 ||
         req.width > 2048 || req.height > 2048) {
-        std::cout << std::format("[AsyncPipeline] Invalid dimensions: {}x{}\n",
-                   req.width, req.height);
+        hq_println(std::format("[AsyncPipeline] Invalid dimensions: {}x{}",
+                   req.width, req.height));
         co_return GeneratedImage{};
     }
     if ((req.width % 8U) != 0U || (req.height % 8U) != 0U) {
-        std::cout << std::format("[AsyncPipeline] Dimensions must be multiples of 8: "
-                   "{}x{}\n", req.width, req.height);
+        hq_println(std::format("[AsyncPipeline] Dimensions must be multiples of 8: "
+                   "{}x{}", req.width, req.height));
         co_return GeneratedImage{};
     }
     if (req.num_steps == 0 || req.num_steps > 150) {
-        std::cout << std::format("[AsyncPipeline] Invalid step count: {}\n",
-                   req.num_steps);
+        hq_println(std::format("[AsyncPipeline] Invalid step count: {}",
+                   req.num_steps));
         co_return GeneratedImage{};
     }
 
-    std::cout << std::format("[AsyncPipeline] Starting async generation: \"{}\" "
-               "({}x{} {} steps)\n",
-               req.prompt, req.width, req.height, req.num_steps);
+    hq_println(std::format("[AsyncPipeline] Starting async generation: \"{}\" "
+               "({}x{} {} steps)",
+               req.prompt, req.width, req.height, req.num_steps));
 
     // Step 1: NPU text encoding via NpuDmaPipeline
     hq::npu::NpuEncodeRequest enc_req{
@@ -96,8 +107,8 @@ task<GeneratedImage> AsyncPipeline::generate_async(GenerationRequest req) {
 
     auto slot_result = npu_pipeline_->submit(enc_req);
     if (!slot_result.has_value()) {
-        std::cout << std::format("[AsyncPipeline] NPU encode submit failed: {}\n",
-                   slot_result.error());
+        hq_println(std::format("[AsyncPipeline] NPU encode submit failed: {}",
+                   slot_result.error()));
         co_return GeneratedImage{};
     }
     std::size_t slot = *slot_result;
@@ -105,13 +116,13 @@ task<GeneratedImage> AsyncPipeline::generate_async(GenerationRequest req) {
     auto cond_handle = co_await NpuReadyAwaiter{*npu_pipeline_, slot,
         std::chrono::milliseconds{5000}};
     if (!cond_handle) {
-        std::cout << std::format("[AsyncPipeline] NPU conditional encoding timed out\n");
+        hq_println(std::format("[AsyncPipeline] NPU conditional encoding timed out"));
         npu_pipeline_->release_slot(slot);
         co_return GeneratedImage{};
     }
 
-    std::cout << std::format("[AsyncPipeline] Conditional embeddings ready "
-               "(elements={:L})\n", cond_handle.element_count);
+    hq_println(std::format("[AsyncPipeline] Conditional embeddings ready "
+               "(elements={:L})", cond_handle.element_count));
 
     // Step 1b: NPU empty-prompt encoding for CFG
     hq::npu::NpuTensorHandle uncond_handle{};
@@ -134,8 +145,8 @@ task<GeneratedImage> AsyncPipeline::generate_async(GenerationRequest req) {
                 uncond_slot, std::chrono::milliseconds{5000}};
             uncond_valid = static_cast<bool>(uncond_handle);
             if (uncond_valid) {
-                std::cout << std::format("[AsyncPipeline] Unconditional embeddings ready "
-                           "(CFG scale={:.1f})\n", req.guidance_scale);
+                hq_println(std::format("[AsyncPipeline] Unconditional embeddings ready "
+                           "(CFG scale={:.1f})", req.guidance_scale));
             }
         }
     }
@@ -157,17 +168,17 @@ task<GeneratedImage> AsyncPipeline::generate_async(GenerationRequest req) {
     const double total_ms =
         std::chrono::duration<double, std::milli>(t_end - t_start).count();
 
-    std::cout << std::format("[AsyncPipeline] Done ({:.1f} ms) "
-               "NPU: {:.0f}% ({:.0f}C)\n",
-               total_ms, npu_util_pct, npu_temp_c);
+    hq_println(std::format("[AsyncPipeline] Done ({:.1f} ms) "
+               "NPU: {:.0f}% ({:.0f}C)",
+               total_ms, npu_util_pct, npu_temp_c));
 
     GeneratedImage result;
     if (gen_result.has_value()) {
         result = std::move(*gen_result);
         result.generation_time_ms = static_cast<float>(total_ms);
     } else {
-        std::cout << std::format("[AsyncPipeline] Generation failed: {}\n",
-                   hq::to_string(gen_result.error()));
+        hq_println(std::format("[AsyncPipeline] Generation failed: {}",
+                   hq::to_string(gen_result.error())));
     }
 
     co_return result;
@@ -182,18 +193,18 @@ Generator<StepResult> AsyncPipeline::generate_streaming(
 
     if (req.width == 0 || req.height == 0 ||
         req.width > 2048 || req.height > 2048) {
-        std::cout << std::format("[AsyncPipeline:stream] Invalid dimensions\n");
+        hq_println(std::format("[AsyncPipeline:stream] Invalid dimensions"));
         co_return;
     }
     if (req.num_steps == 0 || req.num_steps > 150) {
-        std::cout << std::format("[AsyncPipeline:stream] Invalid step count: {}\n",
-                   req.num_steps);
+        hq_println(std::format("[AsyncPipeline:stream] Invalid step count: {}",
+                   req.num_steps));
         co_return;
     }
 
-    std::cout << std::format("[AsyncPipeline:stream] Starting streaming: \"{}\" "
-               "({}x{} {} steps)\n",
-               req.prompt, req.width, req.height, req.num_steps);
+    hq_println(std::format("[AsyncPipeline:stream] Starting streaming: \"{}\" "
+               "({}x{} {} steps)",
+               req.prompt, req.width, req.height, req.num_steps));
 
     // Submit NPU encode
     hq::npu::NpuEncodeRequest enc_req{
@@ -207,8 +218,8 @@ Generator<StepResult> AsyncPipeline::generate_streaming(
 
     auto slot_res = npu_pipeline_->submit(enc_req);
     if (!slot_res.has_value()) {
-        std::cout << std::format("[AsyncPipeline:stream] NPU submit failed: {}\n",
-                   slot_res.error());
+        hq_println(std::format("[AsyncPipeline:stream] NPU submit failed: {}",
+                   slot_res.error()));
         co_return;
     }
     const std::size_t slot = *slot_res;
@@ -219,7 +230,7 @@ Generator<StepResult> AsyncPipeline::generate_streaming(
     npu_pipeline_->release_slot(slot);
 
     if (!handle) {
-        std::cout << std::format("[AsyncPipeline:stream] NPU encode timed out\n");
+        hq_println(std::format("[AsyncPipeline:stream] NPU encode timed out"));
         co_return;
     }
 
@@ -269,8 +280,8 @@ Generator<StepResult> AsyncPipeline::generate_streaming(
                 latents[i] = static_cast<float>(img.pixels[src]) / 255.0f;
             }
         } else {
-            std::cout << std::format("[AsyncPipeline:stream] Step {} failed: {}\n",
-                       step, hq::to_string(step_result.error()));
+            hq_println(std::format("[AsyncPipeline:stream] Step {} failed: {}",
+                       step, hq::to_string(step_result.error())));
         }
 
         co_yield StepResult{
@@ -283,7 +294,7 @@ Generator<StepResult> AsyncPipeline::generate_streaming(
         };
     }
 
-    std::cout << std::format("[AsyncPipeline:stream] Streaming generation complete\n");
+    hq_println(std::format("[AsyncPipeline:stream] Streaming generation complete"));
 }
 
 // ===========================================================================

@@ -18,7 +18,8 @@
 #endif
 #include <sstream>
 #include <format>
-#include <iostream>
+
+extern "C" std::size_t hq_safe_write(int fd, const char* data, std::size_t len);
 
 namespace hq {
 
@@ -159,8 +160,9 @@ CLIPTokenizer::CLIPTokenizer(const std::string& bpe_merges_file,
     // Try file-based loading first; fall back to built-in on error
     auto result = load_from_files_(bpe_merges_file, vocab_file);
     if (!result) {
-        std::cout << std::format("[CLIPTokenizer] File loading failed ({}), using built-in vocab\n",
+        std::string msg = std::format("[CLIPTokenizer] File loading failed ({}), using built-in vocab\n",
                    result.error().message);
+        hq_safe_write(2, msg.data(), msg.size());
         load_builtin_vocab_();
     }
 }

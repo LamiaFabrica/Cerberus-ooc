@@ -10,11 +10,26 @@
 #include "hq/gpu_monitor.hpp"
 
 #include <chrono>
-#include <iostream>
 #if UM790_HAS_STD_PRINT
 #  include <print>
 #endif
 #include <utility>
+
+extern "C" std::size_t hq_safe_write(int fd, const char* data, std::size_t len);
+
+namespace {
+    inline void hq_print(std::string_view msg) {
+        hq_safe_write(1, msg.data(), msg.size());
+    }
+    inline void hq_println(std::string_view msg) {
+        hq_safe_write(1, msg.data(), msg.size());
+        hq_safe_write(1, "\n", 1);
+    }
+    inline void hq_eprintln(std::string_view msg) {
+        hq_safe_write(2, msg.data(), msg.size());
+        hq_safe_write(2, "\n", 1);
+    }
+}
 
 // NVML (NVIDIA Management Library) — queried before ROCm SMI
 #if defined(UM790_HAS_CUDA) && __has_include(<nvml.h>)
@@ -33,7 +48,6 @@
 #if defined(UM790_HAS_HIP) && __has_include(<rocm_smi/rocm_smi.h>)
 #include <rocm_smi/rocm_smi.h>
 #include <format>
-#include <iostream>
 #define GPUMONITOR_HAS_ROCM_SMI 1
 #else
 #define GPUMONITOR_HAS_ROCM_SMI 0
@@ -142,19 +156,19 @@ std::expected<void, GPUErrorInfo> GPUMonitor::initialize() {
 #endif
                     backend_     = Backend::NVML;
                     initialized_ = true;
-                    std::cout << std::format("[GPUMonitor] Initialized with NVML backend (device {})\n",
-                               device_index_);
+                    hq_println(std::format("[GPUMonitor] Initialized with NVML backend (device {})",
+                               device_index_));
                     return {};
                 }
-                std::cout << std::format("[GPUMonitor] NVML device {} handle failed (status={})\n",
-                           device_index_, static_cast<int>(nr));
+                hq_println(std::format("[GPUMonitor] NVML device {} handle failed (status={})",
+                       device_index_, static_cast<int>(nr)));
             } else {
-                std::cout << std::format("[GPUMonitor] NVML device count query failed or no devices (status={}, count={})\n",
-                           static_cast<int>(nr), device_count);
+                hq_println(std::format("[GPUMonitor] NVML device count query failed or no devices (status={}, count={})",
+                           static_cast<int>(nr), device_count));
             }
             nvmlShutdown();
         } else {
-            std::cout << std::format("[GPUMonitor] NVML init failed (status={})\n", static_cast<int>(nr));
+            hq_println(std::format("[GPUMonitor] NVML init failed (status={})", static_cast<int>(nr)));
         }
     }
 #endif
@@ -169,24 +183,24 @@ std::expected<void, GPUErrorInfo> GPUMonitor::initialize() {
             if (st == RSMI_STATUS_SUCCESS && device_count > 0 && device_index_ < device_count) {
                 backend_     = Backend::ROCM_SMI;
                 initialized_ = true;
-                std::cout << std::format("[GPUMonitor] Initialized with ROCm SMI backend (device {})\n",
-                           device_index_);
+                hq_println(std::format("[GPUMonitor] Initialized with ROCm SMI backend (device {})",
+                       device_index_));
                 return {};
             }
-            std::cout << std::format("[GPUMonitor] ROCm SMI device count query failed or no devices (status={}, count={})\n",
-                       static_cast<int>(st), device_count);
+            hq_println(std::format("[GPUMonitor] ROCm SMI device count query failed or no devices (status={}, count={})",
+                   static_cast<int>(st), device_count));
             rsmi_shut_down();
         } else {
-            std::cout << std::format("[GPUMonitor] ROCm SMI init failed (status={})\n", static_cast<int>(st));
+            hq_println(std::format("[GPUMonitor] ROCm SMI init failed (status={})", static_cast<int>(st)));
         }
     }
 #endif
 
     // --- No backend available ---
 #if !GPUMONITOR_HAS_NVML && !GPUMONITOR_HAS_ROCM_SMI
-    std::cout << std::format("[GPUMonitor] No GPU telemetry backend available (neither NVML nor ROCm SMI)\n");
+    hq_println(std::format("[GPUMonitor] No GPU telemetry backend available (neither NVML nor ROCm SMI)"));
 #else
-    std::cout << std::format("[GPUMonitor] All GPU telemetry backends failed to initialize\n");
+    hq_println(std::format("[GPUMonitor] All GPU telemetry backends failed to initialize"));
 #endif
     return std::unexpected{GPUErrorInfo{
         .code       = GPUError::DeviceNotFound,
@@ -257,7 +271,7 @@ std::expected<float, GPUErrorInfo> GPUMonitor::query_utilization() {
 #endif
 
     default:
-        std::cout << std::format("[GPUMonitor] WARNING No GPU backend available — returning error.\n");
+        hq_eprintln(std::format("[GPUMonitor] WARNING No GPU backend available — returning error."));
         return std::unexpected{GPUErrorInfo{
             .code       = GPUError::NotInitialized,
             .message    = "No GPU telemetry backend available (NVML or ROCm SMI not linked)",
@@ -324,7 +338,7 @@ std::expected<float, GPUErrorInfo> GPUMonitor::query_temperature_edge() {
 #endif
 
     default:
-        std::cout << std::format("[GPUMonitor] WARNING No GPU backend available — returning error.\n");
+        hq_eprintln(std::format("[GPUMonitor] WARNING No GPU backend available — returning error."));
         return std::unexpected{GPUErrorInfo{
             .code       = GPUError::NotInitialized,
             .message    = "No GPU telemetry backend available (NVML or ROCm SMI not linked)",
@@ -395,7 +409,7 @@ std::expected<float, GPUErrorInfo> GPUMonitor::query_temperature_junction() {
 #endif
 
     default:
-        std::cout << std::format("[GPUMonitor] WARNING No GPU backend available — returning error.\n");
+        hq_eprintln(std::format("[GPUMonitor] WARNING No GPU backend available — returning error."));
         return std::unexpected{GPUErrorInfo{
             .code       = GPUError::NotInitialized,
             .message    = "No GPU telemetry backend available (NVML or ROCm SMI not linked)",
@@ -461,7 +475,7 @@ std::expected<float, GPUErrorInfo> GPUMonitor::query_power() {
 #endif
 
     default:
-        std::cout << std::format("[GPUMonitor] WARNING No GPU backend available — returning error.\n");
+        hq_eprintln(std::format("[GPUMonitor] WARNING No GPU backend available — returning error."));
         return std::unexpected{GPUErrorInfo{
             .code       = GPUError::NotInitialized,
             .message    = "No GPU telemetry backend available (NVML or ROCm SMI not linked)",
@@ -546,7 +560,7 @@ std::expected<std::pair<float, float>, GPUErrorInfo> GPUMonitor::query_memory() 
 #endif
 
     default:
-        std::cout << std::format("[GPUMonitor] WARNING No GPU backend available — returning error.\n");
+        hq_eprintln(std::format("[GPUMonitor] WARNING No GPU backend available — returning error."));
         return std::unexpected{GPUErrorInfo{
             .code       = GPUError::NotInitialized,
             .message    = "No GPU telemetry backend available (NVML or ROCm SMI not linked)",
@@ -578,7 +592,7 @@ std::expected<GPUTelemetry, GPUErrorInfo> GPUMonitor::query_all() {
 
     auto util = query_utilization();
     if (!util) {
-        std::cout << std::format("[GPUMonitor] Utilization query failed: {}\n", util.error().message);
+        hq_eprintln(std::format("[GPUMonitor] Utilization query failed: {}", util.error().message));
         telem.utilization_percent = -1.0f;
     } else {
         telem.utilization_percent = *util;
@@ -587,7 +601,7 @@ std::expected<GPUTelemetry, GPUErrorInfo> GPUMonitor::query_all() {
 
     auto temp_edge = query_temperature_edge();
     if (!temp_edge) {
-        std::cout << std::format("[GPUMonitor] Edge temperature query failed: {}\n", temp_edge.error().message);
+        hq_eprintln(std::format("[GPUMonitor] Edge temperature query failed: {}", temp_edge.error().message));
         telem.temperature_celsius = -1.0f;
     } else {
         telem.temperature_celsius = *temp_edge;
@@ -596,7 +610,7 @@ std::expected<GPUTelemetry, GPUErrorInfo> GPUMonitor::query_all() {
 
     auto temp_junc = query_temperature_junction();
     if (!temp_junc) {
-        std::cout << std::format("[GPUMonitor] Junction temperature query failed: {}\n", temp_junc.error().message);
+        hq_eprintln(std::format("[GPUMonitor] Junction temperature query failed: {}", temp_junc.error().message));
         telem.junction_temperature_c = -1.0f;
     } else {
         telem.junction_temperature_c = *temp_junc;
@@ -605,7 +619,7 @@ std::expected<GPUTelemetry, GPUErrorInfo> GPUMonitor::query_all() {
 
     auto power = query_power();
     if (!power) {
-        std::cout << std::format("[GPUMonitor] Power query failed: {}\n", power.error().message);
+        hq_eprintln(std::format("[GPUMonitor] Power query failed: {}", power.error().message));
         telem.power_watts = -1.0f;
     } else {
         telem.power_watts = *power;
@@ -614,7 +628,7 @@ std::expected<GPUTelemetry, GPUErrorInfo> GPUMonitor::query_all() {
 
     auto mem = query_memory();
     if (!mem) {
-        std::cout << std::format("[GPUMonitor] Memory query failed: {}\n", mem.error().message);
+        hq_eprintln(std::format("[GPUMonitor] Memory query failed: {}", mem.error().message));
         telem.memory_used_mb  = -1.0f;
         telem.memory_total_mb = -1.0f;
     } else {

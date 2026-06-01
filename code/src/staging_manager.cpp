@@ -15,7 +15,8 @@
 #include <queue>
 #include <vector>
 #include <format>
-#include <iostream>
+
+extern "C" std::size_t hq_safe_write(int fd, const char* data, std::size_t len);
 
 #if defined(UM790_HAS_HIP) || defined(__HIP_PLATFORM_AMD__) || defined(USE_HIP)
 #  include <hip/hip_runtime.h>
@@ -66,9 +67,10 @@ public:
                     buffers_.emplace_back(ptr, cfg_.buffer_size_bytes);
                     free_indices_.push(i);
                 } else {
-                    std::cout << std::format("[staging] WARNING: hipHostMalloc failed ({}), "
+                    std::string msg = std::format("[staging] WARNING: hipHostMalloc failed ({}), "
                                "falling back to regular memory\n",
                                hipGetErrorString(err));
+                    hq_safe_write(1, msg.data(), msg.size());
                     for (auto& b : buffers_) {
                         hipHostFree(b.pinned_ptr);
                         b.pinned_ptr = nullptr;
@@ -86,8 +88,9 @@ public:
         }
 #else
         if (cfg_.pinned) {
-            std::cout << std::format("[staging] WARNING: pinned=true but HIP not available "
+            std::string msg = std::format("[staging] WARNING: pinned=true but HIP not available "
                        "at compile time, using regular memory\n");
+            hq_safe_write(1, msg.data(), msg.size());
         }
 #endif
         for (std::size_t i = 0; i < cfg_.buffer_count; ++i) {
@@ -147,7 +150,7 @@ void EmbeddingStagingManager::release(const StagingBuffer& buf) noexcept {
             return;
         }
     }
-    std::fputs("[staging] WARNING: release() called with unrecognized buffer pointer\n", stderr);
+    hq_safe_write(2, "[staging] WARNING: release() called with unrecognized buffer pointer\n", 66);
 }
 
 std::expected<std::size_t, HostStagingError>
