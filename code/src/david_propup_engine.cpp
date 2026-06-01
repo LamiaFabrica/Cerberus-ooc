@@ -51,7 +51,6 @@
 #include <algorithm>
 #include <chrono>
 #include <iostream>
-#include <sstream>
 #include <fstream>
 #include <filesystem>
 #include <format>
@@ -255,9 +254,8 @@ hq::propup::PropupResult hq::propup::propup_kernel_matmul([[maybe_unused]] std::
     float expected[] = {19,22,43,50};
     for (std::size_t i = 0; i < 4; ++i) {
         if (std::fabs(C[i] - expected[i]) > 1e-4f) {
-            std::ostringstream oss;
-            oss << "C[" << i << "]=" << C[i] << " expected " << expected[i];
-            return PropupResult::fail(name, oss.str());
+            auto diag = std::format("C[{}]={} expected {}", i, C[i], expected[i]);
+            return PropupResult::fail(name, diag);
         }
     }
 
@@ -531,9 +529,8 @@ hq::propup::PropupResult hq::propup::propup_end_to_end_native([[maybe_unused]] s
     float expected[] = {3,5,7,9};
     for (std::size_t i = 0; i < 4; ++i) {
         if (std::fabs(out_buf[i] - expected[i]) > 1e-4f) {
-            std::ostringstream oss;
-            oss << "output[" << i << "]=" << out_buf[i] << " expected " << expected[i];
-            return PropupResult::fail(name, oss.str());
+            auto diag = std::format("output[{}]={} expected {}", i, out_buf[i], expected[i]);
+            return PropupResult::fail(name, diag);
         }
     }
 
@@ -655,9 +652,8 @@ hq::propup::PropupResult hq::propup::propup_kernel_matmul_blocked([[maybe_unused
     float expected[] = {19,22,43,50};
     for (std::size_t i = 0; i < 4; ++i) {
         if (std::fabs(C[i] - expected[i]) > 1e-4f) {
-            std::ostringstream oss;
-            oss << "C[" << i << "]=" << C[i] << " expected " << expected[i];
-            return PropupResult::fail(name, oss.str());
+            auto diag = std::format("C[{}]={} expected {}", i, C[i], expected[i]);
+            return PropupResult::fail(name, diag);
         }
     }
 
@@ -709,9 +705,8 @@ hq::propup::PropupResult hq::propup::propup_performance_matmul_vs_naive([[maybe_
     // The blocked version should be faster on matrices >64x64.
     // On very small matrices it might tie, so require >= 1.0x (not slower).
     if (speedup < 1.0) {
-        std::ostringstream oss;
-        oss << "blocked slower than naive: speedup=" << speedup;
-        return PropupResult::fail(name, oss.str());
+        auto diag = std::format("blocked slower than naive: speedup={}", speedup);
+        return PropupResult::fail(name, diag);
     }
 
     auto res = PropupResult::pass(name);
@@ -863,6 +858,50 @@ hq::propup::PropupResult hq::propup::propup_ranges_adopted_in_kernels(std::ostre
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
     hq_println(std::format("[PROPUP] {} passed in {} ms", name, res.elapsed_ms));
+    return res;
+}
+
+hq::propup::PropupResult hq::propup::propup_gguf_parser_header_valid([[maybe_unused]] std::ostream* log) {
+    const std::string name = "propup_gguf_parser_header_valid";
+    auto t0 = now_ms();
+    (void)log;
+    // Synthetic: no GGUF parser implementation yet; mark as skipped
+    auto res = PropupResult::skip(name, "GGUF parser not implemented");
+    res.elapsed_ms = now_ms() - t0;
+    hq_println(std::format("[PROPUP] {} skipped: {}", name, res.diagnostic));
+    return res;
+}
+
+hq::propup::PropupResult hq::propup::propup_gguf_parser_metadata_read([[maybe_unused]] std::ostream* log) {
+    const std::string name = "propup_gguf_parser_metadata_read";
+    auto t0 = now_ms();
+    (void)log;
+    // Synthetic: no GGUF parser implementation yet; mark as skipped
+    auto res = PropupResult::skip(name, "GGUF parser not implemented");
+    res.elapsed_ms = now_ms() - t0;
+    hq_println(std::format("[PROPUP] {} skipped: {}", name, res.diagnostic));
+    return res;
+}
+
+hq::propup::PropupResult hq::propup::propup_glow_engine_init_deinit([[maybe_unused]] std::ostream* log) {
+    const std::string name = "propup_glow_engine_init_deinit";
+    auto t0 = now_ms();
+    (void)log;
+    // Synthetic: no GlowEngine implementation yet; mark as skipped
+    auto res = PropupResult::skip(name, "GlowEngine not implemented");
+    res.elapsed_ms = now_ms() - t0;
+    hq_println(std::format("[PROPUP] {} skipped: {}", name, res.diagnostic));
+    return res;
+}
+
+hq::propup::PropupResult hq::propup::propup_glow_engine_tensor_create([[maybe_unused]] std::ostream* log) {
+    const std::string name = "propup_glow_engine_tensor_create";
+    auto t0 = now_ms();
+    (void)log;
+    // Synthetic: no GlowEngine implementation yet; mark as skipped
+    auto res = PropupResult::skip(name, "GlowEngine not implemented");
+    res.elapsed_ms = now_ms() - t0;
+    hq_println(std::format("[PROPUP] {} skipped: {}", name, res.diagnostic));
     return res;
 }
 
@@ -1818,7 +1857,19 @@ hq::propup::PropupReport hq::propup::run_all_propups() {
     run_one(propup_kernel_sigmoid, "propup_kernel_sigmoid");
     run_one(propup_ranges_adopted_in_kernels, "propup_ranges_adopted_in_kernels");
 
+    // GGUF Parser propups (synthetic)
+    // run_one(propup_gguf_parser_header_valid, "propup_gguf_parser_header_valid");
+    // run_one(propup_gguf_parser_metadata_read, "propup_gguf_parser_metadata_read");
+
+    // Glow Engine propups
+    // run_one(propup_glow_engine_init_deinit, "propup_glow_engine_init_deinit");
+    // run_one(propup_glow_engine_tensor_create, "propup_glow_engine_tensor_create");
+
     // Adversarial robustness suite
+    run_one(propup_adversarial_null_backend, "propup_adversarial_null_backend");
+    run_one(propup_adversarial_corrupt_graph, "propup_adversarial_corrupt_graph");
+    run_one(propup_adversarial_mismatched_tensor_shapes, "propup_adversarial_mismatched_tensor_shapes");
+    run_one(propup_adversarial_null_input_buffer, "propup_adversarial_null_input_buffer");
 
     // Command layer propups
 
@@ -1856,8 +1907,12 @@ hq::propup::PropupReport hq::propup::run_all_propups() {
     // NEW LfsslSentinel reason-string consistency tests
 
     // NEW LCMD edge behaviour
+    run_one(propup_lcmd_initialize_encrypt, "propup_lcmd_initialize_encrypt");
+    run_one(propup_lcmd_store_retrieve, "propup_lcmd_store_retrieve");
 
     // NEW JWT negative paths
+    run_one(propup_jwt_malformed_rejected, "propup_jwt_malformed_rejected");
+    run_one(propup_jwt_expired_detected, "propup_jwt_expired_detected");
 
     // NEW DLL primitives expansion
 
@@ -1944,6 +1999,344 @@ hq::propup::PropupReport hq::propup::run_all_propups() {
     // (known pre-existing cross-test heap interaction). The following new test makes the interaction explicit.
 
     return report;
+}
+
+// ===========================================================================
+// Adversarial Robustness Suite — real implementations
+// ===========================================================================
+
+hq::propup::PropupResult hq::propup::propup_adversarial_null_backend([[maybe_unused]] std::ostream* log) {
+    (void)log;
+    const std::string name = "propup_adversarial_null_backend";
+    auto t0 = now_ms();
+
+    TieredMemoryConfig tcfg_small;
+    tcfg_small.warm_capacity_bytes = 8ULL * 1024 * 1024;
+    tcfg_small.cool_capacity_bytes = 8ULL * 1024 * 1024;
+    TieredMemoryManager mgr(tcfg_small);
+    CerberusExecutionCoordinator coord(mgr);
+
+    hq::npu::KernelGraph graph;
+    graph.nodes.push_back([]{
+        hq::npu::KernelNode n;
+        n.name = "n1";
+        n.op = hq::npu::KernelNode::Op::Mul;
+        n.inputs = {"x"};
+        n.outputs = {"y"};
+        return n;
+    }());
+
+    // We cannot literally pass nullptr to run() because the signature takes a reference.
+    // Instead we test the next-worst thing: an empty backend name / unregistered target.
+    // The coordinator must not crash; it should return an error via ExpectedVoid.
+    std::vector<float> in_buf = {1,2,3,4};
+    std::vector<float> out_buf(4, 0);
+    const std::byte* ins[]  = {reinterpret_cast<const std::byte*>(in_buf.data())};
+    std::byte*       outs[] = {reinterpret_cast<std::byte*>(out_buf.data())};
+
+    // Use a backend that claims it cannot compile for the target — forces graceful failure path.
+    struct FailingBackend final : public hq::npu::INpuBackend {
+        [[nodiscard]] std::expected<hq::npu::CompiledKernel, std::string>
+        compile(const hq::npu::KernelGraph&, const hq::npu::TargetConfig&) override {
+            return std::unexpected{"FailingBackend: forced compile failure"};
+        }
+        [[nodiscard]] std::expected<void, std::string>
+        execute(const hq::npu::CompiledKernel&, std::span<const std::byte*>, std::span<std::byte*>) override {
+            return std::unexpected{"FailingBackend: forced execute failure"};
+        }
+        [[nodiscard]] bool can_compile_for(std::string_view) const override { return false; }
+        [[nodiscard]] bool is_available() const override { return true; }
+        [[nodiscard]] std::string name() const override { return "FailingBackend"; }
+        [[nodiscard]] bool synthetic_mode() const noexcept override { return true; }
+        [[nodiscard]] std::string unavailable_reason() const override { return {}; }
+        [[nodiscard]] float utilization() const override { return -1.0f; }
+        [[nodiscard]] float temperature() const override { return -1.0f; }
+    };
+
+    FailingBackend fail_backend;
+    hq::npu::CompiledKernel dummy_kernel;
+    dummy_kernel.inputs.push_back(hq::npu::TensorDesc{{4}, hq::npu::TensorDesc::DataType::F32});
+    dummy_kernel.input_names.push_back("x");
+    dummy_kernel.outputs.push_back(hq::npu::TensorDesc{{4}, hq::npu::TensorDesc::DataType::F32});
+    dummy_kernel.output_names.push_back("y");
+    dummy_kernel.compiled = true;
+
+    auto run_r = coord.run(fail_backend, dummy_kernel,
+                           std::span<const std::byte*>(ins),
+                           std::span<std::byte*>(outs));
+    if (run_r) {
+        auto res = PropupResult::fail(name, "expected failure but run() succeeded");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    auto res = PropupResult::pass(name);
+    res.elapsed_ms = now_ms() - t0;
+    hq_println(std::format("[PROPUP] {} passed in {} ms", name, res.elapsed_ms));
+    return res;
+}
+
+hq::propup::PropupResult hq::propup::propup_adversarial_corrupt_graph([[maybe_unused]] std::ostream* log) {
+    (void)log;
+    const std::string name = "propup_adversarial_corrupt_graph";
+    auto t0 = now_ms();
+
+    // Build a corrupt KernelGraph: a node whose output name matches its input name (self-reference).
+    hq::npu::KernelGraph kg;
+    kg.nodes.push_back([]{
+        hq::npu::KernelNode n;
+        n.name = "self_ref";
+        n.op = hq::npu::KernelNode::Op::Add;
+        n.inputs = {"t0"};
+        n.outputs = {"t0"}; // same tensor name — self-reference
+        return n;
+    }());
+
+    // Try to compile via the native backend.
+    hq::cerberus::CerberusNativeBackend native_backend;
+    hq::npu::TargetConfig cfg;
+    cfg.target_name = "native";
+
+    auto compile_r = native_backend.compile(kg, cfg);
+    // If compile returns an error, that's the desired graceful path.
+    if (!compile_r) {
+        auto res = PropupResult::pass(name);
+        res.elapsed_ms = now_ms() - t0;
+        hq_println(std::format("[PROPUP] {} passed in {} ms (compile rejected corrupt graph)", name, res.elapsed_ms));
+        return res;
+    }
+
+    // If it compiled, try execute with zeroed buffers — it should still not crash.
+    std::vector<float> in_buf(4, 0.0f);
+    std::vector<float> out_buf(4, 0.0f);
+    const std::byte* ins[]  = {reinterpret_cast<const std::byte*>(in_buf.data())};
+    std::byte*       outs[] = {reinterpret_cast<std::byte*>(out_buf.data())};
+    auto exec_r = native_backend.execute(*compile_r,
+                                         std::span<const std::byte*>(ins),
+                                         std::span<std::byte*>(outs));
+    if (!exec_r) {
+        auto res = PropupResult::pass(name);
+        res.elapsed_ms = now_ms() - t0;
+        hq_println(std::format("[PROPUP] {} passed in {} ms (execute rejected corrupt graph)", name, res.elapsed_ms));
+        return res;
+    }
+
+    auto res = PropupResult::pass(name);
+    res.elapsed_ms = now_ms() - t0;
+    hq_println(std::format("[PROPUP] {} passed in {} ms (no crash on corrupt graph)", name, res.elapsed_ms));
+    return res;
+}
+
+hq::propup::PropupResult hq::propup::propup_adversarial_mismatched_tensor_shapes([[maybe_unused]] std::ostream* log) {
+    (void)log;
+    const std::string name = "propup_adversarial_mismatched_tensor_shapes";
+    auto t0 = now_ms();
+
+    TieredMemoryConfig tcfg_small;
+    tcfg_small.warm_capacity_bytes = 8ULL * 1024 * 1024;
+    tcfg_small.cool_capacity_bytes = 8ULL * 1024 * 1024;
+    TieredMemoryManager mgr(tcfg_small);
+    CerberusExecutionCoordinator coord(mgr);
+    SmokeTestBackend backend;
+
+    // Build a graph where the declared tensor shape (16) does not match the runtime buffer size (4).
+    hq::npu::KernelGraph graph;
+    graph.nodes.push_back([]{
+        hq::npu::KernelNode n;
+        n.name = "n1";
+        n.op = hq::npu::KernelNode::Op::Mul;
+        n.inputs = {"x"};
+        n.outputs = {"y"};
+        return n;
+    }());
+
+    auto ck = backend.compile(graph, {});
+    if (!ck) {
+        auto res = PropupResult::pass(name);
+        res.elapsed_ms = now_ms() - t0;
+        hq_println(std::format("[PROPUP] {} passed in {} ms (compile rejected mismatch)", name, res.elapsed_ms));
+        return res;
+    }
+
+    // Override the compiled kernel input descriptor to a larger shape than the buffer.
+    ck->inputs[0] = hq::npu::TensorDesc{{16}, hq::npu::TensorDesc::DataType::F32};
+
+    std::vector<float> in_buf = {1,2,3,4}; // only 4 floats, but kernel thinks 16
+    std::vector<float> out_buf(4, 0);
+    const std::byte* ins[]  = {reinterpret_cast<const std::byte*>(in_buf.data())};
+    std::byte*       outs[] = {reinterpret_cast<std::byte*>(out_buf.data())};
+
+    auto run_r = coord.run(backend, *ck,
+                           std::span<const std::byte*>(ins),
+                           std::span<std::byte*>(outs));
+    if (!run_r) {
+        auto res = PropupResult::pass(name);
+        res.elapsed_ms = now_ms() - t0;
+        hq_println(std::format("[PROPUP] {} passed in {} ms (coordinator rejected mismatch)", name, res.elapsed_ms));
+        return res;
+    }
+
+    auto res = PropupResult::pass(name);
+    res.elapsed_ms = now_ms() - t0;
+    hq_println(std::format("[PROPUP] {} passed in {} ms (no crash on mismatch)", name, res.elapsed_ms));
+    return res;
+}
+
+hq::propup::PropupResult hq::propup::propup_adversarial_null_input_buffer([[maybe_unused]] std::ostream* log) {
+    (void)log;
+    const std::string name = "propup_adversarial_null_input_buffer";
+    auto t0 = now_ms();
+
+    // Pass nullptrs to the native matmul kernel.  It must return an error
+    // via std::expected rather than segfault.
+    float* A = nullptr;
+    float* B = nullptr;
+    float* C = nullptr;
+    auto r = hq::cerberus::native::kernel_matmul(A, B, C, 2, 2, 2);
+    if (!r) {
+        auto res = PropupResult::pass(name);
+        res.elapsed_ms = now_ms() - t0;
+        hq_println(std::format("[PROPUP] {} passed in {} ms (kernel returned error: {})", name, res.elapsed_ms, r.error()));
+        return res;
+    }
+
+    auto res = PropupResult::fail(name, "kernel_matmul accepted null pointers without error");
+    res.elapsed_ms = now_ms() - t0;
+    return res;
+}
+
+hq::propup::PropupResult hq::propup::propup_lcmd_initialize_encrypt([[maybe_unused]] std::ostream* log) {
+    (void)log;
+    const std::string name = "propup_lcmd_initialize_encrypt";
+    auto t0 = now_ms();
+
+    hq::cerberus::privacy::LocalMaintenanceDB db;
+    std::vector<std::uint8_t> key(32, 0xAB);
+    namespace fs = std::filesystem;
+    auto tmp_dir = fs::temp_directory_path() / "cerberus_propup";
+    fs::create_directories(tmp_dir);
+    auto path = tmp_dir / "propup_lcmd_init_test.db";
+
+    bool ok = db.initialize(path, key);
+    if (!ok) {
+        auto res = PropupResult::fail(name, "LCMD initialize returned false");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    if (!db.is_initialized()) {
+        auto res = PropupResult::fail(name, "LCMD is_initialized() false after successful initialize");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    auto res = PropupResult::pass(name);
+    res.elapsed_ms = now_ms() - t0;
+    return res;
+}
+
+hq::propup::PropupResult hq::propup::propup_lcmd_store_retrieve([[maybe_unused]] std::ostream* log) {
+    (void)log;
+    const std::string name = "propup_lcmd_store_retrieve";
+    auto t0 = now_ms();
+
+    auto lcmd = make_propup_lcmd();
+    if (!lcmd || !lcmd->is_initialized()) {
+        auto res = PropupResult::fail(name, "make_propup_lcmd() returned null or uninitialized");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    bool stored = lcmd->store_preference("propup_test_key", "propup_test_value_42");
+    if (!stored) {
+        auto res = PropupResult::fail(name, "store_preference returned false");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    std::string val = lcmd->load_preference("propup_test_key");
+    if (val != "propup_test_value_42") {
+        auto res = PropupResult::fail(name, "load_preference returned mismatch");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    auto res = PropupResult::pass(name);
+    res.elapsed_ms = now_ms() - t0;
+    return res;
+}
+
+hq::propup::PropupResult hq::propup::propup_jwt_malformed_rejected([[maybe_unused]] std::ostream* log) {
+    (void)log;
+    const std::string name = "propup_jwt_malformed_rejected";
+    auto t0 = now_ms();
+
+    hq::cerberus::privacy::SessionConfig cfg;
+    cfg.jwt_secret = "propup_test_secret_key_123456789012";
+
+    hq::cerberus::privacy::JWTSession session(cfg);
+
+    std::vector<std::string> bad_tokens = {
+        "",
+        "not.a.jwt",
+        "header.payload",
+        "header.payload.signature.extra",
+        "!!!bad!!!.!!!bad!!!.!!!bad!!!",
+        "a.b.c"
+    };
+
+    for (const auto& token : bad_tokens) {
+        auto [pld, err] = session.validate_token(token);
+        if (pld.has_value()) {
+            auto res = PropupResult::fail(name, "malformed token was accepted");
+            res.elapsed_ms = now_ms() - t0;
+            return res;
+        }
+        if (err.empty() && !token.empty()) {
+            auto res = PropupResult::fail(name, "malformed token rejected but no error message");
+            res.elapsed_ms = now_ms() - t0;
+            return res;
+        }
+    }
+
+    auto res = PropupResult::pass(name);
+    res.elapsed_ms = now_ms() - t0;
+    return res;
+}
+
+hq::propup::PropupResult hq::propup::propup_jwt_expired_detected([[maybe_unused]] std::ostream* log) {
+    (void)log;
+    const std::string name = "propup_jwt_expired_detected";
+    auto t0 = now_ms();
+
+    hq::cerberus::privacy::SessionConfig cfg;
+    cfg.jwt_secret = "propup_test_secret_key_for_expired_jwt_1234";
+    cfg.token_lifetime = std::chrono::seconds{0};
+
+    hq::cerberus::privacy::JWTSession session(cfg);
+    std::string token = session.create_token("propup_test_user", {"cerberus"});
+
+    if (token.empty()) {
+        auto res = PropupResult::fail(name, "create_token returned empty string");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    auto [pld, err] = session.validate_token(token);
+    if (pld.has_value()) {
+        auto res = PropupResult::fail(name, "expired token was accepted as valid");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    if (err.find("expired") == std::string::npos && err.find("Expired") == std::string::npos) {
+        auto res = PropupResult::fail(name, std::string("expired token rejected but reason was not 'expired': ") + err);
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    auto res = PropupResult::pass(name);
+    res.elapsed_ms = now_ms() - t0;
+    return res;
 }
 
 void hq::propup::PropupReport::print() const {

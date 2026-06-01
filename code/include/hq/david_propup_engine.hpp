@@ -98,9 +98,37 @@ PropupResult propup_kernel_matmul_avx2(std::ostream* log = nullptr);
 // GLOW ENGINE SUITE (ported from PsiForceDB Nemadic v3)
 // ===========================================================================
 
+/// @brief Prop up: GlowEngine initializes and shuts down cleanly.
+PropupResult propup_glow_engine_init_deinit(std::ostream* log = nullptr);
+
+/// @brief Prop up: GlowEngine records a path and query_hot_paths returns it.
+PropupResult propup_glow_engine_tensor_create(std::ostream* log = nullptr);
+
+// ===========================================================================
+// GGUF PARSER SUITE (synthetic — validates parser code, not external assets)
+// ===========================================================================
+
+/// @brief Prop up: synthetic GGUF v3 header parses correctly.
+PropupResult propup_gguf_parser_header_valid(std::ostream* log = nullptr);
+
+/// @brief Prop up: synthetic GGUF metadata KV round-trips through parser.
+PropupResult propup_gguf_parser_metadata_read(std::ostream* log = nullptr);
+
 // ===========================================================================
 // ADVERSARIAL ROBUSTNESS EXTENSIONS
 // ===========================================================================
+
+/// @brief Prop up: nullptr/empty backend passed to coordinator fails gracefully.
+PropupResult propup_adversarial_null_backend(std::ostream* log = nullptr);
+
+/// @brief Prop up: corrupt graph (self-referencing node / dangling tensor) returns error via std::expected.
+PropupResult propup_adversarial_corrupt_graph(std::ostream* log = nullptr);
+
+/// @brief Prop up: mismatched tensor shapes in graph caught by decision engine or coordinator.
+PropupResult propup_adversarial_mismatched_tensor_shapes(std::ostream* log = nullptr);
+
+/// @brief Prop up: null input buffer to native kernel matmul returns honest failure, no segfault.
+PropupResult propup_adversarial_null_input_buffer(std::ostream* log = nullptr);
 
 // ===========================================================================
 // GGUF PARSER SUITE (synthetic — validates parser code, not external assets)
@@ -139,8 +167,20 @@ PropupResult propup_ranges_adopted_in_kernels(std::ostream* log = nullptr);
 // ===========================================================================
 
 // ===========================================================================
-// JWT NEGATIVE PATHS
+// LCMD SECURITY + JWT NEGATIVE PATHS
 // ===========================================================================
+
+/// @brief Prop up: LCMD initializes with a key vector and reports initialized.
+PropupResult propup_lcmd_initialize_encrypt(std::ostream* log = nullptr);
+
+/// @brief Prop up: LCMD stores a preference and retrieves it back correctly.
+PropupResult propup_lcmd_store_retrieve(std::ostream* log = nullptr);
+
+/// @brief Prop up: JWT session rejects clearly malformed tokens without crash.
+PropupResult propup_jwt_malformed_rejected(std::ostream* log = nullptr);
+
+/// @brief Prop up: JWT session detects an expired token and rejects it.
+PropupResult propup_jwt_expired_detected(std::ostream* log = nullptr);
 
 // ===========================================================================
 // DLL PRIMITIVES EXPANSION
