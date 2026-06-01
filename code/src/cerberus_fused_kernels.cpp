@@ -10,6 +10,9 @@
 #include <cstring>
 #include <cmath>
 #include <vector>
+#include <ranges>
+#include <algorithm>
+#include <span>
 
 namespace hq::cerberus::native {
 
@@ -25,9 +28,13 @@ std::expected<void, std::string> kernel_fma(
     if (elems == 0)
         return std::unexpected{"zero size"};
 
-    for (std::size_t i = 0; i < elems; ++i) {
-        out[i] = a[i] * b[i] + c[i];
-    }
+    std::ranges::transform(
+        std::views::zip(std::span(a, elems), std::span(b, elems), std::span(c, elems)),
+        out,
+        [](auto t) {
+            auto [x, y, z] = t;
+            return x * y + z;
+        });
     return {};
 }
 

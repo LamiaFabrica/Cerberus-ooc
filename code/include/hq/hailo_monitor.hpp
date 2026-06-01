@@ -24,6 +24,7 @@
 /// @version 2.0.0
 
 #include "hq/cxx26_features.hpp"
+#include "hq/concepts.hpp"
 
 #include <chrono>
 #include <cstdint>
@@ -281,6 +282,7 @@ private:
 // ===========================================================================
 
 template<typename... Args>
+    requires hq::HqFormattableArgs<Args...>
 [[nodiscard]] inline HailoError make_error(HailoErrorCode code,
                                            std::format_string<Args...> fmt,
                                            Args&&... args) {

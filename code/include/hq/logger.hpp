@@ -28,6 +28,7 @@
 ///   -DHQ_LOG_MIN_LEVEL=3  // only WARN and above compiled in
 
 #include "hq/cxx26_features.hpp"
+#include "hq/concepts.hpp"
 
 #include <atomic>
 #include <chrono>
@@ -142,6 +143,7 @@ public:
     // ------------------------------------------------------------------
 
     template<typename... Args>
+        requires hq::HqFormattableArgs<Args...>
     static void writef(LogLevel              level,
                        std::source_location  loc,
                        std::string_view      fmt_str,

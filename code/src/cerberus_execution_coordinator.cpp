@@ -6,15 +6,31 @@
 /// @version 2.0.0 — inputs and outputs now staged through TieredMemoryManager.
 
 #include "hq/cerberus_execution_coordinator.hpp"
+#include "hq/cerberus_error.hpp"
 
 #include <algorithm>
 #include <cstring>
 #include <expected>
 #include <span>
-#include <string>
 #include <vector>
 
 namespace hq {
+
+namespace {
+
+[[nodiscard]] CerberusError map_tier_error(TierError err) noexcept {
+    switch (err) {
+        case TierError::OutOfMemory:     return CerberusError::OutOfMemory;
+        case TierError::InvalidHandle:   return CerberusError::InvalidArgument;
+        case TierError::MigrationFailed: return CerberusError::RuntimeError;
+        case TierError::TierUnavailable: return CerberusError::UnsupportedOperation;
+        case TierError::AlignmentError:  return CerberusError::InvalidArgument;
+        case TierError::InvalidSize:     return CerberusError::InvalidArgument;
+    }
+    return CerberusError::Unknown;
+}
+
+} // namespace
 
 CerberusExecutionCoordinator::CerberusExecutionCoordinator(TieredMemoryManager& manager)
     : manager_{manager} {}
@@ -47,7 +63,7 @@ MemoryTier CerberusExecutionCoordinator::pick_output_tier(
     return preferred;
 }
 
-std::expected<void, std::string>
+hq::ExpectedVoid
 CerberusExecutionCoordinator::run(npu::INpuBackend& backend,
                                   const npu::CompiledKernel& kernel,
                                   std::span<const std::byte*> user_inputs,
@@ -55,14 +71,10 @@ CerberusExecutionCoordinator::run(npu::INpuBackend& backend,
                                   std::ofstream* debug_log) {
     // --- validate counts ------------------------------------------------------
     if (user_inputs.size() != kernel.inputs.size()) {
-        return std::unexpected{
-            "input count mismatch: got " + std::to_string(user_inputs.size()) +
-            ", expected " + std::to_string(kernel.inputs.size())};
+        return std::unexpected(CerberusError::InvalidArgument);
     }
     if (user_outputs.size() != kernel.outputs.size()) {
-        return std::unexpected{
-            "output count mismatch: got " + std::to_string(user_outputs.size()) +
-            ", expected " + std::to_string(kernel.outputs.size())};
+        return std::unexpected(CerberusError::InvalidArgument);
     }
 
     auto log = [&](const std::string& msg) {
@@ -81,14 +93,12 @@ CerberusExecutionCoordinator::run(npu::INpuBackend& backend,
     // --- validate input buffer pointers ---
     for (std::size_t i = 0; i < user_inputs.size(); ++i) {
         if (user_inputs[i] == nullptr) {
-            return std::unexpected{
-                "input buffer[" + std::to_string(i) + "] is null"};
+            return std::unexpected(CerberusError::InvalidArgument);
         }
     }
     for (std::size_t i = 0; i < user_outputs.size(); ++i) {
         if (user_outputs[i] == nullptr) {
-            return std::unexpected{
-                "output buffer[" + std::to_string(i) + "] is null"};
+            return std::unexpected(CerberusError::InvalidArgument);
         }
     }
 
@@ -99,16 +109,12 @@ CerberusExecutionCoordinator::run(npu::INpuBackend& backend,
 
         auto alloc_result = manager_.allocate(sz, tier);
         if (!alloc_result) {
-            return std::unexpected{
-                "tiered allocation failed for input " + std::to_string(i) +
-                ": " + to_string(alloc_result.error())};
+            return std::unexpected(map_tier_error(alloc_result.error()));
         }
 
         input_allocs.emplace_back(manager_, *alloc_result);
         if (!input_allocs.back().valid()) {
-            return std::unexpected{
-                "tiered allocation returned invalid handle for input " +
-                std::to_string(i)};
+            return std::unexpected(CerberusError::OutOfMemory);
         }
 
         std::byte* ptr = static_cast<std::byte*>(input_allocs.back().ptr());
@@ -132,16 +138,12 @@ CerberusExecutionCoordinator::run(npu::INpuBackend& backend,
 
         auto alloc_result = manager_.allocate(sz, tier);
         if (!alloc_result) {
-            return std::unexpected{
-                "tiered allocation failed for output " + std::to_string(i) +
-                ": " + to_string(alloc_result.error())};
+            return std::unexpected(map_tier_error(alloc_result.error()));
         }
 
         output_allocs.emplace_back(manager_, *alloc_result);
         if (!output_allocs.back().valid()) {
-            return std::unexpected{
-                "tiered allocation returned invalid handle for output " +
-                std::to_string(i)};
+            return std::unexpected(CerberusError::OutOfMemory);
         }
 
         std::byte* ptr = static_cast<std::byte*>(output_allocs.back().ptr());
@@ -159,7 +161,7 @@ CerberusExecutionCoordinator::run(npu::INpuBackend& backend,
                                                                    tiered_input_ptrs.size()},
                                        tiered_out_span);
     if (!exec_result) {
-        return std::unexpected{std::move(exec_result.error())};
+        return std::unexpected(CerberusError::BackendExecuteFailed);
     }
 
     // --- copy tiered outputs back to user-provided host buffers ---------------

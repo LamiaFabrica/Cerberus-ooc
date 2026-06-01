@@ -9,7 +9,7 @@
 #include <iostream>
 
 int main() {
-    auto report = hq::propup::run_all_propups(&std::cout);
-    report.print(std::cout);
+    auto report = hq::propup::run_all_propups();
+    report.print();
     return report.all_passed() ? 0 : 1;
 }

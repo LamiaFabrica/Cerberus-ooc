@@ -13,6 +13,9 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <ranges>
+#include <algorithm>
+#include <iterator>
 
 namespace hq::cerberus {
 
@@ -41,16 +44,13 @@ void DecisionEngine::reevaluate_tier(ExecutionStep& step) const {
 
 bool DecisionEngine::all_elementwise(const CerberusGraph& g,
                                      std::span<const std::int32_t> ids) const noexcept {
-    for (std::int32_t id : ids) {
+    return std::ranges::all_of(ids, [&](std::int32_t id) {
         auto idx_opt = g.node_index(id);
         if (!idx_opt) return false;
         const auto& n = g.nodes[*idx_opt];
-        if (n.op != npu::KernelNode::Op::Add &&
-            n.op != npu::KernelNode::Op::Mul) {
-            return false;
-        }
-    }
-    return true;
+        return n.op == npu::KernelNode::Op::Add ||
+               n.op == npu::KernelNode::Op::Mul;
+    });
 }
 
 bool DecisionEngine::is_small_enough_for_native(const GraphNode& node,
@@ -59,11 +59,13 @@ bool DecisionEngine::is_small_enough_for_native(const GraphNode& node,
         // Check if we have known tensor shapes; if all dims <= threshold, native OK
         std::size_t max_dim = 0;
         for (const auto& in_name : node.inputs) {
-            for (const auto& t : tensors) {
-                if (t.name == in_name) {
-                    for (auto d : t.shape)
-                        max_dim = std::max(max_dim, static_cast<std::size_t>(d));
-                }
+            auto it = std::ranges::find_if(tensors, [&in_name](const auto& t) {
+                return t.name == in_name;
+            });
+            if (it != tensors.end()) {
+                std::ranges::for_each(it->shape, [&max_dim](auto d) {
+                    max_dim = std::max(max_dim, static_cast<std::size_t>(d));
+                });
             }
         }
         return max_dim <= cfg_.matmul_native_max_mnk;
@@ -184,8 +186,12 @@ void DecisionEngine::fuse_elementwise_chain(CerberusGraph& g,
 // Main analyse() — produce ordered execution plan from graph
 // ===========================================================================
 
-std::vector<ExecutionStep>
+hq::Expected<std::vector<ExecutionStep>>
 DecisionEngine::analyse(CerberusGraph& graph, std::string_view target_name) {
+    if (graph.nodes.empty()) {
+        return std::unexpected(hq::CerberusError::GraphEmpty);
+    }
+
     std::vector<ExecutionStep> plan;
     plan.reserve(graph.nodes.size());
 
@@ -237,6 +243,10 @@ DecisionEngine::analyse(CerberusGraph& graph, std::string_view target_name) {
                 step.preferred_tier = MemoryTier::Cool;
             }
         }
+    }
+
+    if (plan.empty()) {
+        return std::unexpected(hq::CerberusError::EmptyExecutionPlan);
     }
 
     return plan;

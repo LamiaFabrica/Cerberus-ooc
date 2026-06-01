@@ -17,6 +17,7 @@
 #include "hq/cerberus_decision_engine.hpp"
 #include "hq/cerberus_glow_engine.hpp"
 #include "hq/cerberus_local_maintenance_db.hpp"
+#include "hq/cerberus_error.hpp"
 
 #include <expected>
 #include <string>
@@ -63,7 +64,7 @@ public:
     /// @param input_buffers  Pointers to input host buffers (size = graph.graph_inputs.size()).
     /// @param output_buffers Pointers to output host buffers (size = graph.graph_outputs.size()).
     /// @return CERBERUS_OK on success, or an error string.
-    [[nodiscard]] std::expected<void, std::string>
+    [[nodiscard]] hq::ExpectedVoid
     run_graph(const npu::KernelGraph& graph,
               std::span<std::byte*>       output_buffers,
               std::span<const std::byte*> input_buffers);
@@ -108,7 +109,7 @@ public:
     std::unique_ptr<cli::CerberusCommandExecutor> executor_;
     std::shared_ptr<hq::cerberus::privacy::LocalMaintenanceDB> lcmd_diagnostic_;  // real LCMD passed in (no throwaway creation in athenea-probe handler)
 
-    [[nodiscard]] std::expected<void, std::string> init_backend_();
+    [[nodiscard]] hq::ExpectedVoid init_backend_();
 };
 
 } // namespace hq::cerberus

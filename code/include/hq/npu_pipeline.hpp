@@ -24,6 +24,7 @@
 /// @target MinisForum UM790 Pro (7940HS + Radeon 780M + Hailo-8L)
 
 #include "hq/cxx26_features.hpp"
+#include "hq/concepts.hpp"
 #include "hq/tensor_view.hpp"
 #include "hq/hailo_monitor.hpp"
 #include "hq/gpu_monitor.hpp"
@@ -111,7 +112,7 @@ inline constexpr float CLIP_DMA_LATENCY_US = 60.0f;
 /// plagues heterogeneous pipelines.
 ///
 /// @tparam T Element type.
-template<typename T>
+template<hq::HqScalar T>
 class PinnedTensor {
 public:
     using value_type      = T;

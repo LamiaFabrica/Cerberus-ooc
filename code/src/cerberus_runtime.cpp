@@ -18,6 +18,9 @@
 #include <sstream>
 #include <filesystem>
 #include <cstdlib>
+#include <ranges>
+#include <algorithm>
+#include <iterator>
 
 namespace hq::cerberus {
 
@@ -47,7 +50,7 @@ CerberusRuntime::CerberusRuntime(const Config& cfg)
     auto init_r = init_backend_();
     if (!init_r) {
         throw std::runtime_error(
-            "CerberusRuntime::init_backend_ failed: " + init_r.error());
+            "CerberusRuntime::init_backend_ failed: " + hq::to_string(init_r.error()));
     }
     lcmd_diagnostic_ = cfg_.lcmd;
     if (!lcmd_diagnostic_) {
@@ -82,7 +85,7 @@ CerberusRuntime& CerberusRuntime::operator=(CerberusRuntime&&) noexcept = defaul
 // Backend initialization
 // ===========================================================================
 
-std::expected<void, std::string> CerberusRuntime::init_backend_() {
+hq::ExpectedVoid CerberusRuntime::init_backend_() {
     if (cfg_.preferred_backend == "native" || cfg_.preferred_backend == "cpu") {
         backend_ = std::make_unique<CerberusNativeBackend>();
     } else {
@@ -90,12 +93,10 @@ std::expected<void, std::string> CerberusRuntime::init_backend_() {
         npu::NpuBackendFactory::initialize();
         npu::INpuBackend* found = npu::NpuBackendFactory::by_name(cfg_.preferred_backend);
         if (!found) {
-            return std::unexpected{
-                cfg_.preferred_backend + " backend not registered in NpuBackendFactory"};
+            return std::unexpected{hq::CerberusError::DeviceNotFound};
         }
         if (!found->is_available()) {
-            return std::unexpected{
-                cfg_.preferred_backend + " unavailable: " + found->unavailable_reason()};
+            return std::unexpected{hq::CerberusError::DeviceNotFound};
         }
         // Wrap in a delegating backend (lifetime managed by factory singleton)
         delegating_backend_ = found;
@@ -107,13 +108,13 @@ std::expected<void, std::string> CerberusRuntime::init_backend_() {
 // Main run_graph() — full Cerberus stack
 // ===========================================================================
 
-std::expected<void, std::string>
+hq::ExpectedVoid
 CerberusRuntime::run_graph(const npu::KernelGraph& graph,
                            std::span<std::byte*>       output_buffers,
                            std::span<const std::byte*> input_buffers) {
     npu::INpuBackend* active = backend_.get() ? backend_.get() : delegating_backend_;
     if (!active) {
-        return std::unexpected{"CerberusRuntime: no backend initialized"};
+        return std::unexpected{hq::CerberusError::RuntimeError};
     }
 
     // 1. Convert KernelGraph → CerberusGraph
@@ -121,45 +122,51 @@ CerberusRuntime::run_graph(const npu::KernelGraph& graph,
 
     // 2. Ensure topological order
     if (!cgraph.topo_sort()) {
-        return std::unexpected{"CerberusRuntime: graph has cycles, topo_sort failed"};
+        return std::unexpected{hq::CerberusError::InvalidArgument};
     }
 
-    // 3. DecisionEngine → execution plan
-    auto plan = decision_engine_->analyse(cgraph, cfg_.preferred_backend);
-    if (plan.empty()) {
-        return std::unexpected{"CerberusRuntime: DecisionEngine produced empty plan"};
-    }
-    last_plan_ = plan;
-
-    // 4. Compile the graph through the selected backend
-    npu::TargetConfig tcfg;
-    tcfg.target_name = cfg_.preferred_backend;
-    auto ck_r = active->compile(graph, tcfg);
-    if (!ck_r) {
-        return std::unexpected{
-            "CerberusRuntime: backend compile failed: " + ck_r.error()};
-    }
-    const npu::CompiledKernel& ck = *ck_r;
-
-    // 5. Stage inputs/outputs through the coordinator and execute
-    auto coord_r = coordinator_->run(*active, ck,
-                                      input_buffers, output_buffers);
-    if (!coord_r) {
-        return std::unexpected{
-            "CerberusRuntime: coordinator run failed: " + coord_r.error()};
-    }
-
-    // 6. Learn from this execution via the GlowEngine
-    if (glow_engine_) {
-        std::vector<std::int32_t> node_path;
-        node_path.reserve(cgraph.nodes.size());
-        for (const auto& node : cgraph.nodes) {
-            node_path.push_back(node.id);
-        }
-        glow_engine_->record_execution(node_path);
-    }
-
-    return {};
+    // 3–6. Chain the remaining operations with .and_then / .or_else
+    return hq::ExpectedVoid{}
+        .and_then([&]() -> hq::Expected<std::vector<ExecutionStep>> {
+            auto plan = decision_engine_->analyse(cgraph, cfg_.preferred_backend);
+            if (!plan) {
+                return std::unexpected{plan.error()};
+            }
+            if (plan->empty()) {
+                return std::unexpected{hq::CerberusError::EmptyExecutionPlan};
+            }
+            return *plan;
+        })
+        .and_then([&](std::vector<ExecutionStep> plan) -> hq::ExpectedVoid {
+            last_plan_ = std::move(plan);
+            npu::TargetConfig tcfg;
+            tcfg.target_name = cfg_.preferred_backend;
+            auto ck_r = active->compile(graph, tcfg);
+            if (!ck_r) {
+                return std::unexpected{hq::CerberusError::BackendCompileFailed};
+            }
+            const npu::CompiledKernel& ck = *ck_r;
+            auto coord_r = coordinator_->run(*active, ck,
+                                               input_buffers, output_buffers);
+            if (!coord_r) {
+                return std::unexpected{hq::CerberusError::ExecutionError};
+            }
+            return {};
+        })
+        .and_then([&]() -> hq::ExpectedVoid {
+            if (glow_engine_) {
+                std::vector<std::int32_t> node_path;
+                node_path.reserve(cgraph.nodes.size());
+                std::ranges::copy(
+                    cgraph.nodes | std::views::transform([](const auto& node) { return node.id; }),
+                    std::back_inserter(node_path));
+                glow_engine_->record_execution(node_path);
+            }
+            return {};
+        })
+        .or_else([&](hq::CerberusError e) -> hq::ExpectedVoid {
+            return std::unexpected{e};
+        });
 }
 
 std::string CerberusRuntime::execute_command(const std::string& raw_command) {

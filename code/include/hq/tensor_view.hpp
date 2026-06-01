@@ -15,6 +15,7 @@
 /// @version 2.0.0
 
 #include "hq/cxx26_features.hpp"
+#include "hq/concepts.hpp"
 
 #include <array>
 #include <concepts>
@@ -46,7 +47,7 @@ namespace hq::tensor {
 ///
 /// @tparam T     Element type (may be cv-qualified, e.g. const float).
 /// @tparam Rank  Number of dimensions (1–6).
-template<typename T, std::size_t Rank>
+template<hq::HqScalar T, std::size_t Rank>
 class TensorView {
 public:
     static_assert(Rank >= 1 && Rank <= 6, "TensorView supports ranks 1–6");
@@ -248,10 +249,10 @@ private:
 // Convenience aliases
 // ===========================================================================
 
-template<typename T> using Tensor1D = TensorView<T, 1>;
-template<typename T> using Tensor2D = TensorView<T, 2>;
-template<typename T> using Tensor3D = TensorView<T, 3>;
-template<typename T> using Tensor4D = TensorView<T, 4>;
+template<hq::HqScalar T> using Tensor1D = TensorView<T, 1>;
+template<hq::HqScalar T> using Tensor2D = TensorView<T, 2>;
+template<hq::HqScalar T> using Tensor3D = TensorView<T, 3>;
+template<hq::HqScalar T> using Tensor4D = TensorView<T, 4>;
 
 using FloatTensor1D = Tensor1D<float>;
 using FloatTensor2D = Tensor2D<float>;
@@ -262,15 +263,15 @@ using Int64Tensor1D = Tensor1D<std::int64_t>;
 using ByteTensor1D  = Tensor1D<std::byte>;
 
 /// NHWC/NCHW image tensor: [batch, channels/height, height/width, width/channels]
-template<typename T = float>
+template<hq::HqScalar T = float>
 using ImageTensor = TensorView<T, 4>;
 
 /// Latent tensor for VAE/UNet: [batch=1, channels=4, h/8, w/8]
-template<typename T = float>
+template<hq::HqScalar T = float>
 using LatentTensor = TensorView<T, 4>;
 
 /// Embedding tensor: [batch=1, seq_len=77, hidden_dim]
-template<typename T = float>
+template<hq::HqScalar T = float>
 using EmbeddingTensor = TensorView<T, 3>;
 
 // ===========================================================================
@@ -278,7 +279,7 @@ using EmbeddingTensor = TensorView<T, 3>;
 // ===========================================================================
 
 /// Given a NCHW tensor, return a stride-mapped view with NHWC indexing.
-template<typename T>
+template<hq::HqScalar T>
 TensorView<T, 4> to_hwc_view(TensorView<T, 4>& chw) noexcept {
     const auto sh = chw.shape();
     const std::size_t N = sh[0], C = sh[1], H = sh[2], W = sh[3];
@@ -289,7 +290,7 @@ TensorView<T, 4> to_hwc_view(TensorView<T, 4>& chw) noexcept {
 }
 
 /// Given a NHWC tensor, return a stride-mapped view with NCHW indexing.
-template<typename T>
+template<hq::HqScalar T>
 TensorView<T, 4> to_chw_view(TensorView<T, 4>& hwc) noexcept {
     const auto sh = hwc.shape();
     const std::size_t N = sh[0], H = sh[1], W = sh[2], C = sh[3];
@@ -304,7 +305,7 @@ TensorView<T, 4> to_chw_view(TensorView<T, 4>& hwc) noexcept {
 // ===========================================================================
 
 /// Wrap a std::vector in a TensorView (vector must outlive the view).
-template<typename T, std::size_t Rank>
+template<hq::HqScalar T, std::size_t Rank>
 auto make_tensor(std::vector<T>& storage,
                  const std::array<std::size_t, Rank>& shape)
     -> TensorView<T, Rank>
@@ -313,7 +314,7 @@ auto make_tensor(std::vector<T>& storage,
 }
 
 /// Fill tensor with Gaussian noise (mean 0, stddev 1 by default).
-template<typename T, std::size_t Rank>
+template<hq::HqScalar T, std::size_t Rank>
 void fill_gaussian(TensorView<T, Rank>& tv, std::mt19937& rng,
                    T mean = T{0}, T stddev = T{1})
     requires std::is_floating_point_v<T>
@@ -324,7 +325,7 @@ void fill_gaussian(TensorView<T, Rank>& tv, std::mt19937& rng,
 
 /// Element-wise multiply-add: dst[i] = a * src0[i] + b * src1[i].
 /// All three tensors must have identical element counts.
-template<typename T, std::size_t Rank>
+template<hq::HqScalar T, std::size_t Rank>
 void fmadd(TensorView<T, Rank>& dst,
            T a, const TensorView<const T, Rank>& src0,
            T b, const TensorView<const T, Rank>& src1)

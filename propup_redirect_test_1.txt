@@ -1,0 +1,97 @@
+The requested API version [21] is not available, only API versions [1, 17] are supported in this build. Current ORT Version is: 1.17.1
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP] propup_tiered_memory passed in 0.506836 ms
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP] propup_coordinator_memory_loop passed in 0.0932617 ms
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP] propup_coordinator_tier_decisions passed in 0.0283203 ms
+[PROPUP] propup_compile_graph_analysis passed in 0.00463867 ms
+[PROPUP] propup_kernel_matmul passed in 0.00292969 ms
+[PROPUP] propup_kernel_elementwise passed in 0.000732422 ms
+[PROPUP] propup_kernel_fma passed in 0.00170898 ms
+[PROPUP] propup_kernel_matmul_blocked passed in 0.00415039 ms
+[PROPUP] propup_performance_matmul_vs_naive naive=32.3802 ms blocked=27.8343 ms speedup=1.16332
+[PROPUP] propup_performance_matmul_vs_naive passed in 61.1211 ms
+[PROPUP] propup_kernel_matmul_avx2 avx2=2.3093 ms max_err=1.90735e-06
+[PROPUP] propup_kernel_avx512_detect avx2=yes avx512f=no
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP] propup_end_to_end_native passed in 0.202148 ms
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[PROPUP] propup_decision_engine_fusion passed in 0.0908203 ms
+[21:06:52.061] [INFO ] npu_backend_unified.cpp:766 hq::npu::NpuBackendFactory::initialize()::<lambda()>() — [NpuBackendFactory] Probed 3 backends:
+[21:06:52.061] [INFO ] npu_backend_unified.cpp:791 hq::npu::NpuBackendFactory::print_status()::<lambda(hq::npu::INpuBackend*)>() —   ONNX-CPU-Fallback: available=yes, synthetic=yes, can_compile_for(intel_npu)=no, can_compile_for(cuda)=no, can_compile_for(cpu)=yes
+[21:06:52.062] [INFO ] npu_backend_unified.cpp:791 hq::npu::NpuBackendFactory::print_status()::<lambda(hq::npu::INpuBackend*)>() —   NVIDIA-CUDA: available=no, synthetic=yes, can_compile_for(intel_npu)=no, can_compile_for(cuda)=yes, can_compile_for(cpu)=no
+[21:06:52.062] [INFO ] npu_backend_unified.cpp:791 hq::npu::NpuBackendFactory::print_status()::<lambda(hq::npu::INpuBackend*)>() —   Intel-OpenVINO-NPU: available=no, synthetic=yes, can_compile_for(intel_npu)=yes, can_compile_for(cuda)=no, can_compile_for(cpu)=yes
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+
+=== David Propup Engine Report ===
+  [PASS] propup_tiered_memory (0.506836 ms)
+  [PASS] propup_coordinator_memory_loop (0.0932617 ms)
+  [PASS] propup_coordinator_tier_decisions (0.0283203 ms)
+  [PASS] propup_compile_graph_analysis (0.00463867 ms)
+  [PASS] propup_kernel_matmul (0.00292969 ms)
+  [PASS] propup_kernel_elementwise (0.000732422 ms)
+  [PASS] propup_kernel_fma (0.00170898 ms)
+  [PASS] propup_kernel_matmul_blocked (0.00415039 ms)
+  [PASS] propup_performance_matmul_vs_naive (61.1211 ms)
+  [PASS] propup_kernel_matmul_avx2 (9.04468 ms)
+  [PASS] propup_kernel_avx512_detect (0.0192871 ms)
+  [PASS] propup_end_to_end_native (0.202148 ms)
+  [PASS] propup_decision_engine_fusion (0.0908203 ms)
+  [PASS] propup_kernel_relu (0.000732422 ms)
+  [PASS] propup_kernel_sigmoid (0.00317383 ms)
+  [PASS] propup_lcmd_offline_sync_count (0.0793457 ms)
+  [PASS] propup_intel_npu_telemetry_construction (206.947 ms)
+  [PASS] propup_intel_npu_telemetry_graceful_unavailable (3.83911 ms)
+  [PASS] propup_intel_npu_telemetry_source_description (3.64233 ms)
+  [PASS] propup_intel_npu_telemetry_repeated_calls_safe (3.7627 ms)
+  [PASS] propup_intel_npu_telemetry_backend_integration (10.627 ms)
+  [PASS] propup_intel_npu_telemetry_discovery_does_not_crash (39.2329 ms)
+  [PASS] propup_intel_npu_telemetry_real_source_flag_consistent (3.55688 ms)
+  [PASS] propup_intel_npu_telemetry_with_tmm_athenea_shape (3.75269 ms)
+  [PASS] propup_intel_npu_telemetry_during_tier_migration (4.09814 ms)
+  [PASS] propup_intel_npu_telemetry_sustained_sampling (3.98242 ms)
+  [PASS] propup_runtime_memory_loop_60s_lcmd (3.84546 ms)
+  [PASS] propup_quant_kernels_no_prohibited_language_in_iq4_path (0.38208 ms)
+  [PASS] propup_quant_kernels_no_duplicate_iq4_definition (0.257568 ms)
+  [PASS] propup_npu_surface_language_hygiene (2.68823 ms)
+  [PASS] propup_intel_npu_telemetry_linux_levelzero_graceful (4.12793 ms)
+  [PASS] round22_fma_blend_stability (0.19873 ms)
+  [PASS] round22_telemetry_cache_benefit (3.59863 ms)
+  [PASS] round22_reduced_sampling_util (3.4563 ms)
+  [PASS] round22_tmm_hot_during_optimized_burst (0.138184 ms)
+  [PASS] round22_lcmd_via_runtime_only (0.0910645 ms)
+  [PASS] round22_fma_in_denoise_path (0.0117188 ms)
+  [PASS] round22_cache_in_intel_telemetry (3.67822 ms)
+  [PASS] round22_endurance_with_reduced_sync (0.123779 ms)
+  [PASS] round22_quality_fma_vs_naive (1.24634 ms)
+  [PASS] round22_npu_util_metrics_in_report (4.07251 ms)
+  [PASS] round22_tmm_coordinator_interaction (0.128662 ms)
+  [PASS] round22_all_stages_documented (0.0925293 ms)
+  [PASS] round23_runtime_diagnostic_tmm (0.0791016 ms)
+  [PASS] round23_runtime_diagnostic_coordinator (0.067627 ms)
+  [PASS] round23_runtime_diagnostic_lcmd (0.0695801 ms)
+  [PASS] round23_runtime_diagnostic_all_three (0.101562 ms)
+  [PASS] round23_runtime_tmm_allocation_works (0.0966797 ms)
+  [PASS] round23_runtime_coordinator_present (0.0698242 ms)
+  [PASS] round23_lcmd_only_via_runtime_accessor (0.0734863 ms)
+  [PASS] round23_diagnostic_accessors_no_fake_db (0.0695801 ms)
+-----------------------------------
+  TOTAL: 51/51 passed in 383.41 ms
+  STATUS: ALL CLEAR
+===================================

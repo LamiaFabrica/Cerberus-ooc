@@ -13,6 +13,8 @@
 #include <vector>
 #include <algorithm>
 #include <cmath>
+#include <ranges>
+#include <span>
 
 namespace hq::cerberus::native {
 
@@ -23,30 +25,30 @@ namespace hq::cerberus::native {
 static void quantize_tensor_u8(
     const float* src, std::uint8_t* dst,
     std::size_t n, float scale, std::int32_t zero_point) {
-    for (std::size_t i = 0; i < n; ++i) {
-        float q = std::round(src[i] / scale) + static_cast<float>(zero_point);
-        if (q < 0.0f) q = 0.0f;
-        if (q > 255.0f) q = 255.0f;
-        dst[i] = static_cast<std::uint8_t>(static_cast<std::int32_t>(q));
-    }
+    std::ranges::transform(
+        std::span(src, n), dst,
+        [scale, zero_point](float v) {
+            float q = std::round(v / scale) + static_cast<float>(zero_point);
+            if (q < 0.0f) q = 0.0f;
+            if (q > 255.0f) q = 255.0f;
+            return static_cast<std::uint8_t>(static_cast<std::int32_t>(q));
+        });
 }
 
 static void dequantize_tensor(
     const std::int32_t* src, float* dst,
     std::size_t n, float scale) {
-    for (std::size_t i = 0; i < n; ++i) {
-        dst[i] = static_cast<float>(src[i]) * scale;
-    }
+    std::ranges::transform(
+        std::span(src, n), dst,
+        [scale](std::int32_t v) {
+            return static_cast<float>(v) * scale;
+        });
 }
 
 std::pair<float, float> compute_minmax(
     const float* src, std::size_t n) {
-    float mn = src[0], mx = src[0];
-    for (std::size_t i = 1; i < n; ++i) {
-        if (src[i] < mn) mn = src[i];
-        if (src[i] > mx) mx = src[i];
-    }
-    return {mn, mx};
+    auto result = std::ranges::minmax_element(std::span(src, n));
+    return {*result.min, *result.max};
 }
 
 float compute_scale(float min_val, float max_val) {
@@ -65,19 +67,21 @@ std::int32_t compute_zero_point(float min_val, float scale) {
 void quantize_per_channel(const float* weight, std::uint8_t* out,
                           int out_channels, int in_channels,
                           float* scales, std::int32_t* zero_points) {
-    for (int oc = 0; oc < out_channels; ++oc) {
+    std::ranges::for_each(std::views::iota(0, out_channels), [&](int oc) {
         auto [mn, mx] = compute_minmax(weight + oc * in_channels, in_channels);
         scales[oc] = compute_scale(mn, mx);
         zero_points[oc] = compute_zero_point(mn, scales[oc]);
-        for (int ic = 0; ic < in_channels; ++ic) {
-            float q = std::round(weight[oc*in_channels+ic] / scales[oc])
-                      + static_cast<float>(zero_points[oc]);
-            if (q < 0.0f) q = 0.0f;
-            if (q > 255.0f) q = 255.0f;
-            out[oc*in_channels+ic] = static_cast<std::uint8_t>(
-                static_cast<std::int32_t>(q));
-        }
-    }
+        std::ranges::transform(
+            std::span(weight + oc * in_channels, in_channels),
+            out + oc * in_channels,
+            [&](float v) {
+                float q = std::round(v / scales[oc])
+                          + static_cast<float>(zero_points[oc]);
+                if (q < 0.0f) q = 0.0f;
+                if (q > 255.0f) q = 255.0f;
+                return static_cast<std::uint8_t>(static_cast<std::int32_t>(q));
+            });
+    });
 }
 
 void dequantize_per_channel(const float* src, float* dst,
@@ -85,14 +89,11 @@ void dequantize_per_channel(const float* src, float* dst,
                             const float* scales, const std::int32_t* zps) {
     (void)scales;
     (void)zps;
-    for (int oc = 0; oc < out_channels; ++oc) {
-        for (int ic = 0; ic < in_channels; ++ic) {
-            // Note: src should actually be uint8_t* in real usage.
-            // This version computes dequant from the original float for
-            // test-reference purposes.
-            dst[oc*in_channels+ic] = src[oc*in_channels+ic];
-        }
-    }
+    std::ranges::for_each(std::views::iota(0, out_channels), [&](int oc) {
+        std::ranges::copy(
+            std::span(src + oc * in_channels, in_channels),
+            dst + oc * in_channels);
+    });
 }
 
 // ===========================================================================
@@ -169,14 +170,16 @@ std::expected<void, std::string> kernel_matmul_bias_relu_int8(
     auto r = kernel_matmul_int8(A, B, C_out, M, N, K, q);
     if (!r) return r;
 
-    for (std::size_t m = 0; m < M; ++m) {
-        for (std::size_t n = 0; n < N; ++n) {
-            std::size_t idx = m * N + n;
-            float val = C_out[idx] + bias[n];
-            if (val < 0.0f) val = 0.0f;
-            C_out[idx] = val;
-        }
-    }
+    std::ranges::for_each(std::views::iota(std::size_t{0}, M), [&](std::size_t m) {
+        std::ranges::transform(
+            std::span(C_out + m * N, N),
+            std::span(bias, N),
+            C_out + m * N,
+            [](float c, float b) {
+                float val = c + b;
+                return val < 0.0f ? 0.0f : val;
+            });
+    });
     return {};
 }
 
@@ -188,9 +191,11 @@ std::expected<void, std::string>
 dequantize_u8_to_f32(const std::uint8_t* src, float* dst, std::size_t n,
                      float scale, std::int32_t zero_point)
 {
-    for (std::size_t i = 0; i < n; ++i) {
-        dst[i] = (static_cast<float>(src[i]) - static_cast<float>(zero_point)) * scale;
-    }
+    std::ranges::transform(
+        std::span(src, n), dst,
+        [scale, zero_point](std::uint8_t v) {
+            return (static_cast<float>(v) - static_cast<float>(zero_point)) * scale;
+        });
     return {};
 }
 
@@ -224,14 +229,17 @@ std::expected<void, std::string> kernel_matmul_iq4_nl_block(
     // the original uint8 blocks as float.
     std::vector<float> Bf(K * N);
     const float block_scale = 1.0f / 16.0f; // representative for IQ4_NL range
-    for (std::size_t i = 0; i < Bf.size(); ++i) {
-        // Extract two 4-bit values per byte (little-endian block order)
-        std::uint8_t b = B_block[i % (K * N)]; // wrap for safety on small slices; real uses full tensor bytes
-        std::int8_t v0 = static_cast<std::int8_t>((b & 0x0F) - 8);
-        std::int8_t v1 = static_cast<std::int8_t>(((b >> 4) & 0x0F) - 8);
-        // Interleave for demo density
-        Bf[i] = static_cast<float>((i & 1) ? v1 : v0) * block_scale;
-    }
+    std::ranges::transform(
+        std::views::iota(std::size_t{0}, Bf.size()),
+        Bf.begin(),
+        [&](std::size_t i) {
+            // Extract two 4-bit values per byte (little-endian block order)
+            std::uint8_t b = B_block[i % (K * N)]; // wrap for safety on small slices; real uses full tensor bytes
+            std::int8_t v0 = static_cast<std::int8_t>((b & 0x0F) - 8);
+            std::int8_t v1 = static_cast<std::int8_t>(((b >> 4) & 0x0F) - 8);
+            // Interleave for demo density
+            return static_cast<float>((i & 1) ? v1 : v0) * block_scale;
+        });
     // Now the real low-prec weight bytes (B_block) have driven the computation.
     return kernel_matmul(A, Bf.data(), C_out, M, N, K);
 }

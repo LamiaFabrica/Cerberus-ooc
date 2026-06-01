@@ -17,6 +17,7 @@
 /// @author LamiaFabrica Team
 
 #include "hq/cxx26_features.hpp"
+#include "hq/concepts.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -75,7 +76,7 @@ struct StagingErrorInfo {
 // PinnedStagingPool — double-buffered pinned staging for embeddings
 // ===========================================================================
 
-template<typename T = float>
+template<hq::HqScalar T = float>
 class PinnedStagingPool {
 public:
     // -----------------------------------------------------------------------
