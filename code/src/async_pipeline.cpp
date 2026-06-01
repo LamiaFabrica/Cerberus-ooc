@@ -27,6 +27,7 @@
 
 #ifdef UM790_HAS_HIP
 #include <hip/hip_runtime_api.h>
+#include <iostream>
 #endif
 
 namespace hq::async {
@@ -45,7 +46,7 @@ AsyncPipeline::AsyncPipeline(const PipelineConfig& cfg)
               .embedding_bytes = hq::npu::MAX_EMBEDDING_BYTES,
           })}
 {
-    std::print("[AsyncPipeline] Initialized async pipeline for UM790 Pro\n");
+    std::cout << std::format("[AsyncPipeline] Initialized async pipeline for UM790 Pro\n");
 }
 
 AsyncPipeline::~AsyncPipeline() noexcept {
@@ -64,22 +65,22 @@ task<GeneratedImage> AsyncPipeline::generate_async(GenerationRequest req) {
 
     if (req.width == 0 || req.height == 0 ||
         req.width > 2048 || req.height > 2048) {
-        std::print("[AsyncPipeline] Invalid dimensions: {}x{}\n",
+        std::cout << std::format("[AsyncPipeline] Invalid dimensions: {}x{}\n",
                    req.width, req.height);
         co_return GeneratedImage{};
     }
     if ((req.width % 8U) != 0U || (req.height % 8U) != 0U) {
-        std::print("[AsyncPipeline] Dimensions must be multiples of 8: "
+        std::cout << std::format("[AsyncPipeline] Dimensions must be multiples of 8: "
                    "{}x{}\n", req.width, req.height);
         co_return GeneratedImage{};
     }
     if (req.num_steps == 0 || req.num_steps > 150) {
-        std::print("[AsyncPipeline] Invalid step count: {}\n",
+        std::cout << std::format("[AsyncPipeline] Invalid step count: {}\n",
                    req.num_steps);
         co_return GeneratedImage{};
     }
 
-    std::print("[AsyncPipeline] Starting async generation: \"{}\" "
+    std::cout << std::format("[AsyncPipeline] Starting async generation: \"{}\" "
                "({}x{} {} steps)\n",
                req.prompt, req.width, req.height, req.num_steps);
 
@@ -95,7 +96,7 @@ task<GeneratedImage> AsyncPipeline::generate_async(GenerationRequest req) {
 
     auto slot_result = npu_pipeline_->submit(enc_req);
     if (!slot_result.has_value()) {
-        std::print("[AsyncPipeline] NPU encode submit failed: {}\n",
+        std::cout << std::format("[AsyncPipeline] NPU encode submit failed: {}\n",
                    slot_result.error());
         co_return GeneratedImage{};
     }
@@ -104,12 +105,12 @@ task<GeneratedImage> AsyncPipeline::generate_async(GenerationRequest req) {
     auto cond_handle = co_await NpuReadyAwaiter{*npu_pipeline_, slot,
         std::chrono::milliseconds{5000}};
     if (!cond_handle) {
-        std::print("[AsyncPipeline] NPU conditional encoding timed out\n");
+        std::cout << std::format("[AsyncPipeline] NPU conditional encoding timed out\n");
         npu_pipeline_->release_slot(slot);
         co_return GeneratedImage{};
     }
 
-    std::print("[AsyncPipeline] Conditional embeddings ready "
+    std::cout << std::format("[AsyncPipeline] Conditional embeddings ready "
                "(elements={:L})\n", cond_handle.element_count);
 
     // Step 1b: NPU empty-prompt encoding for CFG
@@ -133,7 +134,7 @@ task<GeneratedImage> AsyncPipeline::generate_async(GenerationRequest req) {
                 uncond_slot, std::chrono::milliseconds{5000}};
             uncond_valid = static_cast<bool>(uncond_handle);
             if (uncond_valid) {
-                std::print("[AsyncPipeline] Unconditional embeddings ready "
+                std::cout << std::format("[AsyncPipeline] Unconditional embeddings ready "
                            "(CFG scale={:.1f})\n", req.guidance_scale);
             }
         }
@@ -156,7 +157,7 @@ task<GeneratedImage> AsyncPipeline::generate_async(GenerationRequest req) {
     const double total_ms =
         std::chrono::duration<double, std::milli>(t_end - t_start).count();
 
-    std::print("[AsyncPipeline] Done ({:.1f} ms) "
+    std::cout << std::format("[AsyncPipeline] Done ({:.1f} ms) "
                "NPU: {:.0f}% ({:.0f}C)\n",
                total_ms, npu_util_pct, npu_temp_c);
 
@@ -165,7 +166,7 @@ task<GeneratedImage> AsyncPipeline::generate_async(GenerationRequest req) {
         result = std::move(*gen_result);
         result.generation_time_ms = static_cast<float>(total_ms);
     } else {
-        std::print("[AsyncPipeline] Generation failed: {}\n",
+        std::cout << std::format("[AsyncPipeline] Generation failed: {}\n",
                    hq::to_string(gen_result.error()));
     }
 
@@ -181,16 +182,16 @@ Generator<StepResult> AsyncPipeline::generate_streaming(
 
     if (req.width == 0 || req.height == 0 ||
         req.width > 2048 || req.height > 2048) {
-        std::print("[AsyncPipeline:stream] Invalid dimensions\n");
+        std::cout << std::format("[AsyncPipeline:stream] Invalid dimensions\n");
         co_return;
     }
     if (req.num_steps == 0 || req.num_steps > 150) {
-        std::print("[AsyncPipeline:stream] Invalid step count: {}\n",
+        std::cout << std::format("[AsyncPipeline:stream] Invalid step count: {}\n",
                    req.num_steps);
         co_return;
     }
 
-    std::print("[AsyncPipeline:stream] Starting streaming: \"{}\" "
+    std::cout << std::format("[AsyncPipeline:stream] Starting streaming: \"{}\" "
                "({}x{} {} steps)\n",
                req.prompt, req.width, req.height, req.num_steps);
 
@@ -206,7 +207,7 @@ Generator<StepResult> AsyncPipeline::generate_streaming(
 
     auto slot_res = npu_pipeline_->submit(enc_req);
     if (!slot_res.has_value()) {
-        std::print("[AsyncPipeline:stream] NPU submit failed: {}\n",
+        std::cout << std::format("[AsyncPipeline:stream] NPU submit failed: {}\n",
                    slot_res.error());
         co_return;
     }
@@ -218,7 +219,7 @@ Generator<StepResult> AsyncPipeline::generate_streaming(
     npu_pipeline_->release_slot(slot);
 
     if (!handle) {
-        std::print("[AsyncPipeline:stream] NPU encode timed out\n");
+        std::cout << std::format("[AsyncPipeline:stream] NPU encode timed out\n");
         co_return;
     }
 
@@ -268,7 +269,7 @@ Generator<StepResult> AsyncPipeline::generate_streaming(
                 latents[i] = static_cast<float>(img.pixels[src]) / 255.0f;
             }
         } else {
-            std::print("[AsyncPipeline:stream] Step {} failed: {}\n",
+            std::cout << std::format("[AsyncPipeline:stream] Step {} failed: {}\n",
                        step, hq::to_string(step_result.error()));
         }
 
@@ -282,7 +283,7 @@ Generator<StepResult> AsyncPipeline::generate_streaming(
         };
     }
 
-    std::print("[AsyncPipeline:stream] Streaming generation complete\n");
+    std::cout << std::format("[AsyncPipeline:stream] Streaming generation complete\n");
 }
 
 // ===========================================================================

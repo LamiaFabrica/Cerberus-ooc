@@ -51,6 +51,7 @@
 #include <string_view>
 #include <thread>
 #include <vector>
+#include <format>
 
 using namespace std::literals;
 
@@ -136,7 +137,7 @@ int main(int argc, char** argv) {
     if (args.command == "monitor")            return cmd_monitor(args);
     if (args.command == "profile")            return cmd_profile(args);
 
-    std::print("Unknown command: '{}'\n", args.command);
+    std::cout << std::format("Unknown command: '{}'\n", args.command);
     print_help(argv[0]);
     return EXIT_FAILURE;
 }
@@ -220,35 +221,35 @@ int main(int argc, char** argv) {
 // Help text
 // ---------------------------------------------------------------------------
 void print_help(std::string_view program) {
-    std::print("Usage: {} [command] [options]\n\n", program);
-    std::print("Commands:\n");
-    std::print("  generate <prompt>      Generate a single image from text prompt\n");
-    std::print("  batch <file>           Generate images from prompts in file (one per line)\n");
-    std::print("  benchmark              Run full benchmark suite (all workloads)\n");
-    std::print("  campaign               Multi-workload structured measurement campaign\n");
-    std::print("  tier-migrate-bench     Measure TieredMemoryManager promote/demote cost\n");
-    std::print("  watchdog-test          Run watchdog state transition validation\n");
-  std::print("  health-report          Show real-time pipeline health score\n");
-  std::print("  probe-backends         Probe hardware and show available backends (NOT active pipeline state)\n");
-  std::print("  device-info            Query and display device telemetry\n");
-    std::print("  monitor                Live hardware dashboard (GPU/NPU + health score)\n");
-    std::print("  profile [prompt]       Run one generate() and show per-phase timing breakdown\n");
-    std::print("  npu-benchmark          Run NPU memory interface benchmark\n");
-    std::print("  stress-test <seconds>  Run sustained stress test for N seconds\n");
-    std::print("  cerberus-run           Run a native Cerberus graph (MatMul+Add) via the engine\n");
-    std::print("\nOptions:\n");
-    std::print("  --model-path <path>    Path to ONNX model files (default: models)\n");
-    std::print("  --steps <N>            Inference steps (default: 20)\n");
-    std::print("  --width <N>            Image width (default: 512)\n");
-    std::print("  --height <N>           Image height (default: 512)\n");
-    std::print("  --output <path>        Output directory for generated images (default: ./output)\n");
-    std::print("  --seed <N>             Random seed (default: random)\n");
-    std::print("  --iterations <N>       Benchmark/campaign iterations for P50/P95/P99 (default: 30)\n");
-    std::print("  --interval <ms>        Monitor refresh interval in milliseconds (default: 1000)\n");
-    std::print("  --watchdog             Enable utilization watchdog (default: on)\n");
-    std::print("  --no-watchdog          Disable utilization watchdog\n");
-    std::print("  --verbose              Verbose output\n");
-    std::print("  --help                 Show this help\n");
+    std::cout << std::format("Usage: {} [command] [options]\n\n", program);
+    std::cout << std::format("Commands:\n");
+    std::cout << std::format("  generate <prompt>      Generate a single image from text prompt\n");
+    std::cout << std::format("  batch <file>           Generate images from prompts in file (one per line)\n");
+    std::cout << std::format("  benchmark              Run full benchmark suite (all workloads)\n");
+    std::cout << std::format("  campaign               Multi-workload structured measurement campaign\n");
+    std::cout << std::format("  tier-migrate-bench     Measure TieredMemoryManager promote/demote cost\n");
+    std::cout << std::format("  watchdog-test          Run watchdog state transition validation\n");
+  std::cout << std::format("  health-report          Show real-time pipeline health score\n");
+  std::cout << std::format("  probe-backends         Probe hardware and show available backends (NOT active pipeline state)\n");
+  std::cout << std::format("  device-info            Query and display device telemetry\n");
+    std::cout << std::format("  monitor                Live hardware dashboard (GPU/NPU + health score)\n");
+    std::cout << std::format("  profile [prompt]       Run one generate() and show per-phase timing breakdown\n");
+    std::cout << std::format("  npu-benchmark          Run NPU memory interface benchmark\n");
+    std::cout << std::format("  stress-test <seconds>  Run sustained stress test for N seconds\n");
+    std::cout << std::format("  cerberus-run           Run a native Cerberus graph (MatMul+Add) via the engine\n");
+    std::cout << std::format("\nOptions:\n");
+    std::cout << std::format("  --model-path <path>    Path to ONNX model files (default: models)\n");
+    std::cout << std::format("  --steps <N>            Inference steps (default: 20)\n");
+    std::cout << std::format("  --width <N>            Image width (default: 512)\n");
+    std::cout << std::format("  --height <N>           Image height (default: 512)\n");
+    std::cout << std::format("  --output <path>        Output directory for generated images (default: ./output)\n");
+    std::cout << std::format("  --seed <N>             Random seed (default: random)\n");
+    std::cout << std::format("  --iterations <N>       Benchmark/campaign iterations for P50/P95/P99 (default: 30)\n");
+    std::cout << std::format("  --interval <ms>        Monitor refresh interval in milliseconds (default: 1000)\n");
+    std::cout << std::format("  --watchdog             Enable utilization watchdog (default: on)\n");
+    std::cout << std::format("  --no-watchdog          Disable utilization watchdog\n");
+    std::cout << std::format("  --verbose              Verbose output\n");
+    std::cout << std::format("  --help                 Show this help\n");
 }
 
 // ---------------------------------------------------------------------------
@@ -284,7 +285,7 @@ void print_help(std::string_view program) {
 // Error helper
 // ---------------------------------------------------------------------------
 [[nodiscard]] int print_error(std::string_view msg) {
-    std::print("Error: {}\n", msg);
+    std::cout << std::format("Error: {}\n", msg);
     return EXIT_FAILURE;
 }
 
@@ -305,18 +306,18 @@ void print_help(std::string_view program) {
 // =============================================================================
 [[nodiscard]] int cmd_generate(const CLIArgs& args) {
     if (args.prompt.empty()) {
-        std::print("Usage: generate <prompt> [options]\n");
+        std::cout << std::format("Usage: generate <prompt> [options]\n");
         return EXIT_FAILURE;
     }
 
-    std::print("=== Cerberus Image Generation ===\n");
-    std::print("  Prompt    : {}\n", args.prompt);
-    std::print("  Model     : {}/\n", args.model_path);
-    std::print("  Size      : {}x{} px  |  Steps: {}  |  CFG: 7.5\n",
+    std::cout << std::format("=== Cerberus Image Generation ===\n");
+    std::cout << std::format("  Prompt    : {}\n", args.prompt);
+    std::cout << std::format("  Model     : {}/\n", args.model_path);
+    std::cout << std::format("  Size      : {}x{} px  |  Steps: {}  |  CFG: 7.5\n",
                args.width, args.height, args.steps);
-    std::print("  Seed      : {}\n",
+    std::cout << std::format("  Seed      : {}\n",
                args.seed != 0 ? std::to_string(args.seed) : std::string{"random"});
-    std::print("  Output    : {}/\n\n", args.output_dir);
+    std::cout << std::format("  Output    : {}/\n\n", args.output_dir);
 
     // Ensure output directory exists
     std::filesystem::create_directories(args.output_dir);
@@ -343,7 +344,7 @@ void print_help(std::string_view program) {
             while (!gen_done.load(std::memory_order_relaxed) && !st.stop_requested()) {
                 const auto elapsed_s = std::chrono::duration_cast<std::chrono::seconds>(
                     std::chrono::steady_clock::now() - gen_start).count();
-                std::print("\r  Generating... {:3}s elapsed  ", elapsed_s);
+                std::cout << std::format("\r  Generating... {:3}s elapsed  ", elapsed_s);
                 std::fflush(stdout);
                 std::this_thread::sleep_for(std::chrono::milliseconds(250));
             }
@@ -354,10 +355,10 @@ void print_help(std::string_view program) {
         gen_done.store(true, std::memory_order_relaxed);
         progress_th.request_stop();
         progress_th.join();
-        std::print("\r                                    \r");
+        std::cout << std::format("\r                                    \r");
 
         if (!result) {
-            std::print("Generation failed: {}\n", hq::to_string(result.error()));
+            std::cout << std::format("Generation failed: {}\n", hq::to_string(result.error()));
             pipeline.shutdown();
             return EXIT_FAILURE;
         }
@@ -371,26 +372,26 @@ void print_help(std::string_view program) {
         auto out_path = std::filesystem::path(args.output_dir)
                         / "generated_image.ppm";
         if (!save_image_ppm(out_path, *result)) {
-            std::print("  Output     : WARNING — failed to save to {}\n", out_path.string());
+            std::cout << std::format("  Output     : WARNING — failed to save to {}\n", out_path.string());
         } else {
-            std::print("  Output     : {}\n", out_path.string());
+            std::cout << std::format("  Output     : {}\n", out_path.string());
         }
 
         auto stats = pipeline.get_stats();
-        std::print("\n=== Generation Complete ===\n");
-        std::print("  Status     : SUCCESS\n");
-        std::print("  Wall-clock : {} ms\n", elapsed_ms);
-        std::print("  Pipeline   : {:.1f} ms  ({:.1f} ms/step avg)\n",
+        std::cout << std::format("\n=== Generation Complete ===\n");
+        std::cout << std::format("  Status     : SUCCESS\n");
+        std::cout << std::format("  Wall-clock : {} ms\n", elapsed_ms);
+        std::cout << std::format("  Pipeline   : {:.1f} ms  ({:.1f} ms/step avg)\n",
                    result->generation_time_ms, per_step_ms);
-        std::print("  Image      : {}x{} px\n", result->width, result->height);
-        std::print("  Throughput : {:.3f} iter/s  |  Recoveries: {}\n",
+        std::cout << std::format("  Image      : {}x{} px\n", result->width, result->height);
+        std::cout << std::format("  Throughput : {:.3f} iter/s  |  Recoveries: {}\n",
                    (elapsed_ms > 0) ? 1000.0 / static_cast<double>(elapsed_ms) : 0.0,
                    stats.watchdog_recoveries);
 
         pipeline.shutdown();
 
     } catch (const std::exception& e) {
-        std::print("Fatal: {}\n", e.what());
+        std::cout << std::format("Fatal: {}\n", e.what());
         return EXIT_FAILURE;
     }
 
@@ -402,7 +403,7 @@ void print_help(std::string_view program) {
 // =============================================================================
 [[nodiscard]] int cmd_batch(const CLIArgs& args) {
     if (args.batch_file.empty()) {
-        std::print("Usage: batch <file> [options]\n");
+        std::cout << std::format("Usage: batch <file> [options]\n");
         return EXIT_FAILURE;
     }
 
@@ -422,13 +423,13 @@ void print_help(std::string_view program) {
         return print_error("Batch file contains no prompts");
     }
 
-    std::print("=== UM790 Pipeline Runner v2.0.0 ===\n");
-    std::print("Command: batch\n");
-    std::print("File:    {}\n", args.batch_file);
-    std::print("Prompts: {}\n", prompts.size());
-    std::print("Size:    {}x{}\n", args.width, args.height);
-    std::print("Steps:   {}\n", args.steps);
-    std::print("Output:  {}\n\n", args.output_dir);
+    std::cout << std::format("=== UM790 Pipeline Runner v2.0.0 ===\n");
+    std::cout << std::format("Command: batch\n");
+    std::cout << std::format("File:    {}\n", args.batch_file);
+    std::cout << std::format("Prompts: {}\n", prompts.size());
+    std::cout << std::format("Size:    {}x{}\n", args.width, args.height);
+    std::cout << std::format("Steps:   {}\n", args.steps);
+    std::cout << std::format("Output:  {}\n\n", args.output_dir);
 
     std::filesystem::create_directories(args.output_dir);
 
@@ -442,7 +443,7 @@ void print_help(std::string_view program) {
         auto total_t0 = std::chrono::steady_clock::now();
 
         for (std::size_t i = 0; i < prompts.size(); ++i) {
-            std::print("[{}/{}] Generating: {}\n", i + 1, prompts.size(), prompts[i]);
+            std::cout << std::format("[{}/{}] Generating: {}\n", i + 1, prompts.size(), prompts[i]);
 
             hq::GenerationRequest req{
                 .prompt         = prompts[i],
@@ -461,7 +462,7 @@ void print_help(std::string_view program) {
                 img_t1 - img_t0).count();
 
             if (!result) {
-                std::print("  FAILED: {}\n", hq::to_string(result.error()));
+                std::cout << std::format("  FAILED: {}\n", hq::to_string(result.error()));
                 ++fail_count;
                 continue;
             }
@@ -472,9 +473,9 @@ void print_help(std::string_view program) {
             auto out_path = std::filesystem::path(args.output_dir)
                             / std::format("batch_{:03d}.ppm", i + 1);
             if (!save_image_ppm(out_path, *result)) {
-                std::print("  Warning: failed to save {}\n", out_path.string());
+                std::cout << std::format("  Warning: failed to save {}\n", out_path.string());
             }
-            std::print("  OK in {} ms\n", img_ms);
+            std::cout << std::format("  OK in {} ms\n", img_ms);
         }
 
         auto total_t1 = std::chrono::steady_clock::now();
@@ -494,20 +495,20 @@ void print_help(std::string_view program) {
         }
         if (!per_image_times.empty()) avg_ms /= per_image_times.size();
 
-        std::print("\n=== Batch Summary ===\n");
-        std::print("  Total time:   {} ms\n", total_ms);
-        std::print("  Successful:   {}\n", success_count);
-        std::print("  Failed:       {}\n", fail_count);
-        std::print("  Avg/image:    {:.1f} ms\n", avg_ms);
-        std::print("  Min/image:    {:.1f} ms\n", min_ms);
-        std::print("  Max/image:    {:.1f} ms\n", max_ms);
-        std::print("  Throughput:   {:.2f} images/sec\n",
+        std::cout << std::format("\n=== Batch Summary ===\n");
+        std::cout << std::format("  Total time:   {} ms\n", total_ms);
+        std::cout << std::format("  Successful:   {}\n", success_count);
+        std::cout << std::format("  Failed:       {}\n", fail_count);
+        std::cout << std::format("  Avg/image:    {:.1f} ms\n", avg_ms);
+        std::cout << std::format("  Min/image:    {:.1f} ms\n", min_ms);
+        std::cout << std::format("  Max/image:    {:.1f} ms\n", max_ms);
+        std::cout << std::format("  Throughput:   {:.2f} images/sec\n",
                    (total_ms > 0)
                        ? (success_count * 1000.0 / static_cast<double>(total_ms))
                        : 0.0);
 
     } catch (const std::exception& e) {
-        std::print("Fatal: {}\n", e.what());
+        std::cout << std::format("Fatal: {}\n", e.what());
         return EXIT_FAILURE;
     }
 
@@ -518,15 +519,15 @@ void print_help(std::string_view program) {
 // CMD: benchmark — Statistically rigorous pipeline benchmark
 // =============================================================================
 [[nodiscard]] int cmd_benchmark(const CLIArgs& args) {
-    std::print("=== UM790 Pipeline Benchmark v3.0.0 ===\n");
-    std::print("Command:    benchmark\n");
-    std::print("Iterations: {}\n", args.iterations);
-    std::print("Steps/iter: {}\n", args.steps);
-    std::print("Size:       {}x{}\n", args.width, args.height);
-    std::print("Timestamp:  {}\n\n", timestamp_now());
+    std::cout << std::format("=== UM790 Pipeline Benchmark v3.0.0 ===\n");
+    std::cout << std::format("Command:    benchmark\n");
+    std::cout << std::format("Iterations: {}\n", args.iterations);
+    std::cout << std::format("Steps/iter: {}\n", args.steps);
+    std::cout << std::format("Size:       {}x{}\n", args.width, args.height);
+    std::cout << std::format("Timestamp:  {}\n\n", timestamp_now());
 
     if (args.iterations == 0) {
-        std::print("Error: --iterations must be > 0\n");
+        std::cout << std::format("Error: --iterations must be > 0\n");
         return EXIT_FAILURE;
     }
 
@@ -535,12 +536,12 @@ void print_help(std::string_view program) {
     // Measure instrumentation overhead, then clear the probe events
     const double overhead_ns = bench_log.measure_overhead_ns(10000);
     bench_log.clear();
-    std::print("Instrumentation overhead: {:.1f} ns/record\n\n", overhead_ns);
+    std::cout << std::format("Instrumentation overhead: {:.1f} ns/record\n\n", overhead_ns);
 
     auto cfg = make_pipeline_config(args);
 
-    std::print("| Iter | Latency (ms) | GPU%% | Hailo%% |\n");
-    std::print("|------|--------------|-------|--------|\n");
+    std::cout << std::format("| Iter | Latency (ms) | GPU%% | Hailo%% |\n");
+    std::cout << std::format("|------|--------------|-------|--------|\n");
 
     bench_log.record(hq::BenchPhase::CAMPAIGN_START);
 
@@ -572,11 +573,11 @@ void print_help(std::string_view program) {
             float h_util = static_cast<float>(pstats.avg_hailo_utilization);
 
             if (!result) {
-                std::print("| {:>4} | {:>12.1f} | {:>5.1f} | {:>6.1f} | FAILED: {} |\n",
+                std::cout << std::format("| {:>4} | {:>12.1f} | {:>5.1f} | {:>6.1f} | FAILED: {} |\n",
                            iter + 1, ms, g_util, h_util,
                            hq::to_string(result.error()));
             } else {
-                std::print("| {:>4} | {:>12.1f} | {:>5.1f} | {:>6.1f} |\n",
+                std::cout << std::format("| {:>4} | {:>12.1f} | {:>5.1f} | {:>6.1f} |\n",
                            iter + 1, ms, g_util, h_util);
             }
         }
@@ -585,7 +586,7 @@ void print_help(std::string_view program) {
         pipeline.shutdown();
 
     } catch (const std::exception& e) {
-        std::print("Benchmark failed: {}\n", e.what());
+        std::cout << std::format("Benchmark failed: {}\n", e.what());
         return EXIT_FAILURE;
     }
 
@@ -594,17 +595,17 @@ void print_help(std::string_view program) {
     const double overhead_pct = (s.mean_ms > 0.0)
         ? (overhead_ns / 1.0e6 / s.mean_ms * 100.0) : 0.0;
 
-    std::print("\n=== Statistical Summary ({} iterations) ===\n", s.count);
-    std::print("  P50 latency:   {:>8.2f} ms\n", s.p50_ms);
-    std::print("  P95 latency:   {:>8.2f} ms\n", s.p95_ms);
-    std::print("  P99 latency:   {:>8.2f} ms\n", s.p99_ms);
-    std::print("  Mean:          {:>8.2f} ms\n", s.mean_ms);
-    std::print("  Stddev:        {:>8.2f} ms\n", s.stddev_ms);
-    std::print("  CV:            {:>8.1f}%%\n", s.cv_pct);
-    std::print("  Min / Max:     {:>8.2f} / {:.2f} ms\n", s.min_ms, s.max_ms);
-    std::print("  Throughput:    {:>8.2f} iter/s\n",
+    std::cout << std::format("\n=== Statistical Summary ({} iterations) ===\n", s.count);
+    std::cout << std::format("  P50 latency:   {:>8.2f} ms\n", s.p50_ms);
+    std::cout << std::format("  P95 latency:   {:>8.2f} ms\n", s.p95_ms);
+    std::cout << std::format("  P99 latency:   {:>8.2f} ms\n", s.p99_ms);
+    std::cout << std::format("  Mean:          {:>8.2f} ms\n", s.mean_ms);
+    std::cout << std::format("  Stddev:        {:>8.2f} ms\n", s.stddev_ms);
+    std::cout << std::format("  CV:            {:>8.1f}%%\n", s.cv_pct);
+    std::cout << std::format("  Min / Max:     {:>8.2f} / {:.2f} ms\n", s.min_ms, s.max_ms);
+    std::cout << std::format("  Throughput:    {:>8.2f} iter/s\n",
                (s.mean_ms > 0.0) ? 1000.0 / s.mean_ms : 0.0);
-    std::print("  Logger overhead: {:.1f} ns/record ({:.4f}%% of mean)\n",
+    std::cout << std::format("  Logger overhead: {:.1f} ns/record ({:.4f}%% of mean)\n",
                overhead_ns, overhead_pct);
 
     // Export structured data
@@ -613,13 +614,13 @@ void print_help(std::string_view program) {
     const auto csv_path  = std::filesystem::path(args.output_dir) / "benchmark.csv";
     const auto md_path   = std::filesystem::path(args.output_dir) / "benchmark.md";
     if (bench_log.export_json(json_path))
-        std::print("\n  JSON:     {}\n", json_path.string());
+        std::cout << std::format("\n  JSON:     {}\n", json_path.string());
     if (bench_log.export_csv(csv_path))
-        std::print("  CSV:      {}\n", csv_path.string());
+        std::cout << std::format("  CSV:      {}\n", csv_path.string());
     if (bench_log.export_markdown(md_path))
-        std::print("  Markdown: {}\n", md_path.string());
+        std::cout << std::format("  Markdown: {}\n", md_path.string());
 
-    std::print("\n=== Benchmark Complete ===\n");
+    std::cout << std::format("\n=== Benchmark Complete ===\n");
     return EXIT_SUCCESS;
 }
 
@@ -628,9 +629,9 @@ void print_help(std::string_view program) {
 // =============================================================================
 [[nodiscard]] int cmd_npu_benchmark(const CLIArgs& args) {
     (void)args;
-    std::print("=== UM790 NPU Memory Interface Benchmark ===\n");
-    std::print("Target: CPU → NPU → GPU memory loop\n");
-    std::print("Measuring: encode latency, DMA time, NPU utilisation\n\n");
+    std::cout << std::format("=== UM790 NPU Memory Interface Benchmark ===\n");
+    std::cout << std::format("Target: CPU → NPU → GPU memory loop\n");
+    std::cout << std::format("Measuring: encode latency, DMA time, NPU utilisation\n\n");
 
     hq::npu::NpuDmaPipeline::Config ncfg{
         .num_slots       = 3,
@@ -650,8 +651,8 @@ void print_help(std::string_view program) {
             "portrait of a warrior queen",
         };
 
-        std::print("| # | Prompt | Encode (us) | DMA (us) | NPU%% | NPU_C |\n");
-        std::print("|---|--------|------------|---------|------|-------|\n");
+        std::cout << std::format("| # | Prompt | Encode (us) | DMA (us) | NPU%% | NPU_C |\n");
+        std::cout << std::format("|---|--------|------------|---------|------|-------|\n");
 
         for (std::size_t i = 0; i < test_prompts.size(); ++i) {
             hq::npu::NpuEncodeRequest req{
@@ -668,7 +669,7 @@ void print_help(std::string_view program) {
                 std::chrono::duration<double, std::micro>(t1 - t0).count();
 
             if (!slot_result.has_value()) {
-                std::print("| {:>2} | {:>6} | FAIL: {} |\n",
+                std::cout << std::format("| {:>2} | {:>6} | FAIL: {} |\n",
                            i + 1,
                            test_prompts[i].substr(0, 6),
                            slot_result.error());
@@ -683,7 +684,7 @@ void print_help(std::string_view program) {
             float npu_util = npu.last_npu_utilization();
             float npu_temp = npu.npu_temperature();
 
-            std::print("| {:>2} | {:>6}.. | {:>10.0f} | {:>7.0f} | {:>4.0f} | {:>5.0f} |\n",
+            std::cout << std::format("| {:>2} | {:>6}.. | {:>10.0f} | {:>7.0f} | {:>4.0f} | {:>5.0f} |\n",
                        i + 1,
                        test_prompts[i].substr(0, 6),
                        encode_time_us,
@@ -695,7 +696,7 @@ void print_help(std::string_view program) {
         }
 
         // Burst throughput test
-        std::print("\n## NPU Burst Throughput\n");
+        std::cout << std::format("\n## NPU Burst Throughput\n");
         constexpr std::size_t BURST_COUNT = 20;
         std::vector<double> burst_times;
 
@@ -725,31 +726,31 @@ void print_help(std::string_view program) {
         }
         burst_avg /= burst_times.size();
 
-        std::print("  Burst encodes:   {}\n", BURST_COUNT);
-        std::print("  Avg/burst:       {:.2f} ms\n", burst_avg);
-        std::print("  Min/Max:         {:.2f} / {:.2f} ms\n", burst_min, burst_max);
-        std::print("  NPU throughput:  {:.2f} encodes/s\n",
+        std::cout << std::format("  Burst encodes:   {}\n", BURST_COUNT);
+        std::cout << std::format("  Avg/burst:       {:.2f} ms\n", burst_avg);
+        std::cout << std::format("  Min/Max:         {:.2f} / {:.2f} ms\n", burst_min, burst_max);
+        std::cout << std::format("  NPU throughput:  {:.2f} encodes/s\n",
                    1000.0 / std::max(burst_avg, 1.0));
-        std::print("  Avg NPU util:    {:.1f}%\n", npu.avg_npu_utilization());
+        std::cout << std::format("  Avg NPU util:    {:.1f}%\n", npu.avg_npu_utilization());
 
         auto stats = npu.get_stats();
-        std::print("  DMA transfers:   {}\n", stats.dma_transfers);
-        std::print("  DMA bytes:       {:L}\n", stats.dma_bytes);
-        std::print("  Avg DMA time:    {:.1f} us\n", stats.avg_dma_time_us);
+        std::cout << std::format("  DMA transfers:   {}\n", stats.dma_transfers);
+        std::cout << std::format("  DMA bytes:       {:L}\n", stats.dma_bytes);
+        std::cout << std::format("  Avg DMA time:    {:.1f} us\n", stats.avg_dma_time_us);
 
         double dma_gbps = (stats.dma_bytes > 0 && stats.avg_dma_time_us > 0)
             ? (static_cast<double>(stats.dma_bytes) / stats.avg_dma_time_us
                * 1e6 / 1e9) : 0.0;
-        std::print("  DMA bandwidth:   {:.2f} GB/s ({:.0f}% of PCIe 3.0 x4)\n",
+        std::cout << std::format("  DMA bandwidth:   {:.2f} GB/s ({:.0f}% of PCIe 3.0 x4)\n",
                    dma_gbps,
                    dma_gbps / hq::npu::HAILO_PCIE_BANDWIDTH_GBS * 100.0f);
 
     } catch (const std::exception& e) {
-        std::print("NPU benchmark failed: {}\n", e.what());
+        std::cout << std::format("NPU benchmark failed: {}\n", e.what());
         return EXIT_FAILURE;
     }
 
-    std::print("\n=== NPU Benchmark Complete ===\n");
+    std::cout << std::format("\n=== NPU Benchmark Complete ===\n");
     return EXIT_SUCCESS;
 }
 
@@ -758,9 +759,9 @@ void print_help(std::string_view program) {
 // =============================================================================
 [[nodiscard]] int cmd_watchdog_test(const CLIArgs& args) {
     (void)args; // unused in this command
-    std::print("=== UM790 Pipeline Runner v2.0.0 ===\n");
-    std::print("Command: watchdog-test\n");
-    std::print("Running watchdog state transition validation...\n\n");
+    std::cout << std::format("=== UM790 Pipeline Runner v2.0.0 ===\n");
+    std::cout << std::format("Command: watchdog-test\n");
+    std::cout << std::format("Running watchdog state transition validation...\n\n");
 
     // Test configuration with low thresholds so we trigger transitions
     hq::WatchdogConfig wcfg{
@@ -814,14 +815,14 @@ void print_help(std::string_view program) {
         70.0f, 70.0f, 70.0f, 70.0f, 70.0f,  // 15-19: normal
     };
 
-    std::print("Simulating 20 steps with utilization pattern:\n");
-    std::print("  Steps 0-4:  NORMAL  (GPU 75%%, Hailo 70%%)\n");
-    std::print("  Steps 5-9:  LOW     (GPU 45%%, Hailo 42%%)\n");
-    std::print("  Steps 10-14:CRITICAL(GPU 25%%, Hailo 22%%)\n");
-    std::print("  Steps 15-19:NORMAL  (GPU 75%%, Hailo 70%%)\n\n");
+    std::cout << std::format("Simulating 20 steps with utilization pattern:\n");
+    std::cout << std::format("  Steps 0-4:  NORMAL  (GPU 75%%, Hailo 70%%)\n");
+    std::cout << std::format("  Steps 5-9:  LOW     (GPU 45%%, Hailo 42%%)\n");
+    std::cout << std::format("  Steps 10-14:CRITICAL(GPU 25%%, Hailo 22%%)\n");
+    std::cout << std::format("  Steps 15-19:NORMAL  (GPU 75%%, Hailo 70%%)\n\n");
 
-    std::print("| Step | GPU Util | Hailo Util | GPU State | Hailo State | Action |\n");
-    std::print("|------|----------|------------|-----------|-------------|--------|\n");
+    std::cout << std::format("| Step | GPU Util | Hailo Util | GPU State | Hailo State | Action |\n");
+    std::cout << std::format("|------|----------|------------|-----------|-------------|--------|\n");
 
     for (std::uint32_t step = 0; step < 20; ++step) {
         hq::UtilizationSnapshot gpu_snap{
@@ -850,7 +851,7 @@ void print_help(std::string_view program) {
                 (action->device == hq::ComputeUnit::GPU_780M) ? "GPU" : "Hailo");
         }
 
-        std::print("| {:>4} | {:>7.1f}% | {:>9.1f}% | {:>9} | {:>11} | {:>6} |\n",
+        std::cout << std::format("| {:>4} | {:>7.1f}% | {:>9.1f}% | {:>9} | {:>11} | {:>6} |\n",
                    step,
                    gpu_snap.utilization,
                    hailo_snap.utilization,
@@ -859,13 +860,13 @@ void print_help(std::string_view program) {
                    action_str);
     }
 
-    std::print("\n--- Transition Log ---\n");
+    std::cout << std::format("\n--- Transition Log ---\n");
     for (const auto& t : transitions) {
-        std::print("{}\n", t);
+        std::cout << std::format("{}\n", t);
     }
 
     // Validate expectations
-    std::print("\n--- Validation ---\n");
+    std::cout << std::format("\n--- Validation ---\n");
     bool passed = true;
 
     // Expected: recovery should fire at step 8 (3 consecutive low = steps 5,6,7)
@@ -878,10 +879,10 @@ void print_help(std::string_view program) {
     // Critical at step 10 fires immediately
 
     if (recovery_count == 0) {
-        std::print("  FAIL: No recoveries were triggered\n");
+        std::cout << std::format("  FAIL: No recoveries were triggered\n");
         passed = false;
     } else {
-        std::print("  OK: {} recovery/ies triggered\n", recovery_count);
+        std::cout << std::format("  OK: {} recovery/ies triggered\n", recovery_count);
     }
 
     // Check that critical steps triggered immediate recovery
@@ -890,16 +891,16 @@ void print_help(std::string_view program) {
         if (rs >= 10 && rs <= 14) has_critical_recovery = true;
     }
     if (!has_critical_recovery) {
-        std::print("  FAIL: No recovery during critical phase (steps 10-14)\n");
+        std::cout << std::format("  FAIL: No recovery during critical phase (steps 10-14)\n");
         passed = false;
     } else {
-        std::print("  OK: Recovery triggered during critical phase\n");
+        std::cout << std::format("  OK: Recovery triggered during critical phase\n");
     }
 
-    std::print("\n  Result: {}\n", passed ? "PASS" : "FAIL");
-    std::print("  Recovery steps: ");
-    for (auto s : recovery_steps) std::print("{} ", s);
-    std::print("\n");
+    std::cout << std::format("\n  Result: {}\n", passed ? "PASS" : "FAIL");
+    std::cout << std::format("  Recovery steps: ");
+    for (auto s : recovery_steps) std::cout << std::format("{} ", s);
+    std::cout << std::format("\n");
 
     return passed ? EXIT_SUCCESS : EXIT_FAILURE;
 }
@@ -908,9 +909,9 @@ void print_help(std::string_view program) {
 // CMD: health-report — Real pipeline health score (requires production hardware)
 // =============================================================================
 [[nodiscard]] int cmd_health_report(const CLIArgs& args) {
-    std::print("=== UM790 Pipeline Runner v2.0.0 ===\n");
-    std::print("Command: health-report\n");
-    std::print("Timestamp: {}\n\n", timestamp_now());
+    std::cout << std::format("=== UM790 Pipeline Runner v2.0.0 ===\n");
+    std::cout << std::format("Command: health-report\n");
+    std::cout << std::format("Timestamp: {}\n\n", timestamp_now());
 
     auto cfg = make_pipeline_config(args);
     std::optional<hq::HealthReport> report;
@@ -929,25 +930,25 @@ void print_help(std::string_view program) {
         report = pipeline.get_health_report();
         pipeline.shutdown();
     } catch (const std::exception& e) {
-        std::print("Health check failed: {}\n\n", e.what());
-        std::print("NOTICE: Real health measurement requires the production UM790 Pro\n");
-        std::print("with ROCm 6.0+, HailoRT 4.20+, and ONNX Runtime installed.\n");
-        std::print("No measurement data is available on this build host.\n");
+        std::cout << std::format("Health check failed: {}\n\n", e.what());
+        std::cout << std::format("NOTICE: Real health measurement requires the production UM790 Pro\n");
+        std::cout << std::format("with ROCm 6.0+, HailoRT 4.20+, and ONNX Runtime installed.\n");
+        std::cout << std::format("No measurement data is available on this build host.\n");
         return EXIT_SUCCESS;
     }
 
     if (!report) {
-        std::print("NOTICE: Pipeline returned no health report.\n");
-        std::print("Real measurement requires the production UM790 Pro hardware.\n");
+        std::cout << std::format("NOTICE: Pipeline returned no health report.\n");
+        std::cout << std::format("Real measurement requires the production UM790 Pro hardware.\n");
         return EXIT_SUCCESS;
     }
 
-    std::print("\n=== Health Report ===\n");
-    std::print("Overall Score: {:.1f}/100 (Grade: {})\n",
+    std::cout << std::format("\n=== Health Report ===\n");
+    std::cout << std::format("Overall Score: {:.1f}/100 (Grade: {})\n",
                report->overall_score,
                hq::PipelineHealthScore::grade_name(report->grade));
-    std::print("Summary: {}\n", report->summary);
-    std::print("=====================\n");
+    std::cout << std::format("Summary: {}\n", report->summary);
+    std::cout << std::format("=====================\n");
 
     return EXIT_SUCCESS;
 }
@@ -1048,75 +1049,75 @@ void print_help(std::string_view program) {
 // =============================================================================
 [[nodiscard]] int cmd_device_info(const CLIArgs& args) {
     (void)args;
-    std::print("=== Cerberus Device Information ===\n");
-    std::print("Command:   device-info\n");
-    std::print("Timestamp: {}\n\n", timestamp_now());
+    std::cout << std::format("=== Cerberus Device Information ===\n");
+    std::cout << std::format("Command:   device-info\n");
+    std::cout << std::format("Timestamp: {}\n\n", timestamp_now());
 
     // --- GPU Monitor ---
-    std::print("## GPU Monitor\n\n");
+    std::cout << std::format("## GPU Monitor\n\n");
     try {
         hq::GPUMonitor gpu_mon{0};
         auto init = gpu_mon.initialize();
         if (init) {
             auto telem = gpu_mon.query_all();
             if (telem) {
-                std::print("| Property            | Value          |\n");
-                std::print("|---------------------|----------------|\n");
-                std::print("| Device Index        | {}              |\n", gpu_mon.device_index());
-                std::print("| Utilization         | {:>6.1f}%       |\n", telem->utilization_percent);
-                std::print("| Edge Temperature    | {:>6.1f} C      |\n", telem->temperature_celsius);
-                std::print("| Junction Temperature| {:>6.1f} C      |\n", telem->junction_temperature_c);
-                std::print("| Power Draw          | {:>6.2f} W      |\n", telem->power_watts);
-                std::print("| VRAM Used           | {:>6.1f} MiB    |\n", telem->memory_used_mb);
-                std::print("| VRAM Total          | {:>6.1f} MiB    |\n", telem->memory_total_mb);
-                std::print("| Throttling          | {}              |\n",
+                std::cout << std::format("| Property            | Value          |\n");
+                std::cout << std::format("|---------------------|----------------|\n");
+                std::cout << std::format("| Device Index        | {}              |\n", gpu_mon.device_index());
+                std::cout << std::format("| Utilization         | {:>6.1f}%       |\n", telem->utilization_percent);
+                std::cout << std::format("| Edge Temperature    | {:>6.1f} C      |\n", telem->temperature_celsius);
+                std::cout << std::format("| Junction Temperature| {:>6.1f} C      |\n", telem->junction_temperature_c);
+                std::cout << std::format("| Power Draw          | {:>6.2f} W      |\n", telem->power_watts);
+                std::cout << std::format("| VRAM Used           | {:>6.1f} MiB    |\n", telem->memory_used_mb);
+                std::cout << std::format("| VRAM Total          | {:>6.1f} MiB    |\n", telem->memory_total_mb);
+                std::cout << std::format("| Throttling          | {}              |\n",
                            telem->is_throttling ? "YES" : "NO");
-                std::print("| Initialized         | YES            |\n");
+                std::cout << std::format("| Initialized         | YES            |\n");
             } else {
-                std::print("| Status | Query failed: {} |\n", telem.error().message);
+                std::cout << std::format("| Status | Query failed: {} |\n", telem.error().message);
             }
         } else {
-            std::print("| Status | Initialization failed: {} |\n", init.error().message);
-            std::print("| Note   | GPU monitor requires ROCm SMI library |\n");
+            std::cout << std::format("| Status | Initialization failed: {} |\n", init.error().message);
+            std::cout << std::format("| Note   | GPU monitor requires ROCm SMI library |\n");
         }
     } catch (const std::exception& e) {
-        std::print("| Status | Exception: {} |\n", e.what());
-        std::print("| Note   | GPU monitor may require ROCm runtime |\n");
+        std::cout << std::format("| Status | Exception: {} |\n", e.what());
+        std::cout << std::format("| Note   | GPU monitor may require ROCm runtime |\n");
     }
 
     // --- Hailo Monitor ---
-    std::print("\n## Hailo Monitor (Hailo-8L)\n\n");
+    std::cout << std::format("\n## Hailo Monitor (Hailo-8L)\n\n");
     try {
         hq::HailoMonitor hailo_mon;
         auto open = hailo_mon.open("");
         if (open) {
             auto stats = hailo_mon.sample();
             if (stats) {
-                std::print("| Property              | Value          |\n");
-                std::print("|-----------------------|----------------|\n");
-                std::print("| Device ID             | {}         |\n", hailo_mon.device_id());
-                std::print("| Fused Utilization     | {:>6.1f}%       |\n", stats->nn_core_utilization);
-                std::print("| Power Indicator       | {:>6.1f}%       |\n", stats->power_indicator);
-                std::print("| Inference Indicator   | {:>6.1f}%       |\n", stats->inference_indicator);
-                std::print("| Power Draw            | {:>6.2f} W      |\n", stats->power_watts);
-                std::print("| Temperature           | {:>6.1f} C      |\n", stats->temperature_celsius);
-                std::print("| Inferences Count      | {:>15} |\n", stats->inferences_count);
-                std::print("| Inference Delta       | {:>15} |\n", stats->inference_delta);
-                std::print("| Device Healthy        | {}              |\n",
+                std::cout << std::format("| Property              | Value          |\n");
+                std::cout << std::format("|-----------------------|----------------|\n");
+                std::cout << std::format("| Device ID             | {}         |\n", hailo_mon.device_id());
+                std::cout << std::format("| Fused Utilization     | {:>6.1f}%       |\n", stats->nn_core_utilization);
+                std::cout << std::format("| Power Indicator       | {:>6.1f}%       |\n", stats->power_indicator);
+                std::cout << std::format("| Inference Indicator   | {:>6.1f}%       |\n", stats->inference_indicator);
+                std::cout << std::format("| Power Draw            | {:>6.2f} W      |\n", stats->power_watts);
+                std::cout << std::format("| Temperature           | {:>6.1f} C      |\n", stats->temperature_celsius);
+                std::cout << std::format("| Inferences Count      | {:>15} |\n", stats->inferences_count);
+                std::cout << std::format("| Inference Delta       | {:>15} |\n", stats->inference_delta);
+                std::cout << std::format("| Device Healthy        | {}              |\n",
                            stats->device_healthy ? "YES" : "NO");
             } else {
-                std::print("| Status | Sample failed: {} |\n", stats.error().what());
+                std::cout << std::format("| Status | Sample failed: {} |\n", stats.error().what());
             }
         } else {
-            std::print("| Status | Open failed: {} |\n", open.error().what());
-            std::print("| Note   | Hailo device may not be connected |\n");
+            std::cout << std::format("| Status | Open failed: {} |\n", open.error().what());
+            std::cout << std::format("| Note   | Hailo device may not be connected |\n");
         }
     } catch (const std::exception& e) {
-        std::print("| Status | Exception: {} |\n", e.what());
-        std::print("| Note   | Hailo monitor may require HailoRT |\n");
+        std::cout << std::format("| Status | Exception: {} |\n", e.what());
+        std::cout << std::format("| Note   | Hailo monitor may require HailoRT |\n");
     }
 
-    std::print("\n=== Device Info Complete ===\n");
+    std::cout << std::format("\n=== Device Info Complete ===\n");
     return EXIT_SUCCESS;
 }
 
@@ -1145,7 +1146,7 @@ static void monitor_sigint_handler(int) noexcept {
     std::signal(SIGINT, monitor_sigint_handler);
 
     // Initial clear — ANSI supported on Windows Terminal (Windows 10+)
-    std::print("\033[2J\033[H");
+    std::cout << std::format("\033[2J\033[H");
     std::fflush(stdout);
 
     while (g_monitor_running.load(std::memory_order_relaxed)) {
@@ -1176,69 +1177,69 @@ static void monitor_sigint_handler(int) noexcept {
         const auto report = health.compute();
 
         // Home cursor — overwrite previous frame in-place (no flicker)
-        std::print("\033[H");
+        std::cout << std::format("\033[H");
 
         // Header
-        std::print("=== Cerberus Live Monitor ===  {}  [Ctrl+C to stop]\033[K\n",
+        std::cout << std::format("=== Cerberus Live Monitor ===  {}  [Ctrl+C to stop]\033[K\n",
                    timestamp_now());
-        std::print("Refresh: {}ms\033[K\n", args.monitor_interval_ms);
-        std::print("\033[K\n");
+        std::cout << std::format("Refresh: {}ms\033[K\n", args.monitor_interval_ms);
+        std::cout << std::format("\033[K\n");
 
         // Hardware telemetry
-        std::print("  HARDWARE TELEMETRY\033[K\n");
-        std::print("  ---------------------------------------------------------------\033[K\n");
+        std::cout << std::format("  HARDWARE TELEMETRY\033[K\n");
+        std::cout << std::format("  ---------------------------------------------------------------\033[K\n");
         if (gpu_ok) {
-            std::print("  GPU  (Radeon 780M) :  util {:5.1f}%  temp {:5.1f}C  power {:5.1f}W  [{}]\033[K\n",
+            std::cout << std::format("  GPU  (Radeon 780M) :  util {:5.1f}%  temp {:5.1f}C  power {:5.1f}W  [{}]\033[K\n",
                        gpu_util, gpu_temp, gpu_power, gpu_status);
         } else {
-            std::print("  GPU  (Radeon 780M) :  hardware unavailable (ROCm not found)\033[K\n");
+            std::cout << std::format("  GPU  (Radeon 780M) :  hardware unavailable (ROCm not found)\033[K\n");
         }
         if (hailo_ok) {
-            std::print("  NPU  (Hailo-8L)    :  util {:5.1f}%  temp {:5.1f}C  power {:5.1f}W  [{}]\033[K\n",
+            std::cout << std::format("  NPU  (Hailo-8L)    :  util {:5.1f}%  temp {:5.1f}C  power {:5.1f}W  [{}]\033[K\n",
                        npu_util, npu_temp, npu_power, npu_status);
         } else {
-            std::print("  NPU  (Hailo-8L)    :  hardware unavailable (HailoRT not found)\033[K\n");
+            std::cout << std::format("  NPU  (Hailo-8L)    :  hardware unavailable (HailoRT not found)\033[K\n");
         }
-        std::print("  CPU  (Zen 4 HS)    :  use OS task manager for CPU-level monitoring\033[K\n");
-        std::print("  ---------------------------------------------------------------\033[K\n");
-        std::print("\033[K\n");
+        std::cout << std::format("  CPU  (Zen 4 HS)    :  use OS task manager for CPU-level monitoring\033[K\n");
+        std::cout << std::format("  ---------------------------------------------------------------\033[K\n");
+        std::cout << std::format("\033[K\n");
 
         // Pipeline health score
-        std::print("  PIPELINE HEALTH SCORE: {:.1f}/100  Grade: {} ({})\033[K\n",
+        std::cout << std::format("  PIPELINE HEALTH SCORE: {:.1f}/100  Grade: {} ({})\033[K\n",
                    report.overall_score,
                    hq::PipelineHealthScore::grade_name(report.grade),
                    hq::PipelineHealthScore::grade_description(report.grade));
-        std::print("  ---------------------------------------------------------------\033[K\n");
-        std::print("  GPU Util {:5.1f}  Hailo Util {:5.1f}  NPU Util {:5.1f}\033[K\n",
+        std::cout << std::format("  ---------------------------------------------------------------\033[K\n");
+        std::cout << std::format("  GPU Util {:5.1f}  Hailo Util {:5.1f}  NPU Util {:5.1f}\033[K\n",
                    report.sub_scores.gpu_utilization,
                    report.sub_scores.hailo_utilization,
                    report.sub_scores.npu_utilization);
-        std::print("  Latency  {:5.1f}  Memory BW  {:5.1f}  Recovery {:5.1f}\033[K\n",
+        std::cout << std::format("  Latency  {:5.1f}  Memory BW  {:5.1f}  Recovery {:5.1f}\033[K\n",
                    report.sub_scores.latency,
                    report.sub_scores.memory,
                    report.sub_scores.recovery);
-        std::print("  Thermal  {:5.1f}  Stability  {:5.1f}\033[K\n",
+        std::cout << std::format("  Thermal  {:5.1f}  Stability  {:5.1f}\033[K\n",
                    report.sub_scores.thermal,
                    report.sub_scores.stability);
-        std::print("  ---------------------------------------------------------------\033[K\n");
+        std::cout << std::format("  ---------------------------------------------------------------\033[K\n");
         {
             const std::string& s = report.summary.empty()
                 ? std::string{"No inference data (start a pipeline session to see live metrics)"}
                 : report.summary;
-            std::print("  {:.70}\033[K\n", s);
+            std::cout << std::format("  {:.70}\033[K\n", s);
         }
-        std::print("\033[K\n");
+        std::cout << std::format("\033[K\n");
 
         // Pipeline status
-        std::print("  PIPELINE STATUS: No active pipeline session\033[K\n");
-        std::print("\033[K\n");
+        std::cout << std::format("  PIPELINE STATUS: No active pipeline session\033[K\n");
+        std::cout << std::format("\033[K\n");
 
         std::fflush(stdout);
         std::this_thread::sleep_for(std::chrono::milliseconds(args.monitor_interval_ms));
     }
 
     std::signal(SIGINT, SIG_DFL);
-    std::print("\n\nMonitor stopped.\n");
+    std::cout << std::format("\n\nMonitor stopped.\n");
     return EXIT_SUCCESS;
 }
 
@@ -1246,11 +1247,11 @@ static void monitor_sigint_handler(int) noexcept {
 // CMD: stress-test — Sustained generation for N seconds
 // =============================================================================
 [[nodiscard]] int cmd_stress_test(const CLIArgs& args) {
-    std::print("=== UM790 Pipeline Runner v2.0.0 ===\n");
-    std::print("Command: stress-test\n");
-    std::print("Duration: {} seconds\n", args.stress_seconds);
-    std::print("Size:     {}x{}\n", args.width, args.height);
-    std::print("Steps:    {}\n\n", args.steps);
+    std::cout << std::format("=== UM790 Pipeline Runner v2.0.0 ===\n");
+    std::cout << std::format("Command: stress-test\n");
+    std::cout << std::format("Duration: {} seconds\n", args.stress_seconds);
+    std::cout << std::format("Size:     {}x{}\n", args.width, args.height);
+    std::cout << std::format("Steps:    {}\n\n", args.steps);
 
     std::filesystem::create_directories(args.output_dir);
 
@@ -1279,9 +1280,9 @@ static void monitor_sigint_handler(int) noexcept {
         hq::HailoMonitor hailo_mon;
         auto hailo_open = hailo_mon.open("");
 
-        std::print("Starting stress test loop...\n");
-        std::print("\n| Second | GPU% | Hailo% | GPU_T | Hailo_T | Gens |\n");
-        std::print("|--------|------|--------|-------|---------|------|\n");
+        std::cout << std::format("Starting stress test loop...\n");
+        std::cout << std::format("\n| Second | GPU% | Hailo% | GPU_T | Hailo_T | Gens |\n");
+        std::cout << std::format("|--------|------|--------|-------|---------|------|\n");
 
         std::uint32_t last_second = 0;
         std::uint32_t gens_this_second = 0;
@@ -1314,7 +1315,7 @@ static void monitor_sigint_handler(int) noexcept {
                 peak_gpu_temp = std::max(peak_gpu_temp, gt);
                 peak_hailo_temp = std::max(peak_hailo_temp, ht);
 
-                std::print("| {:>6} | {:>4.0f} | {:>6.0f} | {:>5.1f} | {:>7.1f} | {:>4} |\n",
+                std::cout << std::format("| {:>6} | {:>4.0f} | {:>6.0f} | {:>5.1f} | {:>7.1f} | {:>4} |\n",
                            last_second, gu, hu, gt, ht, gens_this_second);
 
                 gens_this_second = 0;
@@ -1358,14 +1359,14 @@ static void monitor_sigint_handler(int) noexcept {
                 if (hailostats) ht = hailostats->temperature_celsius;
             }
 
-            std::print("| {:>6} | {:>4.0f} | {:>6.0f} | {:>5.1f} | {:>7.1f} | {:>4} |\n",
+            std::cout << std::format("| {:>6} | {:>4.0f} | {:>6.0f} | {:>5.1f} | {:>7.1f} | {:>4} |\n",
                        last_second, gu, hu, gt, ht, gens_this_second);
         }
 
         pipeline.shutdown();
 
     } catch (const std::exception& e) {
-        std::print("Fatal during stress test: {}\n", e.what());
+        std::cout << std::format("Fatal during stress test: {}\n", e.what());
         return EXIT_FAILURE;
     }
 
@@ -1391,30 +1392,30 @@ static void monitor_sigint_handler(int) noexcept {
     }
 
     // Thermal summary
-    std::print("\n=== Stress Test Complete ===\n");
-    std::print("  Duration:         {} seconds\n", args.stress_seconds);
-    std::print("  Total time:       {} ms\n", total_ms);
-    std::print("  Generations:      {}\n", generations);
-    std::print("  Throughput:       {:.2f} gen/s\n",
+    std::cout << std::format("\n=== Stress Test Complete ===\n");
+    std::cout << std::format("  Duration:         {} seconds\n", args.stress_seconds);
+    std::cout << std::format("  Total time:       {} ms\n", total_ms);
+    std::cout << std::format("  Generations:      {}\n", generations);
+    std::cout << std::format("  Throughput:       {:.2f} gen/s\n",
                (args.stress_seconds > 0)
                    ? static_cast<double>(generations) / args.stress_seconds
                    : 0.0);
 
-    std::print("\n--- Thermal Summary ---\n");
-    std::print("  | Metric        | Avg     | Peak    | Status |\n");
-    std::print("  |---------------|---------|---------|--------|\n");
+    std::cout << std::format("\n--- Thermal Summary ---\n");
+    std::cout << std::format("  | Metric        | Avg     | Peak    | Status |\n");
+    std::cout << std::format("  |---------------|---------|---------|--------|\n");
 
     std::string gpu_status = (peak_gpu_temp > 85.0f) ? "HOT" :
                               (peak_gpu_temp > 75.0f) ? "WARM" : "OK";
     std::string hailo_status = (peak_hailo_temp > 75.0f) ? "HOT" :
                                 (peak_hailo_temp > 65.0f) ? "WARM" : "OK";
 
-    std::print("  | GPU Temp      | {:>6.1f}C | {:>6.1f}C | {:>6} |\n",
+    std::cout << std::format("  | GPU Temp      | {:>6.1f}C | {:>6.1f}C | {:>6} |\n",
                avg_gpu_temp, peak_gpu_temp, gpu_status);
-    std::print("  | Hailo Temp    | {:>6.1f}C | {:>6.1f}C | {:>6} |\n",
+    std::cout << std::format("  | Hailo Temp    | {:>6.1f}C | {:>6.1f}C | {:>6} |\n",
                avg_hailo_temp, peak_hailo_temp, hailo_status);
-    std::print("  | GPU Util      | {:>6.1f}% |         |        |\n", avg_gpu_util);
-    std::print("  | Hailo Util    | {:>6.1f}% |         |        |\n", avg_hailo_util);
+    std::cout << std::format("  | GPU Util      | {:>6.1f}% |         |        |\n", avg_gpu_util);
+    std::cout << std::format("  | Hailo Util    | {:>6.1f}% |         |        |\n", avg_hailo_util);
 
     return EXIT_SUCCESS;
 }
@@ -1423,51 +1424,51 @@ static void monitor_sigint_handler(int) noexcept {
 // CMD: campaign — Multi-workload structured measurement campaign
 // =============================================================================
 [[nodiscard]] int cmd_campaign(const CLIArgs& args) {
-    std::print("=== UM790 Measurement Campaign v3.0.0 ===\n");
-    std::print("Command:    campaign\n");
-    std::print("Iterations: {} per workload\n", args.iterations);
-    std::print("Timestamp:  {}\n\n", timestamp_now());
+    std::cout << std::format("=== UM790 Measurement Campaign v3.0.0 ===\n");
+    std::cout << std::format("Command:    campaign\n");
+    std::cout << std::format("Iterations: {} per workload\n", args.iterations);
+    std::cout << std::format("Timestamp:  {}\n\n", timestamp_now());
 
     if (args.iterations == 0) {
-        std::print("Error: --iterations must be > 0\n");
+        std::cout << std::format("Error: --iterations must be > 0\n");
         return EXIT_FAILURE;
     }
 
     // -------------------------------------------------------------------------
     // Hardware state snapshot at campaign start
     // -------------------------------------------------------------------------
-    std::print("## Hardware State at Campaign Start\n\n");
+    std::cout << std::format("## Hardware State at Campaign Start\n\n");
     try {
         hq::GPUMonitor gpu_mon{0};
         if (auto init = gpu_mon.initialize(); init) {
             if (auto t = gpu_mon.query_all(); t) {
-                std::print("  GPU: {:.0f}%% util  {:.0f}C  {:.0f}W\n",
+                std::cout << std::format("  GPU: {:.0f}%% util  {:.0f}C  {:.0f}W\n",
                            t->utilization_percent,
                            t->temperature_celsius,
                            t->power_watts);
             }
         } else {
-            std::print("  GPU: ROCm not present — hardware unavailable\n");
+            std::cout << std::format("  GPU: ROCm not present — hardware unavailable\n");
         }
     } catch (...) {
-        std::print("  GPU: unavailable\n");
+        std::cout << std::format("  GPU: unavailable\n");
     }
     try {
         hq::HailoMonitor hailo_mon;
         if (auto open = hailo_mon.open(""); open) {
             if (auto s = hailo_mon.sample(); s) {
-                std::print("  Hailo: {:.0f}%% util  {:.0f}C  {:.0f}W\n",
+                std::cout << std::format("  Hailo: {:.0f}%% util  {:.0f}C  {:.0f}W\n",
                            s->nn_core_utilization,
                            s->temperature_celsius,
                            s->power_watts);
             }
         } else {
-            std::print("  Hailo: HailoRT not present — hardware unavailable\n");
+            std::cout << std::format("  Hailo: HailoRT not present — hardware unavailable\n");
         }
     } catch (...) {
-        std::print("  Hailo: unavailable\n");
+        std::cout << std::format("  Hailo: unavailable\n");
     }
-    std::print("\n");
+    std::cout << std::format("\n");
 
     // -------------------------------------------------------------------------
     // Workload definitions
@@ -1495,7 +1496,7 @@ static void monitor_sigint_handler(int) noexcept {
     hq::BenchmarkLogger bench_log;
     const double overhead_ns = bench_log.measure_overhead_ns(10000);
     bench_log.clear();
-    std::print("Logger overhead: {:.1f} ns/record\n\n", overhead_ns);
+    std::cout << std::format("Logger overhead: {:.1f} ns/record\n\n", overhead_ns);
 
     // -------------------------------------------------------------------------
     // Per-workload timing vectors
@@ -1523,7 +1524,7 @@ static void monitor_sigint_handler(int) noexcept {
 
         for (std::size_t wl = 0; wl < kNumWorkloads; ++wl) {
             const Workload& W = kWorkloads[wl];
-            std::print("Running {} — {} ({}x{} {}steps × {} iters)...\n",
+            std::cout << std::format("Running {} — {} ({}x{} {}steps × {} iters)...\n",
                        W.id, W.prompt, W.width, W.height,
                        W.num_steps, args.iterations);
 
@@ -1555,21 +1556,21 @@ static void monitor_sigint_handler(int) noexcept {
         pipeline.shutdown();
 
     } catch (const std::exception& e) {
-        std::print("Campaign failed: {}\n", e.what());
+        std::cout << std::format("Campaign failed: {}\n", e.what());
         return EXIT_FAILURE;
     }
 
     // -------------------------------------------------------------------------
     // Results table
     // -------------------------------------------------------------------------
-    std::print("\n=== Campaign Results ===\n\n");
-    std::print("| ID   | Workload                  | N  |  P50 ms |  P95 ms |  P99 ms |  Mean ms | CV%% |\n");
-    std::print("|------|---------------------------|----|---------|---------|---------|---------|---------|\n");
+    std::cout << std::format("\n=== Campaign Results ===\n\n");
+    std::cout << std::format("| ID   | Workload                  | N  |  P50 ms |  P95 ms |  P99 ms |  Mean ms | CV%% |\n");
+    std::cout << std::format("|------|---------------------------|----|---------|---------|---------|---------|---------|\n");
 
     for (std::size_t wl = 0; wl < kNumWorkloads; ++wl) {
         const Workload& W = kWorkloads[wl];
         auto s = hq::LatencyStats::from_ms(wl_times[wl]);
-        std::print("| {:4} | {:25} | {:2} | {:>7.2f} | {:>7.2f} | {:>7.2f} | {:>8.2f} | {:>6.1f} |\n",
+        std::cout << std::format("| {:4} | {:25} | {:2} | {:>7.2f} | {:>7.2f} | {:>7.2f} | {:>8.2f} | {:>6.1f} |\n",
                    W.id,
                    W.prompt,
                    s.count,
@@ -1580,7 +1581,7 @@ static void monitor_sigint_handler(int) noexcept {
                    s.cv_pct);
     }
 
-    std::print("\nLogger overhead: {:.1f} ns/record\n", overhead_ns);
+    std::cout << std::format("\nLogger overhead: {:.1f} ns/record\n", overhead_ns);
 
     // -------------------------------------------------------------------------
     // Export
@@ -1589,11 +1590,11 @@ static void monitor_sigint_handler(int) noexcept {
     const auto json_path = std::filesystem::path(args.output_dir) / "campaign.json";
     const auto csv_path  = std::filesystem::path(args.output_dir) / "campaign.csv";
     if (bench_log.export_json(json_path))
-        std::print("  JSON: {}\n", json_path.string());
+        std::cout << std::format("  JSON: {}\n", json_path.string());
     if (bench_log.export_csv(csv_path))
-        std::print("  CSV:  {}\n", csv_path.string());
+        std::cout << std::format("  CSV:  {}\n", csv_path.string());
 
-    std::print("\n=== Campaign Complete ===\n");
+    std::cout << std::format("\n=== Campaign Complete ===\n");
     return EXIT_SUCCESS;
 }
 
@@ -1609,15 +1610,15 @@ static void monitor_sigint_handler(int) noexcept {
     constexpr std::size_t kTestBytes   = kTestSizeMiB * 1024ULL * 1024ULL;
     const std::uint32_t   N = args.iterations;
 
-    std::print("\n=== TieredMemoryManager Migrate Benchmark ===\n");
-    std::print("Block:      {} MiB ({} bytes)\n", kTestSizeMiB, kTestBytes);
-    std::print("Direction:  Cool<->Warm ({} cycles each)\n", N);
-    std::print("Host-only: memcpy-backed (CXL absent — Warm falls back to aligned_alloc)\n\n");
+    std::cout << std::format("\n=== TieredMemoryManager Migrate Benchmark ===\n");
+    std::cout << std::format("Block:      {} MiB ({} bytes)\n", kTestSizeMiB, kTestBytes);
+    std::cout << std::format("Direction:  Cool<->Warm ({} cycles each)\n", N);
+    std::cout << std::format("Host-only: memcpy-backed (CXL absent — Warm falls back to aligned_alloc)\n\n");
 
     hq::BenchmarkLogger bench_log;
     const double overhead_ns = bench_log.measure_overhead_ns(10000);
     bench_log.clear();
-    std::print("Logger overhead: {:.1f} ns/record\n\n", overhead_ns);
+    std::cout << std::format("Logger overhead: {:.1f} ns/record\n\n", overhead_ns);
 
     // Capacity: 3x block size to handle simultaneous old+new during migration
     hq::TieredMemoryConfig cfg;
@@ -1628,13 +1629,13 @@ static void monitor_sigint_handler(int) noexcept {
     // Allocate test block in Cool tier, fill with a known pattern
     auto alloc_r = tmm.allocate(kTestBytes, hq::MemoryTier::Cool);
     if (!alloc_r) {
-        std::print("FATAL: Cool tier alloc failed: {}\n", hq::to_string(alloc_r.error()));
+        std::cout << std::format("FATAL: Cool tier alloc failed: {}\n", hq::to_string(alloc_r.error()));
         return EXIT_FAILURE;
     }
     const hq::TierHandle handle = alloc_r->handle;
     if (alloc_r->ptr) std::memset(alloc_r->ptr, 0xAB, kTestBytes);
 
-    std::print("Initial: handle={:#x}  tier={}  ptr={}\n\n",
+    std::cout << std::format("Initial: handle={:#x}  tier={}  ptr={}\n\n",
                handle,
                hq::to_string(alloc_r->tier),
                alloc_r->ptr ? "valid" : "null");
@@ -1652,7 +1653,7 @@ static void monitor_sigint_handler(int) noexcept {
             const std::uint64_t dur = static_cast<std::uint64_t>(
                 std::chrono::duration_cast<std::chrono::nanoseconds>(t1 - t0).count());
             if (!pr) {
-                std::print("promote() failed at iter {}: {}\n", i, hq::to_string(pr.error()));
+                std::cout << std::format("promote() failed at iter {}: {}\n", i, hq::to_string(pr.error()));
                 return EXIT_FAILURE;
             }
             promote_ns_v.push_back(dur);
@@ -1666,7 +1667,7 @@ static void monitor_sigint_handler(int) noexcept {
             const std::uint64_t dur = static_cast<std::uint64_t>(
                 std::chrono::duration_cast<std::chrono::nanoseconds>(t1 - t0).count());
             if (!dm) {
-                std::print("demote() failed at iter {}: {}\n", i, hq::to_string(dm.error()));
+                std::cout << std::format("demote() failed at iter {}: {}\n", i, hq::to_string(dm.error()));
                 return EXIT_FAILURE;
             }
             demote_ns_v.push_back(dur);
@@ -1682,17 +1683,17 @@ static void monitor_sigint_handler(int) noexcept {
     const double tp_promote = (kTestSizeMiB * 1000.0) / ps.p50_ms; // MiB/s at P50
     const double tp_demote  = (kTestSizeMiB * 1000.0) / ds.p50_ms;
 
-    std::print("=== Results (N={}) ===\n\n", N);
-    std::print("{:<22}  {:>9}  {:>9}  {:>9}  {:>9}  {:>7}  {:>16}\n",
+    std::cout << std::format("=== Results (N={}) ===\n\n", N);
+    std::cout << std::format("{:<22}  {:>9}  {:>9}  {:>9}  {:>9}  {:>7}  {:>16}\n",
                "Direction", "P50 ms", "P95 ms", "P99 ms", "Mean ms", "CV%", "Throughput MiB/s");
-    std::print("{:-<22}  {:->9}  {:->9}  {:->9}  {:->9}  {:->7}  {:->16}\n",
+    std::cout << std::format("{:-<22}  {:->9}  {:->9}  {:->9}  {:->9}  {:->7}  {:->16}\n",
                "", "", "", "", "", "", "");
-    std::print("{:<22}  {:>9.3f}  {:>9.3f}  {:>9.3f}  {:>9.3f}  {:>7.1f}  {:>16.1f}\n",
+    std::cout << std::format("{:<22}  {:>9.3f}  {:>9.3f}  {:>9.3f}  {:>9.3f}  {:>7.1f}  {:>16.1f}\n",
                "Cool->Warm (promote)", ps.p50_ms, ps.p95_ms, ps.p99_ms, ps.mean_ms, ps.cv_pct, tp_promote);
-    std::print("{:<22}  {:>9.3f}  {:>9.3f}  {:>9.3f}  {:>9.3f}  {:>7.1f}  {:>16.1f}\n",
+    std::cout << std::format("{:<22}  {:>9.3f}  {:>9.3f}  {:>9.3f}  {:>9.3f}  {:>7.1f}  {:>16.1f}\n",
                "Warm->Cool (demote)", ds.p50_ms, ds.p95_ms, ds.p99_ms, ds.mean_ms, ds.cv_pct, tp_demote);
 
-    std::print("\nLogger overhead: {:.1f} ns/record = {:.4f}%% of P50 promote cost\n",
+    std::cout << std::format("\nLogger overhead: {:.1f} ns/record = {:.4f}%% of P50 promote cost\n",
                overhead_ns,
                (ps.p50_ms > 0.0) ? (overhead_ns / (ps.p50_ms * 1.0e6) * 100.0) : 0.0);
 
@@ -1701,11 +1702,11 @@ static void monitor_sigint_handler(int) noexcept {
     const auto json_path = std::filesystem::path(args.output_dir) / "tier_migrate.json";
     const auto csv_path  = std::filesystem::path(args.output_dir) / "tier_migrate.csv";
     if (bench_log.export_json(json_path))
-        std::print("  JSON: {}\n", json_path.string());
+        std::cout << std::format("  JSON: {}\n", json_path.string());
     if (bench_log.export_csv(csv_path))
-        std::print("  CSV:  {}\n", csv_path.string());
+        std::cout << std::format("  CSV:  {}\n", csv_path.string());
 
-    std::print("\n=== TierMigrateBench Complete ===\n");
+    std::cout << std::format("\n=== TierMigrateBench Complete ===\n");
     return EXIT_SUCCESS;
 }
 
@@ -1717,13 +1718,13 @@ static void monitor_sigint_handler(int) noexcept {
         ? "a futuristic city at night, neon lights, cinematic"
         : args.prompt;
 
-    std::print("=== Cerberus Heterogeneous Profile ===\n");
-    std::print("  Prompt  : {}\n", prompt);
-    std::print("  Size    : {}x{}  Steps: {}\n\n", args.width, args.height, args.steps);
+    std::cout << std::format("=== Cerberus Heterogeneous Profile ===\n");
+    std::cout << std::format("  Prompt  : {}\n", prompt);
+    std::cout << std::format("  Size    : {}x{}  Steps: {}\n\n", args.width, args.height, args.steps);
 
-    std::print("  NOTE: This binary targets AMD Zen 4 (-march=znver4).\n");
-    std::print("  Run on the UM790 Pro (Ryzen 9 7940HS) for real hardware numbers.\n");
-    std::print("  On non-Zen4 hardware the binary will fault with STATUS_ILLEGAL_INSTRUCTION.\n\n");
+    std::cout << std::format("  NOTE: This binary targets AMD Zen 4 (-march=znver4).\n");
+    std::cout << std::format("  Run on the UM790 Pro (Ryzen 9 7940HS) for real hardware numbers.\n");
+    std::cout << std::format("  On non-Zen4 hardware the binary will fault with STATUS_ILLEGAL_INSTRUCTION.\n\n");
 
     auto cfg = make_pipeline_config(args);
     cfg.enable_watchdog = false;  // suppress watchdog noise during profiling
@@ -1738,15 +1739,15 @@ static void monitor_sigint_handler(int) noexcept {
     req.guidance_scale = 7.5f;
     req.seed           = args.seed != 0 ? static_cast<int>(args.seed) : 42;
 
-    std::print("  Running generate()...\n\n");
+    std::cout << std::format("  Running generate()...\n\n");
     auto result = pipeline.generate(req);
 
     const auto& timings = pipeline.last_phase_timings();
 
-    std::print("=== Phase Timing Breakdown ===\n");
-    std::print("  +-----------------------+----------+------+\n");
-    std::print("  | Phase                 |    ms    | %%   |\n");
-    std::print("  +-----------------------+----------+------+\n");
+    std::cout << std::format("=== Phase Timing Breakdown ===\n");
+    std::cout << std::format("  +-----------------------+----------+------+\n");
+    std::cout << std::format("  | Phase                 |    ms    | %%   |\n");
+    std::cout << std::format("  +-----------------------+----------+------+\n");
 
     const double total_ms = timings.text_encode_ms + timings.embedding_stage_ms
                           + timings.denoise_total_ms + timings.vae_decode_ms
@@ -1756,42 +1757,42 @@ static void monitor_sigint_handler(int) noexcept {
         return total_ms > 0.0 ? (ms / total_ms) * 100.0 : 0.0;
     };
 
-    std::print("  | Text encode (NPU/CPU) | {:8.1f} | {:4.1f} |\n",
+    std::cout << std::format("  | Text encode (NPU/CPU) | {:8.1f} | {:4.1f} |\n",
                timings.text_encode_ms, pct(timings.text_encode_ms));
-    std::print("  | Embedding staging     | {:8.1f} | {:4.1f} |\n",
+    std::cout << std::format("  | Embedding staging     | {:8.1f} | {:4.1f} |\n",
                timings.embedding_stage_ms, pct(timings.embedding_stage_ms));
-    std::print("  | Denoise loop ({:2} step)| {:8.1f} | {:4.1f} |\n",
+    std::cout << std::format("  | Denoise loop ({:2} step)| {:8.1f} | {:4.1f} |\n",
                timings.num_denoise_steps, timings.denoise_total_ms, pct(timings.denoise_total_ms));
-    std::print("  |   CFG blend (NPU/in-loop) {:6.1f}µs total across {} steps\n",
+    std::cout << std::format("  |   CFG blend (NPU/in-loop) {:6.1f}µs total across {} steps\n",
                timings.npu_blend_in_loop_us, timings.num_denoise_steps);
-    std::print("  | VAE decode            | {:8.1f} | {:4.1f} |\n",
+    std::cout << std::format("  | VAE decode            | {:8.1f} | {:4.1f} |\n",
                timings.vae_decode_ms, pct(timings.vae_decode_ms));
-    std::print("  | NPU post-process      | {:8.1f} | {:4.1f} |\n",
+    std::cout << std::format("  | NPU post-process      | {:8.1f} | {:4.1f} |\n",
                timings.post_process_ms, pct(timings.post_process_ms));
-    std::print("  +-----------------------+----------+------+\n");
-    std::print("  | TOTAL                 | {:8.1f} | 100  |\n", total_ms);
-    std::print("  +-----------------------+----------+------+\n\n");
+    std::cout << std::format("  +-----------------------+----------+------+\n");
+    std::cout << std::format("  | TOTAL                 | {:8.1f} | 100  |\n", total_ms);
+    std::cout << std::format("  +-----------------------+----------+------+\n\n");
 
-    std::print("  Encoder       : {}\n", timings.encoder_name);
-    std::print("  Post-processor: {}\n", timings.post_processor_name);
-    std::print("\n");
+    std::cout << std::format("  Encoder       : {}\n", timings.encoder_name);
+    std::cout << std::format("  Post-processor: {}\n", timings.post_processor_name);
+    std::cout << std::format("\n");
 
     if (!result) {
-        std::print("  generate() failed: {}\n", hq::to_string(result.error()));
+        std::cout << std::format("  generate() failed: {}\n", hq::to_string(result.error()));
         return EXIT_FAILURE;
     }
 
-    std::print("  Generate succeeded. Image: {}x{} ({} bytes)\n",
+    std::cout << std::format("  Generate succeeded. Image: {}x{} ({} bytes)\n",
                result->width, result->height, result->pixels.size());
-    std::print("\n=== Heterogeneous Execution Reality (2026-05-22) ===\n");
-    std::print("  Text encoding  : {} — CPU inference via ONNX Runtime (no NPU hardware)\n",
+    std::cout << std::format("\n=== Heterogeneous Execution Reality (2026-05-22) ===\n");
+    std::cout << std::format("  Text encoding  : {} — CPU inference via ONNX Runtime (no NPU hardware)\n",
                 timings.encoder_name);
-    std::print("  UNet denoising : ORT GPU session (ROCm EP if available, else CPU)\n");
-    std::print("  VAE decode     : ORT session (same path as UNet)\n");
-    std::print("  Post-processing: {} — CPU pass-through (HailoRT not installed)\n",
+    std::cout << std::format("  UNet denoising : ORT GPU session (ROCm EP if available, else CPU)\n");
+    std::cout << std::format("  VAE decode     : ORT session (same path as UNet)\n");
+    std::cout << std::format("  Post-processing: {} — CPU pass-through (HailoRT not installed)\n",
                timings.post_processor_name);
-    std::print("\n  Real NPU (Hailo-8L) participation: 0%%\n");
-    std::print("  Requires: HailoRT SDK + HEF on Ubuntu + UM790 Pro hardware\n");
-    std::print("\n=== Profile Complete ===\n");
+    std::cout << std::format("\n  Real NPU (Hailo-8L) participation: 0%%\n");
+    std::cout << std::format("  Requires: HailoRT SDK + HEF on Ubuntu + UM790 Pro hardware\n");
+    std::cout << std::format("\n=== Profile Complete ===\n");
     return EXIT_SUCCESS;
 }

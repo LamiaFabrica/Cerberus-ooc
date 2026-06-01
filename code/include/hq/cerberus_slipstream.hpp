@@ -41,9 +41,9 @@ enum class SlipstreamMessageType : uint16_t {
     SYS_STATS      = 0x0500,
     SYS_SHUTDOWN   = 0x0502,
 
-    ERROR_GENERIC  = 0xFF00,
-    ERROR_AUTH     = 0xFF01,
-    ERROR_TIMEOUT  = 0xFF04,
+    ERR_GENERIC  = 0xFF00,
+    ERR_AUTH     = 0xFF01,
+    ERR_TIMEOUT  = 0xFF04,
 };
 
 // ===========================================================================

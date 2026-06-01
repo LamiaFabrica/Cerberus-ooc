@@ -62,15 +62,21 @@ if(NOT UM790_HAS_STD_EXPECTED)
 endif()
 
 # --- std::print (<print>) ---
-_cerberus_check_feature("std::print" "
-    #include <print>
-    int main() { std::print(\"hello {}\\n\", 42); return 0; }
-" UM790_HAS_STD_PRINT)
+# MinGW-W64 GCC 15 ships <print> but the runtime lacks std::__open_terminal /
+# std::__write_to_terminal, so linking fails. Force the shim on this platform.
+if(WIN32 AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    set(UM790_HAS_STD_PRINT FALSE)
+    message(STATUS "  std::print: NO (MinGW runtime missing terminal symbols — shim will be used)")
+else()
+    _cerberus_check_feature("std::print" "
+        #include <print>
+        int main() { std::print(\"hello {}\\n\", 42); return 0; }
+    " UM790_HAS_STD_PRINT)
+endif()
 
 if(NOT UM790_HAS_STD_PRINT)
-    message(WARNING
-        "std::print is required but not available. "
-        "Ensure GCC >= 15 or Clang >= 19 with C++26 enabled.")
+    message(STATUS
+        "std::print unavailable — using std::format + hq_safe_write shim.")
 endif()
 
 # --- std::mdspan (<mdspan>) ---

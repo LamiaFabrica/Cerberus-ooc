@@ -456,6 +456,7 @@ set(UM790_PIPELINE_SOURCES
     src/cerberus_user_security.cpp
     src/cerberus_jwt_session.cpp
     src/cerberus_first_run.cpp
+    src/intel_npu_telemetry.cpp
 )
 
 list(APPEND UM790_PIPELINE_SOURCES src/hip_graph_denoiser.cpp)
@@ -509,6 +510,8 @@ target_link_libraries(um790_pipeline
         Threads::Threads
         # ClusterTransport requires Winsock on Windows
         $<$<PLATFORM_ID:Windows>:ws2_32>
+        # Intel NPU telemetry requires PDH (Performance Data Helper) on Windows
+        $<$<PLATFORM_ID:Windows>:pdh>
 )
 
 target_compile_definitions(um790_pipeline PUBLIC
@@ -613,6 +616,7 @@ target_link_libraries(cerberus_server PRIVATE
     um790_pipeline
     um790_compile_options
     $<$<PLATFORM_ID:Windows>:ws2_32>
+    $<$<PLATFORM_ID:Windows>:pdh>
 )
 
 # ---------------------------------------------------------------------------

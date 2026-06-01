@@ -32,6 +32,7 @@
 #  include <print>
 #endif
 #include <string>
+#include <iostream>
 
 // ---------------------------------------------------------------------------
 // HailoRT integration — three-tier detection:
@@ -214,14 +215,14 @@ std::expected<void, HailoError> HailoMonitor::open_with_vdevice(
     // Store the actual PCIe address we opened
     opened_device_id_ = selected.dev_id;
 
-    std::print("[hailo] Opened device {} (PCIe {}), {} device(s) scanned.\n",
+    std::cout << std::format("[hailo] Opened device {} (PCIe {}), {} device(s) scanned.\n",
                opened_device_id_,
                selected.bus_rev,
                devices.size());
 
     // If VDevice was provided, log the binding for inference counting
     if (vdevice_) {
-        std::print("[hailo] VDevice bound for real inference counting.\n");
+        std::cout << std::format("[hailo] VDevice bound for real inference counting.\n");
     }
 #else
     // Non-HailoRT build: HONESTLY fail. Do NOT synthesize a connected state.
@@ -243,7 +244,7 @@ std::expected<void, HailoError> HailoMonitor::open_with_vdevice(
 
 void HailoMonitor::close() noexcept {
     if (device_) {
-        std::print("[hailo] Closing device {}.\n", opened_device_id_);
+        std::cout << std::format("[hailo] Closing device {}.\n", opened_device_id_);
         device_.reset();
     }
     opened_device_id_.clear();
@@ -393,7 +394,7 @@ std::expected<void, HailoError> HailoMonitor::hard_reset() {
                        hailo_get_status_message(status)));
     }
 
-    std::print("[hailo] Hard reset (chip level) completed on {}.\n",
+    std::cout << std::format("[hailo] Hard reset (chip level) completed on {}.\n",
                opened_device_id_);
 #else
     return std::unexpected(
@@ -520,7 +521,7 @@ bool HailoMonitor::detect_sensor_mismatch(float power_util,
     // --- Error condition: power says idle but inference says active ---
     // This is physically impossible on Hailo-8L: inference always draws power.
     if (power_util < 5.0f && inference_util > 40.0f) {
-        std::print("[hailo] ERROR sensor mismatch: power={:.1f}% but inference={:.1f}% "
+        std::cout << std::format("[hailo] ERROR sensor mismatch: power={:.1f}% but inference={:.1f}% "
                    "(impossible — power < 5%% && inference > 40%%).\n",
                    power_util, inference_util);
         return true;
@@ -529,7 +530,7 @@ bool HailoMonitor::detect_sensor_mismatch(float power_util,
     // --- Warning condition: indicators diverge beyond 50 percentage points ---
     const float divergence = std::abs(power_util - inference_util);
     if (divergence > 50.0f) {
-        std::print("[hailo] WARN sensor divergence: |{:.1f}% - {:.1f}%| = {:.1f}% > 50%%.\n",
+        std::cout << std::format("[hailo] WARN sensor divergence: |{:.1f}% - {:.1f}%| = {:.1f}% > 50%%.\n",
                    power_util, inference_util, divergence);
         return true;
     }
