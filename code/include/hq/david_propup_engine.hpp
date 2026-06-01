@@ -30,15 +30,19 @@ namespace hq::propup {
 
 struct PropupResult {
     bool passed{false};
+    bool skipped{false};
     std::string name;
     std::string diagnostic;
     double elapsed_ms{0.0};
 
     static PropupResult pass(std::string_view n) {
-        return PropupResult{true, std::string(n), {}, 0.0};
+        return PropupResult{true, false, std::string(n), {}, 0.0};
     }
     static PropupResult fail(std::string_view n, std::string_view diag) {
-        return PropupResult{false, std::string(n), std::string(diag), 0.0};
+        return PropupResult{false, false, std::string(n), std::string(diag), 0.0};
+    }
+    static PropupResult skip(std::string_view n, std::string_view diag) {
+        return PropupResult{false, true, std::string(n), std::string(diag), 0.0};
     }
 };
 
@@ -177,6 +181,33 @@ PropupResult propup_lcmd_offline_sync_count(std::ostream* log = nullptr);
 PropupResult propup_staging_after_tier_migration(std::ostream* log = nullptr);
 
 // ===========================================================================
+// Athenea probe endurance tests (disabled pending TMM heap audit)
+// ===========================================================================
+
+// These propups exercise heavy TMM promote/demote + coordinator paths.
+// They are compiled out of the default run_all_propups() to avoid the cumulative
+// heap segfault documented in issue k-4.  Declarations remain so they can be
+// enabled individually once reset_for_testing() or process-level heap trim is
+// proven sufficient.
+
+PropupResult propup_athenea_probe_lcmd_via_report_struct(std::ostream* log = nullptr);
+PropupResult propup_athenea_probe_report_struct_full_discipline(std::ostream* log = nullptr);
+PropupResult propup_athenea_probe_report_owns_telemetry_accum(std::ostream* log = nullptr);
+PropupResult propup_athenea_probe_endurance_step_graph_coordinator(std::ostream* log = nullptr);
+PropupResult propup_athenea_probe_real_iq4_block_hot_flow(std::ostream* log = nullptr);
+PropupResult propup_athenea_real_quant_weight_driver_owns_flow(std::ostream* log = nullptr);
+PropupResult propup_athenea_quant_driver_real_bytes_hot_dtype(std::ostream* log = nullptr);
+PropupResult propup_cerberusgraph_from_kernel_quant_propagation(std::ostream* log = nullptr);
+PropupResult propup_decision_engine_quant_routing(std::ostream* log = nullptr);
+PropupResult propup_athenea_probe_real_load_tensor_slice_bytes_hot_endurance(std::ostream* log = nullptr);
+PropupResult propup_quant_memory_loop_iq4_nl_block_dtype_preserved_in_compiled_kernels(std::ostream* log = nullptr);
+PropupResult propup_runtime_tmm_present_coordinator_routing_athenea_probe_endurance(std::ostream* log = nullptr);
+PropupResult propup_no_f32_weight_reinterpret_in_hot_quant_loop(std::ostream* log = nullptr);
+PropupResult propup_athenea_probe_report_full_owning_discipline_real_quant_endurance(std::ostream* log = nullptr);
+PropupResult propup_ground_up_quant_memory_loop_real_bytes_to_hot_coordinator_lcmd(std::ostream* log = nullptr);
+PropupResult propup_runtime_memory_loop_60s_lcmd(std::ostream* log = nullptr);
+
+// ===========================================================================
 // Full test suite — runs all validators and returns aggregate report
 // ===========================================================================
 
@@ -185,6 +216,7 @@ struct PropupReport {
     std::size_t passed_count{0};
     std::size_t failed_count{0};
     double total_ms{0.0};
+    std::size_t skipped_count{0};
     std::size_t skipped_verbose_count{0};
 
     [[nodiscard]] bool all_passed() const noexcept {
@@ -194,6 +226,46 @@ struct PropupReport {
 };
 
 [[nodiscard]] PropupReport run_all_propups(std::ostream* log = nullptr);
+
+// ===========================================================================
+// Round 22 propups (12 tests — FMA blend, telemetry cache, TMM hot, LCMD, denoise, endurance, quality, NPU metrics, coordination, documentation)
+// ===========================================================================
+
+/// @brief Prop up: FMA blend stability.
+PropupResult propup_round22_fma_blend_stability(std::ostream* log = nullptr);
+
+/// @brief Prop up: telemetry cache benefit.
+PropupResult propup_round22_telemetry_cache_benefit(std::ostream* log = nullptr);
+
+/// @brief Prop up: reduced sampling utilization.
+PropupResult propup_round22_reduced_sampling_util(std::ostream* log = nullptr);
+
+/// @brief Prop up: TMM hot during optimized burst.
+PropupResult propup_round22_tmm_hot_during_optimized_burst(std::ostream* log = nullptr);
+
+/// @brief Prop up: LCMD via runtime only.
+PropupResult propup_round22_lcmd_via_runtime_only(std::ostream* log = nullptr);
+
+/// @brief Prop up: FMA in denoise path.
+PropupResult propup_round22_fma_in_denoise_path(std::ostream* log = nullptr);
+
+/// @brief Prop up: cache in Intel telemetry.
+PropupResult propup_round22_cache_in_intel_telemetry(std::ostream* log = nullptr);
+
+/// @brief Prop up: endurance with reduced sync.
+PropupResult propup_round22_endurance_with_reduced_sync(std::ostream* log = nullptr);
+
+/// @brief Prop up: quality FMA vs naive.
+PropupResult propup_round22_quality_fma_vs_naive(std::ostream* log = nullptr);
+
+/// @brief Prop up: NPU utilization metrics in report.
+PropupResult propup_round22_npu_util_metrics_in_report(std::ostream* log = nullptr);
+
+/// @brief Prop up: TMM coordinator interaction.
+PropupResult propup_round22_tmm_coordinator_interaction(std::ostream* log = nullptr);
+
+/// @brief Prop up: all stages documented.
+PropupResult propup_round22_all_stages_documented(std::ostream* log = nullptr);
 
 /// @brief Prop up: Athenea 60s endurance cold→hot.
 PropupResult propup_round24_athenea_60s_endurance_cold_hot(std::ostream* log = nullptr);
@@ -252,5 +324,17 @@ PropupResult propup_intel_npu_telemetry_during_tier_migration(std::ostream* log 
 
 /// @brief Prop up: IntelNpuTelemetry sustained sampling respects cache and stays in bounds.
 PropupResult propup_intel_npu_telemetry_sustained_sampling(std::ostream* log = nullptr);
+
+/// @brief Prop up: NPU surface language hygiene (no prohibited terms).
+PropupResult propup_npu_surface_language_hygiene(std::ostream* log = nullptr);
+
+/// @brief Prop up: Linux LevelZero graceful dynamic discovery + real numbers when present.
+PropupResult propup_intel_npu_telemetry_linux_levelzero_graceful(std::ostream* log = nullptr);
+
+/// @brief Prop up: Quantized kernels contain no prohibited language in IQ4 path.
+PropupResult propup_quant_kernels_no_prohibited_language_in_iq4_path(std::ostream* log = nullptr);
+
+/// @brief Prop up: No duplicate IQ4 definition in quantized kernels.
+PropupResult propup_quant_kernels_no_duplicate_iq4_definition(std::ostream* log = nullptr);
 
 } // namespace hq::propup

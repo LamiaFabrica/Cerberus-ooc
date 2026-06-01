@@ -65,6 +65,7 @@ public:
         , default_align_{default_alignment} {}
 
     [[nodiscard]] std::size_t allocated() const noexcept { return allocated_; }
+    [[nodiscard]] std::size_t default_alignment() const noexcept { return default_align_; }
 
 protected:
     void* do_allocate(std::size_t bytes, std::size_t alignment) override {
@@ -78,8 +79,8 @@ protected:
         return p;
     }
 
-    void do_deallocate(void* p, std::size_t bytes, std::size_t /*alignment*/) override {
-        const std::size_t a = std::max(/*alignment*/ default_align_, default_align_);
+    void do_deallocate(void* p, std::size_t bytes, std::size_t alignment) override {
+        const std::size_t a = std::max(alignment, default_align_);
         const std::size_t actual = align_up(bytes, a);
         free_aligned_(p);
         if (allocated_ >= actual) allocated_ -= actual;
@@ -115,6 +116,7 @@ public:
 
     [[nodiscard]] bool cxl_present() const noexcept { return cxl_present_; }
     [[nodiscard]] std::size_t allocated() const noexcept { return allocated_; }
+    [[nodiscard]] std::size_t default_alignment() const noexcept { return default_align_; }
 
 protected:
     void* do_allocate(std::size_t bytes, std::size_t alignment) override {
@@ -139,8 +141,8 @@ protected:
         return p;
     }
 
-    void do_deallocate(void* p, std::size_t bytes, std::size_t /*alignment*/) override {
-        const std::size_t a = std::max(/*alignment*/ default_align_, default_align_);
+    void do_deallocate(void* p, std::size_t bytes, std::size_t alignment) override {
+        const std::size_t a = std::max(alignment, default_align_);
         const std::size_t actual = align_up(bytes, a);
 #if __has_include(<numa.h>)
         if (cxl_present_) {
@@ -326,27 +328,19 @@ TieredMemoryManager::~TieredMemoryManager() noexcept {
     if (!impl_) return;
     auto& m = *impl_;
 
-    // Free all hot-tier allocations (GPU memory leaks silently otherwise)
-    std::unique_lock lock{m.registry_mutex};
-    for (auto& [handle, alloc] : m.registry) {
-        if (alloc.tier == MemoryTier::Hot) {
-            free_hot(alloc.device_ptr);
-        } else if (alloc.tier == MemoryTier::Warm) {
-            if (alloc.ptr) m.warm_res->deallocate(alloc.ptr, alloc.size_bytes,
-                                                    alloc.alignment);
-        } else if (alloc.tier == MemoryTier::Cool) {
-            if (alloc.ptr) m.cool_res->deallocate(alloc.ptr, alloc.size_bytes,
-                                                    alloc.alignment);
-        } else {
-            // Cold: remove spill file
-            auto it = m.cold_files.find(handle);
-            if (it != m.cold_files.end()) {
-                std::error_code ec;
-                std::filesystem::remove(it->second, ec);
-            }
+    // Collect all handles first, then free them via free() to avoid
+    // double-free and keep PMR accounting symmetric.
+    std::vector<TierHandle> handles;
+    {
+        std::unique_lock lock{m.registry_mutex};
+        handles.reserve(m.registry.size());
+        for (auto& [handle, alloc] : m.registry) {
+            handles.push_back(handle);
         }
     }
-    m.registry.clear();
+    for (auto h : handles) {
+        (void)free(h);
+    }
 }
 
 void TieredMemoryManager::reset_for_testing() noexcept {
@@ -418,14 +412,9 @@ TieredMemoryManager::allocate(std::size_t size_bytes,
         auto& acc = m.acct[ti];
 
         if (!acc.available) continue;
-        if (acc.capacity > 0 &&
-            acc.allocated.load(std::memory_order_relaxed) + size_bytes > acc.capacity)
-            continue;
 
-        TierAllocation alloc{};
-        alloc.tier       = tier;
-        alloc.size_bytes = size_bytes;
-        alloc.alignment  = alignment == 0
+        // Compute effective alignment for this tier
+        std::size_t effective_align = alignment == 0
                             ? [&]() -> std::size_t {
                                 switch (tier) {
                                     case MemoryTier::Hot:  return m.cfg.hot_alignment;
@@ -436,6 +425,21 @@ TieredMemoryManager::allocate(std::size_t size_bytes,
                                 return 64;
                               }()
                             : alignment;
+
+        // PMR resources use max(requested, default) — mirror that for capacity check
+        std::size_t default_align = 64;
+        if (tier == MemoryTier::Warm) default_align = m.warm_res->default_alignment();
+        else if (tier == MemoryTier::Cool) default_align = m.cool_res->default_alignment();
+        const std::size_t aligned_size = align_up(size_bytes, std::max(effective_align, default_align));
+
+        if (acc.capacity > 0 &&
+            acc.allocated.load(std::memory_order_relaxed) + aligned_size > acc.capacity)
+            continue;
+
+        TierAllocation alloc{};
+        alloc.tier       = tier;
+        alloc.size_bytes = size_bytes;
+        alloc.alignment  = effective_align;
 
         bool success = false;
 
@@ -499,7 +503,7 @@ TieredMemoryManager::allocate(std::size_t size_bytes,
             alloc.handle = m.next_handle.fetch_add(1, std::memory_order_relaxed);
         }
 
-        acc.allocated.fetch_add(size_bytes, std::memory_order_relaxed);
+        acc.allocated.fetch_add(aligned_size, std::memory_order_relaxed);
         const std::size_t cur = acc.allocated.load(std::memory_order_relaxed);
         std::size_t old_peak = acc.peak.load(std::memory_order_relaxed);
         while (cur > old_peak &&
@@ -561,9 +565,17 @@ TieredMemoryManager::free(TierHandle handle) noexcept {
     lock.unlock();
 
     auto& acc = m.acct[ti];
+    // Compute aligned size the same way allocate() did
+    std::size_t default_align = 64;
+    if (alloc.tier == MemoryTier::Warm && m.warm_res) default_align = m.warm_res->default_alignment();
+    else if (alloc.tier == MemoryTier::Cool && m.cool_res) default_align = m.cool_res->default_alignment();
+    const std::size_t aligned_size = align_up(alloc.size_bytes, std::max(alloc.alignment, default_align));
+
     const std::size_t cur = acc.allocated.load(std::memory_order_relaxed);
-    if (cur >= alloc.size_bytes)
-        acc.allocated.fetch_sub(alloc.size_bytes, std::memory_order_relaxed);
+    if (cur >= aligned_size)
+        acc.allocated.fetch_sub(aligned_size, std::memory_order_relaxed);
+    else
+        acc.allocated.store(0, std::memory_order_relaxed);
     acc.free_count.fetch_add(1, std::memory_order_relaxed);
 
     return {};
@@ -675,7 +687,13 @@ TieredMemoryManager::promote(TierHandle handle) {
             }
         }
 
-        old_acc.allocated.fetch_sub(std::min(old_acc.allocated.load(), old_alloc.size_bytes),
+        // Compute aligned size for old tier accounting
+        std::size_t old_default_align = 64;
+        if (old_alloc.tier == MemoryTier::Warm && m.warm_res) old_default_align = m.warm_res->default_alignment();
+        else if (old_alloc.tier == MemoryTier::Cool && m.cool_res) old_default_align = m.cool_res->default_alignment();
+        const std::size_t old_aligned_size = align_up(old_alloc.size_bytes, std::max(old_alloc.alignment, old_default_align));
+
+        old_acc.allocated.fetch_sub(std::min(old_acc.allocated.load(), old_aligned_size),
                                     std::memory_order_relaxed);
         old_acc.free_count.fetch_add(1, std::memory_order_relaxed);
     }
@@ -767,7 +785,13 @@ TieredMemoryManager::demote(TierHandle handle) {
         else if (old_alloc.tier == MemoryTier::Cool && old_alloc.ptr)
             m.cool_res->deallocate(old_alloc.ptr, old_alloc.size_bytes, old_alloc.alignment);
 
-        old_acc.allocated.fetch_sub(std::min(old_acc.allocated.load(), old_alloc.size_bytes),
+        // Compute aligned size for old tier accounting
+        std::size_t old_default_align = 64;
+        if (old_alloc.tier == MemoryTier::Warm && m.warm_res) old_default_align = m.warm_res->default_alignment();
+        else if (old_alloc.tier == MemoryTier::Cool && m.cool_res) old_default_align = m.cool_res->default_alignment();
+        const std::size_t old_aligned_size = align_up(old_alloc.size_bytes, std::max(old_alloc.alignment, old_default_align));
+
+        old_acc.allocated.fetch_sub(std::min(old_acc.allocated.load(), old_aligned_size),
                                     std::memory_order_relaxed);
         old_acc.free_count.fetch_add(1, std::memory_order_relaxed);
     }
