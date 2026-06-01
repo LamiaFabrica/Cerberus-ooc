@@ -30,15 +30,16 @@ namespace hq::propup {
 
 struct PropupResult {
     bool passed{false};
+    bool skipped{false};
     std::string name;
     std::string diagnostic;
     double elapsed_ms{0.0};
 
     static PropupResult pass(std::string_view n) {
-        return PropupResult{true, std::string(n), {}, 0.0};
+        return PropupResult{true, false, std::string(n), {}, 0.0};
     }
     static PropupResult fail(std::string_view n, std::string_view diag) {
-        return PropupResult{false, std::string(n), std::string(diag), 0.0};
+        return PropupResult{false, false, std::string(n), std::string(diag), 0.0};
     }
 };
 
