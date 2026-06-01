@@ -14,6 +14,8 @@
 #endif
 #include <queue>
 #include <vector>
+#include <format>
+#include <iostream>
 
 #if defined(UM790_HAS_HIP) || defined(__HIP_PLATFORM_AMD__) || defined(USE_HIP)
 #  include <hip/hip_runtime.h>
@@ -64,7 +66,7 @@ public:
                     buffers_.emplace_back(ptr, cfg_.buffer_size_bytes);
                     free_indices_.push(i);
                 } else {
-                    std::print("[staging] WARNING: hipHostMalloc failed ({}), "
+                    std::cout << std::format("[staging] WARNING: hipHostMalloc failed ({}), "
                                "falling back to regular memory\n",
                                hipGetErrorString(err));
                     for (auto& b : buffers_) {
@@ -84,7 +86,7 @@ public:
         }
 #else
         if (cfg_.pinned) {
-            std::print("[staging] WARNING: pinned=true but HIP not available "
+            std::cout << std::format("[staging] WARNING: pinned=true but HIP not available "
                        "at compile time, using regular memory\n");
         }
 #endif

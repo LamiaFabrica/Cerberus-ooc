@@ -82,11 +82,14 @@ std::size_t TensorDesc::size_bytes() const noexcept {
 CpuFallbackBackend::CpuFallbackBackend() = default;
 
 std::expected<CompiledKernel, std::string>
-CpuFallbackBackend::compile(const KernelGraph&, const TargetConfig& cfg) {
+CpuFallbackBackend::compile(const KernelGraph& graph, const TargetConfig& cfg) {
     (void)cfg;
     CompiledKernel k;
     k.target_name = "cpu";
     k.compiled = true;
+    k.graph_nodes = graph.nodes;
+    k.inputs = graph.graph_inputs;
+    k.outputs = graph.graph_outputs;
     return k;
 }
 

@@ -128,8 +128,8 @@ struct ServerConfig {
     // --- Production privacy surface (LCMD + RBPC) ---
     // When both are non-null, /v1/inference/* endpoints are fully wired.
     // RBPC node_id is used for verify_confirmation on export/clear.
-    std::shared_ptr<hq::cerberus::LocalMaintenanceDB> lcmd;
-    std::shared_ptr<hq::cerberus::UserSecurity>       user_security;
+    std::shared_ptr<hq::cerberus::privacy::LocalMaintenanceDB> lcmd;
+    std::shared_ptr<hq::cerberus::privacy::UserSecurity>       user_security;
     std::string                                       rbpc_node_id{"local"};
 };
 

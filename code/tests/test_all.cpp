@@ -161,7 +161,7 @@ protected:
 // Existing Test 1: Normal operation.
 // ---------------------------------------------------------------------------
 TEST_F(WatchdogTest, NormalOperation_NoRecovery) {
-    std::print("[TEST] NormalOperation_NoRecovery\n");
+    std::cout << std::format("[TEST] NormalOperation_NoRecovery\n");
     auto wdog = UtilizationWatchdog(default_config(), make_recovery_cb());
     auto last_action = simulate_steps(wdog, 50, 75.0f, 85.0f);
 
@@ -174,14 +174,14 @@ TEST_F(WatchdogTest, NormalOperation_NoRecovery) {
     EXPECT_EQ(stats.gpu_recovery_count, 0);
     EXPECT_EQ(stats.hailo_recovery_count, 0);
     EXPECT_EQ(stats.total_steps, 50);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // ---------------------------------------------------------------------------
 // Existing Test 2: Low utilization triggers recovery.
 // ---------------------------------------------------------------------------
 TEST_F(WatchdogTest, LowUtilization_TriggersRecovery) {
-    std::print("[TEST] LowUtilization_TriggersRecovery\n");
+    std::cout << std::format("[TEST] LowUtilization_TriggersRecovery\n");
     auto wdog = UtilizationWatchdog(default_config(), make_recovery_cb());
 
     std::uint32_t first_recovery_step = UINT32_MAX;
@@ -200,14 +200,14 @@ TEST_F(WatchdogTest, LowUtilization_TriggersRecovery) {
     for (const auto& act : recovery_log_)
         EXPECT_EQ(act.device, ComputeUnit::GPU_780M);
     EXPECT_EQ(wdog.get_gpu_state(), WatchdogState::WARNING);
-    std::print("[TEST] PASSED (first at step {})\n", first_recovery_step);
+    std::cout << std::format("[TEST] PASSED (first at step {})\n", first_recovery_step);
 }
 
 // ---------------------------------------------------------------------------
 // Existing Test 3: Critical utilization triggers immediate recovery.
 // ---------------------------------------------------------------------------
 TEST_F(WatchdogTest, CriticalImmediateRecovery) {
-    std::print("[TEST] CriticalImmediateRecovery\n");
+    std::cout << std::format("[TEST] CriticalImmediateRecovery\n");
     auto wdog = UtilizationWatchdog(default_config(), make_recovery_cb());
 
     auto gpu_snap   = make_gpu_snap(0, 20.0f);
@@ -221,14 +221,14 @@ TEST_F(WatchdogTest, CriticalImmediateRecovery) {
     EXPECT_EQ(action->result, RecoveryResult::SUCCESS);
     EXPECT_EQ(recovery_log_.size(), 1);
     EXPECT_EQ(wdog.get_gpu_state(), WatchdogState::CRITICAL);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // ---------------------------------------------------------------------------
 // Existing Test 4: Sine-wave pattern — no false triggers.
 // ---------------------------------------------------------------------------
 TEST_F(WatchdogTest, SineWavePattern) {
-    std::print("[TEST] SineWavePattern\n");
+    std::cout << std::format("[TEST] SineWavePattern\n");
     auto wdog = UtilizationWatchdog(default_config(), make_recovery_cb());
 
     constexpr float base      = 65.0f;
@@ -245,14 +245,14 @@ TEST_F(WatchdogTest, SineWavePattern) {
     }
     EXPECT_EQ(recovery_log_.size(), 0);
     EXPECT_EQ(wdog.get_gpu_state(), WatchdogState::WARNING);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // ---------------------------------------------------------------------------
 // Existing Test 5: Hailo low while GPU normal.
 // ---------------------------------------------------------------------------
 TEST_F(WatchdogTest, HailoLowGpuNormal) {
-    std::print("[TEST] HailoLowGpuNormal\n");
+    std::cout << std::format("[TEST] HailoLowGpuNormal\n");
     auto wdog = UtilizationWatchdog(default_config(), make_recovery_cb());
 
     std::uint32_t first_hailo_recovery = UINT32_MAX;
@@ -269,14 +269,14 @@ TEST_F(WatchdogTest, HailoLowGpuNormal) {
         EXPECT_EQ(act.device, ComputeUnit::HAILO_8L);
     EXPECT_EQ(wdog.get_gpu_state(), WatchdogState::NORMAL);
     EXPECT_EQ(wdog.get_hailo_state(), WatchdogState::WARNING);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // ---------------------------------------------------------------------------
 // Existing Test 6: Thermal throttling suppresses recovery.
 // ---------------------------------------------------------------------------
 TEST_F(WatchdogTest, ThermalThrottlingNoRecovery) {
-    std::print("[TEST] ThermalThrottlingNoRecovery\n");
+    std::cout << std::format("[TEST] ThermalThrottlingNoRecovery\n");
     auto wdog = UtilizationWatchdog(default_config(), make_recovery_cb());
 
     std::optional<RecoveryAction> last_action;
@@ -287,14 +287,14 @@ TEST_F(WatchdogTest, ThermalThrottlingNoRecovery) {
     }
     EXPECT_FALSE(last_action.has_value());
     EXPECT_EQ(recovery_log_.size(), 0);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // ---------------------------------------------------------------------------
 // Existing Test 7: Recovery backoff increases exponentially.
 // ---------------------------------------------------------------------------
 TEST_F(WatchdogTest, RecoveryBackoff) {
-    std::print("[TEST] RecoveryBackoff\n");
+    std::cout << std::format("[TEST] RecoveryBackoff\n");
     auto cfg = WatchdogConfig{
         .gpu_low_threshold            = 60.0f,
         .gpu_critical_threshold       = 40.0f,
@@ -331,7 +331,7 @@ TEST_F(WatchdogTest, RecoveryBackoff) {
     EXPECT_GE(delays[2].count(), 20);
     EXPECT_LT(delays[0], delays[1]);
     EXPECT_LT(delays[1], delays[2]);
-    std::print("[TEST] PASSED (delays: {}ms {}ms {}ms)\n",
+    std::cout << std::format("[TEST] PASSED (delays: {}ms {}ms {}ms)\n",
                delays[0].count(), delays[1].count(), delays[2].count());
 }
 
@@ -339,7 +339,7 @@ TEST_F(WatchdogTest, RecoveryBackoff) {
 // Existing Test 8: Counter reset.
 // ---------------------------------------------------------------------------
 TEST_F(WatchdogTest, ResetCounters) {
-    std::print("[TEST] ResetCounters\n");
+    std::cout << std::format("[TEST] ResetCounters\n");
     auto wdog = UtilizationWatchdog(default_config(), make_recovery_cb());
 
     for (std::uint32_t i = 0; i < 7; ++i) {
@@ -358,14 +358,14 @@ TEST_F(WatchdogTest, ResetCounters) {
         EXPECT_FALSE(wdog.step(i, gpu_snap, hailo_snap).has_value());
     }
     EXPECT_EQ(recovery_log_.size(), 0);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // ---------------------------------------------------------------------------
 // Existing Test 9: Max recoveries exhausted.
 // ---------------------------------------------------------------------------
 TEST_F(WatchdogTest, MaxRecoveries) {
-    std::print("[TEST] MaxRecoveries\n");
+    std::cout << std::format("[TEST] MaxRecoveries\n");
     auto cfg = WatchdogConfig{
         .gpu_low_threshold            = 60.0f,
         .gpu_critical_threshold       = 40.0f,
@@ -395,14 +395,14 @@ TEST_F(WatchdogTest, MaxRecoveries) {
     EXPECT_TRUE(last_action.has_value());
     EXPECT_EQ(last_action->result, RecoveryResult::FATAL);
     EXPECT_NE(last_action->reason.find("max_recoveries"), std::string::npos);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // ---------------------------------------------------------------------------
 // Existing Test 10: Concurrent device fault.
 // ---------------------------------------------------------------------------
 TEST_F(WatchdogTest, ConcurrentDeviceFault) {
-    std::print("[TEST] ConcurrentDeviceFault\n");
+    std::cout << std::format("[TEST] ConcurrentDeviceFault\n");
     auto cfg = WatchdogConfig{
         .gpu_low_threshold            = 60.0f,
         .gpu_critical_threshold       = 40.0f,
@@ -430,14 +430,14 @@ TEST_F(WatchdogTest, ConcurrentDeviceFault) {
     EXPECT_GE(stats.hailo_recovery_count, 1);
     ASSERT_TRUE(first_action.has_value());
     EXPECT_EQ(first_action->device, ComputeUnit::GPU_780M);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // ---------------------------------------------------------------------------
 // Existing Test 11: Reset all.
 // ---------------------------------------------------------------------------
 TEST_F(WatchdogTest, ResetAll) {
-    std::print("[TEST] ResetAll\n");
+    std::cout << std::format("[TEST] ResetAll\n");
     auto wdog = UtilizationWatchdog(default_config(), make_recovery_cb());
 
     simulate_steps(wdog, 10, 30.0f, 80.0f);
@@ -458,14 +458,14 @@ TEST_F(WatchdogTest, ResetAll) {
     auto action = simulate_steps(wdog, 10, 80.0f, 80.0f);
     EXPECT_FALSE(action.has_value());
     EXPECT_EQ(wdog.get_stats().gpu_recovery_count, 0);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // ---------------------------------------------------------------------------
 // Existing Test 12: Statistics consistency.
 // ---------------------------------------------------------------------------
 TEST_F(WatchdogTest, StatisticsConsistency) {
-    std::print("[TEST] StatisticsConsistency\n");
+    std::cout << std::format("[TEST] StatisticsConsistency\n");
     auto wdog = UtilizationWatchdog(default_config(), make_recovery_cb());
 
     simulate_steps(wdog, 5, 80.0f, 80.0f);
@@ -484,14 +484,14 @@ TEST_F(WatchdogTest, StatisticsConsistency) {
     EXPECT_EQ(stats2.gpu_recovery_count, 0);
     EXPECT_EQ(stats2.gpu_consecutive_low, 5);
     EXPECT_EQ(stats2.gpu_state, WatchdogState::WARNING);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // ---------------------------------------------------------------------------
 // Existing Test 13: CRITICAL vs WARNING boundaries.
 // ---------------------------------------------------------------------------
 TEST_F(WatchdogTest, CriticalVsWarningBoundaries) {
-    std::print("[TEST] CriticalVsWarningBoundaries\n");
+    std::cout << std::format("[TEST] CriticalVsWarningBoundaries\n");
     auto cfg = WatchdogConfig{
         .gpu_low_threshold            = 60.0f,
         .gpu_critical_threshold       = 40.0f,
@@ -525,14 +525,14 @@ TEST_F(WatchdogTest, CriticalVsWarningBoundaries) {
         EXPECT_EQ(recovery_step, 2);
         EXPECT_EQ(wdog.get_gpu_state(), WatchdogState::WARNING);
     }
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // ===========================================================================
 // NEW Test 14: Thermal guard skips — consecutive counter continues.
 // ===========================================================================
 TEST_F(WatchdogTest, WatchdogThermalGuard_SkipsBelowThreshold) {
-    std::print("[TEST] WatchdogThermalGuard_SkipsBelowThreshold\n");
+    std::cout << std::format("[TEST] WatchdogThermalGuard_SkipsBelowThreshold\n");
     auto wdog = UtilizationWatchdog(default_config(), make_recovery_cb());
 
     // 10 steps: 50% util (WARNING zone) at 90°C (> 85°C threshold)
@@ -555,14 +555,14 @@ TEST_F(WatchdogTest, WatchdogThermalGuard_SkipsBelowThreshold) {
         << "Consecutive counter should keep incrementing during thermal skips";
 
     EXPECT_EQ(wdog.get_gpu_state(), WatchdogState::WARNING);
-    std::print("[TEST] PASSED (consecutive={})\n", stats.gpu_consecutive_low);
+    std::cout << std::format("[TEST] PASSED (consecutive={})\n", stats.gpu_consecutive_low);
 }
 
 // ===========================================================================
 // NEW Test 15: Thermal guard recovers when cooled.
 // ===========================================================================
 TEST_F(WatchdogTest, WatchdogThermalGuard_RecoversWhenCooled) {
-    std::print("[TEST] WatchdogThermalGuard_RecoversWhenCooled\n");
+    std::cout << std::format("[TEST] WatchdogThermalGuard_RecoversWhenCooled\n");
     auto wdog = UtilizationWatchdog(default_config(), make_recovery_cb());
 
     // Phase A: 7 steps with low util + high temp → thermal skips.
@@ -585,14 +585,14 @@ TEST_F(WatchdogTest, WatchdogThermalGuard_RecoversWhenCooled) {
     }
 
     EXPECT_EQ(recovery_log_.size(), 1);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // ===========================================================================
 // NEW Test 16: Max backoff capped at 30s.
 // ===========================================================================
 TEST_F(WatchdogTest, WatchdogMaxBackoff_ReachesCap) {
-    std::print("[TEST] WatchdogMaxBackoff_ReachesCap\n");
+    std::cout << std::format("[TEST] WatchdogMaxBackoff_ReachesCap\n");
     auto cfg = WatchdogConfig{
         .gpu_low_threshold            = 60.0f,
         .gpu_critical_threshold       = 40.0f,
@@ -643,7 +643,7 @@ TEST_F(WatchdogTest, WatchdogMaxBackoff_ReachesCap) {
     EXPECT_GE(delays[19].count(), 25000)
         << "Capped backoff should be near 30s";
 
-    std::print("[TEST] PASSED (delays: #18={}ms #19={}ms #20={}ms)\n",
+    std::cout << std::format("[TEST] PASSED (delays: #18={}ms #19={}ms #20={}ms)\n",
                delays[17].count(), delays[18].count(), delays[19].count());
 }
 
@@ -651,7 +651,7 @@ TEST_F(WatchdogTest, WatchdogMaxBackoff_ReachesCap) {
 // NEW Test 17: GPU low + Hailo normal → only GPU recovery.
 // ===========================================================================
 TEST_F(WatchdogTest, WatchdogConcurrentDevices_Independent) {
-    std::print("[TEST] WatchdogConcurrentDevices_Independent\n");
+    std::cout << std::format("[TEST] WatchdogConcurrentDevices_Independent\n");
     auto cfg = WatchdogConfig{
         .gpu_low_threshold            = 60.0f,
         .gpu_critical_threshold       = 40.0f,
@@ -695,7 +695,7 @@ TEST_F(WatchdogTest, WatchdogConcurrentDevices_Independent) {
     EXPECT_GE(stats.gpu_recovery_count, 1);
     EXPECT_EQ(stats.hailo_recovery_count, 0);
 
-    std::print("[TEST] PASSED (GPU recovs={}, Hailo recovs={})\n",
+    std::cout << std::format("[TEST] PASSED (GPU recovs={}, Hailo recovs={})\n",
                gpu_recovery_count, hailo_recovery_count);
 }
 
@@ -703,7 +703,7 @@ TEST_F(WatchdogTest, WatchdogConcurrentDevices_Independent) {
 // NEW Test 18: Alert callback fires with THERMAL THROTTLING message.
 // ===========================================================================
 TEST_F(WatchdogTest, WatchdogAlertCallback_Fires) {
-    std::print("[TEST] WatchdogAlertCallback_Fires\n");
+    std::cout << std::format("[TEST] WatchdogAlertCallback_Fires\n");
 
     auto wdog = UtilizationWatchdog(default_config(), make_recovery_cb(),
                                      make_alert_cb());
@@ -730,7 +730,7 @@ TEST_F(WatchdogTest, WatchdogAlertCallback_Fires) {
     EXPECT_TRUE(found_thermal_msg)
         << "Alert message should contain 'THERMAL THROTTLING'";
 
-    std::print("[TEST] PASSED ({} alert messages)\n", alert_messages_.size());
+    std::cout << std::format("[TEST] PASSED ({} alert messages)\n", alert_messages_.size());
 }
 
 // ===========================================================================
@@ -755,14 +755,14 @@ protected:
 };
 
 TEST_F(HailoMonitorTest, OpenStub_Succeeds) {
-    std::print("[TEST] OpenStub_Succeeds\n");
+    std::cout << std::format("[TEST] OpenStub_Succeeds\n");
     EXPECT_TRUE(monitor_.is_open());
     EXPECT_FALSE(monitor_.device_id().empty());
-    std::print("[TEST] PASSED (device_id={})\n", monitor_.device_id());
+    std::cout << std::format("[TEST] PASSED (device_id={})\n", monitor_.device_id());
 }
 
 TEST_F(HailoMonitorTest, Sample_ReturnsValidStats) {
-    std::print("[TEST] Sample_ReturnsValidStats\n");
+    std::cout << std::format("[TEST] Sample_ReturnsValidStats\n");
     auto result = monitor_.sample();
     ASSERT_TRUE(result.has_value())
         << "sample() failed: " << result.error().what();
@@ -786,13 +786,13 @@ TEST_F(HailoMonitorTest, Sample_ReturnsValidStats) {
     // Inference count should be monotonically tracked
     EXPECT_GE(stats.inferences_count, 0);
 
-    std::print("[TEST] PASSED (util={:.1f}% power={:.2f}W temp={:.1f}C)\n",
+    std::cout << std::format("[TEST] PASSED (util={:.1f}% power={:.2f}W temp={:.1f}C)\n",
                stats.nn_core_utilization, stats.power_watts,
                stats.temperature_celsius);
 }
 
 TEST_F(HailoMonitorTest, DualIndicator_Normal) {
-    std::print("[TEST] DualIndicator_Normal\n");
+    std::cout << std::format("[TEST] DualIndicator_Normal\n");
 
     // Take multiple samples and verify fused utilization is reasonable.
     // In normal operation, fused = 0.5*power + 0.5*inference (equal weights).
@@ -819,11 +819,11 @@ TEST_F(HailoMonitorTest, DualIndicator_Normal) {
 
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 TEST_F(HailoMonitorTest, DualIndicator_DmaStall) {
-    std::print("[TEST] DualIndicator_DmaStall\n");
+    std::cout << std::format("[TEST] DualIndicator_DmaStall\n");
 
     // The DMA stall condition requires: power > 70% AND inference < 30%.
     // In stub mode this is hard to hit naturally. Instead, we verify the
@@ -857,11 +857,11 @@ TEST_F(HailoMonitorTest, DualIndicator_DmaStall) {
     // We may or may not hit the exact DMA stall phase depending on timing.
     // The test passes either way; we verified the fusion is well-formed.
     (void)found_low_inference_phase;
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 TEST_F(HailoMonitorTest, DualIndicator_SensorMismatch) {
-    std::print("[TEST] DualIndicator_SensorMismatch\n");
+    std::cout << std::format("[TEST] DualIndicator_SensorMismatch\n");
 
     // Sensor mismatch in stub mode is unlikely because power and inference
     // are correlated (both derived from the same time-based phase).
@@ -872,18 +872,18 @@ TEST_F(HailoMonitorTest, DualIndicator_SensorMismatch) {
         if (!result.has_value()) {
             EXPECT_EQ(result.error().error_code(),
                       HailoErrorCode::SensorMismatch);
-            std::print("[TEST] Sensor mismatch detected as expected: {}\n",
+            std::cout << std::format("[TEST] Sensor mismatch detected as expected: {}\n",
                        result.error().what());
             return; // Test passes — mismatch was detected.
         }
         EXPECT_TRUE(result.value().device_healthy);
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
-    std::print("[TEST] PASSED (device healthy across 10 samples)\n");
+    std::cout << std::format("[TEST] PASSED (device healthy across 10 samples)\n");
 }
 
 TEST_F(HailoMonitorTest, HardReset_ClearsDelta) {
-    std::print("[TEST] HardReset_ClearsDelta\n");
+    std::cout << std::format("[TEST] HardReset_ClearsDelta\n");
 
     // Take a sample to establish baseline.
     auto result1 = monitor_.sample();
@@ -910,11 +910,11 @@ TEST_F(HailoMonitorTest, HardReset_ClearsDelta) {
     // The cumulative count may have changed due to time passing.
     EXPECT_GE(result2->inferences_count, 0);
 
-    std::print("[TEST] PASSED (delta after reset={})\n", result2->inference_delta);
+    std::cout << std::format("[TEST] PASSED (delta after reset={})\n", result2->inference_delta);
 }
 
 TEST_F(HailoMonitorTest, Threshold_GetSet) {
-    std::print("[TEST] Threshold_GetSet\n");
+    std::cout << std::format("[TEST] Threshold_GetSet\n");
 
     // Verify defaults.
     EXPECT_FLOAT_EQ(monitor_.dma_stall_power_threshold(), 70.0f);
@@ -946,7 +946,7 @@ TEST_F(HailoMonitorTest, Threshold_GetSet) {
     monitor_.set_inference_weight(2.0f);
     EXPECT_FLOAT_EQ(monitor_.inference_weight(), 1.0f);
 
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // ===========================================================================
@@ -959,7 +959,7 @@ protected:
 };
 
 TEST_F(GPUMonitorTest, Initialize_NoRocmSmi_SucceedsStub) {
-    std::print("[TEST] Initialize_NoRocmSmi_SucceedsStub\n");
+    std::cout << std::format("[TEST] Initialize_NoRocmSmi_SucceedsStub\n");
     GPUMonitor monitor(0);
 
     // Without ROCm SMI, initialize() succeeds in stub mode.
@@ -969,11 +969,11 @@ TEST_F(GPUMonitorTest, Initialize_NoRocmSmi_SucceedsStub) {
         << (result.has_value() ? "" : result.error().message);
     EXPECT_TRUE(monitor.is_initialized());
 
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 TEST_F(GPUMonitorTest, QueryAll_ReturnsZeroFallback) {
-    std::print("[TEST] QueryAll_ReturnsZeroFallback\n");
+    std::cout << std::format("[TEST] QueryAll_ReturnsZeroFallback\n");
     GPUMonitor monitor(0);
     auto init = monitor.initialize();
     ASSERT_TRUE(init.has_value());
@@ -993,11 +993,11 @@ TEST_F(GPUMonitorTest, QueryAll_ReturnsZeroFallback) {
     EXPECT_FALSE(telem.is_throttling);  // 0°C is not > 85°C
     EXPECT_GT(telem.timestamp_ms, 0);   // timestamp should be set
 
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 TEST_F(GPUMonitorTest, IsThrottling_NoGpu_ReturnsFalse) {
-    std::print("[TEST] IsThrottling_NoGpu_ReturnsFalse\n");
+    std::cout << std::format("[TEST] IsThrottling_NoGpu_ReturnsFalse\n");
     GPUMonitor monitor(0);
     auto init = monitor.initialize();
     ASSERT_TRUE(init.has_value());
@@ -1015,11 +1015,11 @@ TEST_F(GPUMonitorTest, IsThrottling_NoGpu_ReturnsFalse) {
     EXPECT_FALSE(result2.value())
         << "0°C should not be > 1°C in stub mode";
 
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 TEST_F(GPUMonitorTest, MoveSemantics_Works) {
-    std::print("[TEST] MoveSemantics_Works\n");
+    std::cout << std::format("[TEST] MoveSemantics_Works\n");
     {
         GPUMonitor monitor1(0);
         auto init = monitor1.initialize();
@@ -1039,7 +1039,7 @@ TEST_F(GPUMonitorTest, MoveSemantics_Works) {
         auto result = monitor3.query_all();
         EXPECT_TRUE(result.has_value());
     }
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 
@@ -1058,7 +1058,7 @@ protected:
 };
 
 TEST_F(CLIPTokenizerTest, Encode_EmptyString) {
-    std::print("[TEST] Encode_EmptyString\n");
+    std::cout << std::format("[TEST] Encode_EmptyString\n");
     constexpr std::size_t max_len = 77;
     auto tokens = tokenizer_.encode("", max_len);
 
@@ -1070,11 +1070,11 @@ TEST_F(CLIPTokenizerTest, Encode_EmptyString) {
         EXPECT_EQ(tokens[i], CLIPTokenizer::EOS_TOKEN)
             << "Token at index " << i << " should be EOS/PAD";
     }
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 TEST_F(CLIPTokenizerTest, Encode_SingleWord) {
-    std::print("[TEST] Encode_SingleWord\n");
+    std::cout << std::format("[TEST] Encode_SingleWord\n");
     auto tokens = tokenizer_.encode("the", 77);
 
     ASSERT_GE(tokens.size(), 3); // At least BOS + content + EOS
@@ -1087,11 +1087,11 @@ TEST_F(CLIPTokenizerTest, Encode_SingleWord) {
         if (tokens[i] == 0) { found_the = true; break; }
     }
     EXPECT_TRUE(found_the) << "'the' token (ID=0) should be in the sequence";
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 TEST_F(CLIPTokenizerTest, Encode_PadsToLength) {
-    std::print("[TEST] Encode_PadsToLength\n");
+    std::cout << std::format("[TEST] Encode_PadsToLength\n");
     constexpr std::size_t max_len = 10;
     auto tokens = tokenizer_.encode("hello", max_len);
 
@@ -1119,11 +1119,11 @@ TEST_F(CLIPTokenizerTest, Encode_PadsToLength) {
     for (std::size_t i = first_eos; i < max_len; ++i) {
         EXPECT_EQ(tokens[i], CLIPTokenizer::EOS_TOKEN);
     }
-    std::print("[TEST] PASSED (first EOS at index {})\n", first_eos);
+    std::cout << std::format("[TEST] PASSED (first EOS at index {})\n", first_eos);
 }
 
 TEST_F(CLIPTokenizerTest, Encode_TruncatesLongText) {
-    std::print("[TEST] Encode_TruncatesLongText\n");
+    std::cout << std::format("[TEST] Encode_TruncatesLongText\n");
     constexpr std::size_t max_len = 10;
 
     // Very long text: repeat "hello " many times.
@@ -1140,11 +1140,11 @@ TEST_F(CLIPTokenizerTest, Encode_TruncatesLongText) {
 
     // Last token must be EOS (truncation guarantees this).
     EXPECT_EQ(tokens[max_len - 1], CLIPTokenizer::EOS_TOKEN);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 TEST_F(CLIPTokenizerTest, Decode_Reversible) {
-    std::print("[TEST] Decode_Reversible\n");
+    std::cout << std::format("[TEST] Decode_Reversible\n");
     const std::string original = "a cat in space";
     auto tokens = tokenizer_.encode(original, 77);
     auto decoded = tokenizer_.decode(tokens);
@@ -1157,23 +1157,23 @@ TEST_F(CLIPTokenizerTest, Decode_Reversible) {
     EXPECT_NE(decoded.find("cat"), std::string::npos)
         << "'cat' should be decodable";
 
-    std::print("[TEST] decoded='{}'\n", decoded);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] decoded='{}'\n", decoded);
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 TEST_F(CLIPTokenizerTest, SpecialTokens_CorrectIDs) {
-    std::print("[TEST] SpecialTokens_CorrectIDs\n");
+    std::cout << std::format("[TEST] SpecialTokens_CorrectIDs\n");
     EXPECT_EQ(CLIPTokenizer::BOS_TOKEN, 49406)
         << "BOS token should be 49406";
     EXPECT_EQ(CLIPTokenizer::EOS_TOKEN, 49407)
         << "EOS token should be 49407";
     EXPECT_EQ(CLIPTokenizer::PAD_TOKEN, 49407)
         << "PAD token should be 49407 (same as EOS)";
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 TEST_F(CLIPTokenizerTest, Encode_CommonPrompt) {
-    std::print("[TEST] Encode_CommonPrompt\n");
+    std::cout << std::format("[TEST] Encode_CommonPrompt\n");
     const std::string prompt = "a cat in space";
     auto tokens = tokenizer_.encode(prompt, 77);
 
@@ -1192,7 +1192,7 @@ TEST_F(CLIPTokenizerTest, Encode_CommonPrompt) {
     EXPECT_TRUE(has_valid_content)
         << "Common prompt should produce valid vocabulary tokens";
 
-    std::print("[TEST] PASSED ({} tokens)\n", tokens.size());
+    std::cout << std::format("[TEST] PASSED ({} tokens)\n", tokens.size());
 }
 
 // ===========================================================================
@@ -1206,18 +1206,18 @@ protected:
 };
 
 TEST_F(PinnedStagingTest, Construct_DefaultSize) {
-    std::print("[TEST] Construct_DefaultSize\n");
+    std::cout << std::format("[TEST] Construct_DefaultSize\n");
     PinnedStagingPool<float> pool(EMB_BYTES);
 
     EXPECT_TRUE(pool.initialized());
     EXPECT_EQ(pool.num_slots(), 2);  // Default double-buffer.
     EXPECT_EQ(pool.embedding_bytes(), EMB_BYTES);
 
-    std::print("[TEST] PASSED ({} slots)\n", pool.num_slots());
+    std::cout << std::format("[TEST] PASSED ({} slots)\n", pool.num_slots());
 }
 
 TEST_F(PinnedStagingTest, AcquireHostBuffer_ReturnsWritable) {
-    std::print("[TEST] AcquireHostBuffer_ReturnsWritable\n");
+    std::cout << std::format("[TEST] AcquireHostBuffer_ReturnsWritable\n");
     PinnedStagingPool<float> pool(EMB_BYTES);
     ASSERT_TRUE(pool.initialized());
 
@@ -1239,11 +1239,11 @@ TEST_F(PinnedStagingTest, AcquireHostBuffer_ReturnsWritable) {
             << "Data corruption at index " << i;
     }
 
-    std::print("[TEST] PASSED (wrote {} floats)\n", buf.size());
+    std::cout << std::format("[TEST] PASSED (wrote {} floats)\n", buf.size());
 }
 
 TEST_F(PinnedStagingTest, DoubleBuffer_StepsAlternate) {
-    std::print("[TEST] DoubleBuffer_StepsAlternate\n");
+    std::cout << std::format("[TEST] DoubleBuffer_StepsAlternate\n");
     constexpr int NUM_SLOTS = 2;
     PinnedStagingPool<float> pool(EMB_BYTES, NUM_SLOTS);
     ASSERT_TRUE(pool.initialized());
@@ -1267,11 +1267,11 @@ TEST_F(PinnedStagingTest, DoubleBuffer_StepsAlternate) {
     EXPECT_GE(r1.value().size(), EMB_BYTES / sizeof(float));
     EXPECT_GE(r2.value().size(), EMB_BYTES / sizeof(float));
 
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 TEST_F(PinnedStagingTest, SlotReuse_WaitsForDrain) {
-    std::print("[TEST] SlotReuse_WaitsForDrain\n");
+    std::cout << std::format("[TEST] SlotReuse_WaitsForDrain\n");
     PinnedStagingPool<float> pool(EMB_BYTES, 2);
     ASSERT_TRUE(pool.initialized());
 
@@ -1293,11 +1293,11 @@ TEST_F(PinnedStagingTest, SlotReuse_WaitsForDrain) {
     auto r2 = pool.acquire_host_buffer(2);
     ASSERT_TRUE(r2.has_value());
 
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 TEST_F(PinnedStagingTest, StubBuild_CompilesAndRuns) {
-    std::print("[TEST] StubBuild_CompilesAndRuns\n");
+    std::cout << std::format("[TEST] StubBuild_CompilesAndRuns\n");
 
     // Without HIP, the pool uses heap allocation (std::malloc).
     // This test verifies the stub path compiles and executes.
@@ -1328,7 +1328,7 @@ TEST_F(PinnedStagingTest, StubBuild_CompilesAndRuns) {
         EXPECT_TRUE(pool.is_ready(step));
     }
 
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // ===========================================================================
@@ -1375,7 +1375,7 @@ protected:
 };
 
 TEST_F(IntegrationTest, PipelineConstruct_WithDefaults) {
-    std::print("[TEST] PipelineConstruct_WithDefaults\n");
+    std::cout << std::format("[TEST] PipelineConstruct_WithDefaults\n");
 
     try {
         PipelineConfig cfg{}; // All defaults, empty model paths.
@@ -1397,7 +1397,7 @@ TEST_F(IntegrationTest, PipelineConstruct_WithDefaults) {
 }
 
 TEST_F(IntegrationTest, PipelineShutdown_Idempotent) {
-    std::print("[TEST] PipelineShutdown_Idempotent\n");
+    std::cout << std::format("[TEST] PipelineShutdown_Idempotent\n");
 
     try {
         PipelineConfig cfg{};
@@ -1409,14 +1409,14 @@ TEST_F(IntegrationTest, PipelineShutdown_Idempotent) {
         // Second shutdown — should not crash.
         EXPECT_NO_THROW(pipeline.shutdown());
 
-        std::print("[TEST] PASSED\n");
+        std::cout << std::format("[TEST] PASSED\n");
     } catch (const std::exception& e) {
         GTEST_SKIP() << e.what();
     }
 }
 
 TEST_F(IntegrationTest, PipelineStats_ZeroAtStart) {
-    std::print("[TEST] PipelineStats_ZeroAtStart\n");
+    std::cout << std::format("[TEST] PipelineStats_ZeroAtStart\n");
 
     try {
         PipelineConfig cfg{};
@@ -1436,14 +1436,14 @@ TEST_F(IntegrationTest, PipelineStats_ZeroAtStart) {
         EXPECT_DOUBLE_EQ(stats.avg_hailo_utilization, 0.0);
 
         pipeline.shutdown();
-        std::print("[TEST] PASSED\n");
+        std::cout << std::format("[TEST] PASSED\n");
     } catch (const std::exception& e) {
         GTEST_SKIP() << e.what();
     }
 }
 
 TEST_F(IntegrationTest, ErrorToString_AllValues) {
-    std::print("[TEST] ErrorToString_AllValues\n");
+    std::cout << std::format("[TEST] ErrorToString_AllValues\n");
 
     // Verify every PipelineError enum value has a non-empty string.
     const std::vector<std::pair<PipelineError, std::string>> errors = {
@@ -1489,12 +1489,12 @@ TEST_F(IntegrationTest, ErrorToString_AllValues) {
             << "to_string(GPUError) mismatch for " << expected;
     }
 
-    std::print("[TEST] PASSED ({} PipelineError + {} GPUError values)\n",
+    std::cout << std::format("[TEST] PASSED ({} PipelineError + {} GPUError values)\n",
                errors.size(), gpu_errors.size());
 }
 
 TEST_F(IntegrationTest, CfgGuidanceScale_DefaultValue) {
-    std::print("[TEST] CfgGuidanceScale_DefaultValue\n");
+    std::cout << std::format("[TEST] CfgGuidanceScale_DefaultValue\n");
 
     // Verify that GenerationRequest carries the expected default guidance scale.
     GenerationRequest req{
@@ -1509,11 +1509,11 @@ TEST_F(IntegrationTest, CfgGuidanceScale_DefaultValue) {
     EXPECT_FLOAT_EQ(req.guidance_scale, 7.5f)
         << "Default guidance_scale should be 7.5 (standard SD)";
 
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 TEST_F(IntegrationTest, CfgGuidanceScale_SmokeNoCrash) {
-    std::print("[TEST] CfgGuidanceScale_SmokeNoCrash\n");
+    std::cout << std::format("[TEST] CfgGuidanceScale_SmokeNoCrash\n");
 
     // Smoke test: pipeline should accept various guidance_scale values
     // without crashing. Without model files, generate() will fail at
@@ -1541,14 +1541,14 @@ TEST_F(IntegrationTest, CfgGuidanceScale_SmokeNoCrash) {
         }
 
         pipeline.shutdown();
-        std::print("[TEST] PASSED\n");
+        std::cout << std::format("[TEST] PASSED\n");
     } catch (const std::exception& e) {
         GTEST_SKIP() << e.what();
     }
 }
 
 TEST_F(IntegrationTest, PipelineRejectsDimensionsNotDivisibleByVaeScale) {
-    std::print("[TEST] PipelineRejectsDimensionsNotDivisibleByVaeScale\n");
+    std::cout << std::format("[TEST] PipelineRejectsDimensionsNotDivisibleByVaeScale\n");
 
     // The VAE latent contract is [1, 4, height/8, width/8]. Non-multiple-of-8
     // requests used to truncate latent dimensions silently; generate() must
@@ -1582,14 +1582,14 @@ TEST_F(IntegrationTest, PipelineRejectsDimensionsNotDivisibleByVaeScale) {
         EXPECT_EQ(height_result.error(), PipelineError::InvalidRequest);
 
         pipeline.shutdown();
-        std::print("[TEST] PASSED\n");
+        std::cout << std::format("[TEST] PASSED\n");
     } catch (const std::exception& e) {
         GTEST_SKIP() << e.what();
     }
 }
 
 TEST_F(IntegrationTest, CfgBlendMath_Correctness) {
-    std::print("[TEST] CfgBlendMath_Correctness\n");
+    std::cout << std::format("[TEST] CfgBlendMath_Correctness\n");
 
     // Direct unit test for the CFG blending formula:
     //   noise = uncond + scale * (cond - uncond)
@@ -1629,7 +1629,7 @@ TEST_F(IntegrationTest, CfgBlendMath_Correctness) {
             << "CFG with scale=0.0 should equal unconditional";
     }
 
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // ===========================================================================
@@ -1642,7 +1642,7 @@ protected:
 };
 
 TEST_F(StagingManagerTest, Construct_AndAcquire) {
-    std::print("[TEST] StagingManager_Construct_AndAcquire\n");
+    std::cout << std::format("[TEST] StagingManager_Construct_AndAcquire\n");
     StagingConfig cfg{
         .buffer_count       = 4,
         .buffer_size_bytes  = 4096,
@@ -1675,11 +1675,11 @@ TEST_F(StagingManagerTest, Construct_AndAcquire) {
     auto result_after_release = mgr.acquire();
     EXPECT_TRUE(result_after_release.has_value());
 
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 TEST_F(StagingManagerTest, CopyIn) {
-    std::print("[TEST] StagingManager_CopyIn\n");
+    std::cout << std::format("[TEST] StagingManager_CopyIn\n");
     StagingConfig cfg{
         .buffer_count       = 2,
         .buffer_size_bytes  = 1024,
@@ -1712,7 +1712,7 @@ TEST_F(StagingManagerTest, CopyIn) {
     }
 
     mgr.release(buf);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // ===========================================================================
@@ -1725,7 +1725,7 @@ protected:
 };
 
 TEST_F(WatchdogConfigTest, DefaultValues) {
-    std::print("[TEST] WatchdogConfig_DefaultValues\n");
+    std::cout << std::format("[TEST] WatchdogConfig_DefaultValues\n");
     WatchdogConfig cfg{};
 
     EXPECT_FLOAT_EQ(cfg.gpu_low_threshold, 60.0f);
@@ -1742,7 +1742,7 @@ TEST_F(WatchdogConfigTest, DefaultValues) {
     EXPECT_LT(cfg.gpu_critical_threshold, cfg.gpu_low_threshold);
     EXPECT_LT(cfg.hailo_critical_threshold, cfg.hailo_low_threshold);
 
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // ===========================================================================
@@ -1750,15 +1750,15 @@ TEST_F(WatchdogConfigTest, DefaultValues) {
 // ===========================================================================
 
 TEST_F(CLIPTokenizerTest, VocabSize) {
-    std::print("[TEST] VocabSize\n");
+    std::cout << std::format("[TEST] VocabSize\n");
     EXPECT_GT(tokenizer_.vocab_size(), 0);
     // Built-in vocab: 256 words + 111 subwords = 367, plus BOS/EOS specials.
     EXPECT_GE(tokenizer_.vocab_size(), 350);
-    std::print("[TEST] PASSED (vocab_size={})\n", tokenizer_.vocab_size());
+    std::cout << std::format("[TEST] PASSED (vocab_size={})\n", tokenizer_.vocab_size());
 }
 
 TEST_F(CLIPTokenizerTest, EncodeRaw_NoPad) {
-    std::print("[TEST] EncodeRaw_NoPad\n");
+    std::cout << std::format("[TEST] EncodeRaw_NoPad\n");
     auto tokens = tokenizer_.encode_raw("the");
 
     // encode_raw returns only content tokens (no BOS/EOS/padding).
@@ -1771,7 +1771,7 @@ TEST_F(CLIPTokenizerTest, EncodeRaw_NoPad) {
         EXPECT_NE(t, CLIPTokenizer::EOS_TOKEN)
             << "encode_raw should not include EOS";
     }
-    std::print("[TEST] PASSED ({} raw tokens)\n", tokens.size());
+    std::cout << std::format("[TEST] PASSED ({} raw tokens)\n", tokens.size());
 }
 
 // ===========================================================================
@@ -1785,7 +1785,7 @@ protected:
 };
 
 TEST_F(NpuDmaPipelineTest, Construct_DefaultStatsAreZero) {
-    std::print("[TEST] Construct_DefaultStatsAreZero\n");
+    std::cout << std::format("[TEST] Construct_DefaultStatsAreZero\n");
     hq::npu::NpuDmaPipeline pipe(default_cfg_);
 
     auto stats = pipe.get_stats();
@@ -1798,11 +1798,11 @@ TEST_F(NpuDmaPipelineTest, Construct_DefaultStatsAreZero) {
     EXPECT_DOUBLE_EQ(stats.avg_npu_utilization, 0.0);
     EXPECT_EQ(stats.active_slots, 0);
 
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 TEST_F(NpuDmaPipelineTest, Submit_ReturnsValidSlotIndex) {
-    std::print("[TEST] Submit_ReturnsValidSlotIndex\n");
+    std::cout << std::format("[TEST] Submit_ReturnsValidSlotIndex\n");
     hq::npu::NpuDmaPipeline pipe(default_cfg_);
 
     hq::npu::NpuEncodeRequest req{.prompt = "a cat in space"};
@@ -1813,11 +1813,11 @@ TEST_F(NpuDmaPipelineTest, Submit_ReturnsValidSlotIndex) {
     std::size_t slot = result.value();
     EXPECT_LT(slot, default_cfg_.num_slots);
 
-    std::print("[TEST] PASSED (slot={})\n", slot);
+    std::cout << std::format("[TEST] PASSED (slot={})\n", slot);
 }
 
 TEST_F(NpuDmaPipelineTest, SlotState_AfterSubmit_NotError) {
-    std::print("[TEST] SlotState_AfterSubmit_NotError\n");
+    std::cout << std::format("[TEST] SlotState_AfterSubmit_NotError\n");
     hq::npu::NpuDmaPipeline pipe(default_cfg_);
 
     hq::npu::NpuEncodeRequest req{.prompt = "a cat in space"};
@@ -1827,14 +1827,14 @@ TEST_F(NpuDmaPipelineTest, SlotState_AfterSubmit_NotError) {
 
     using State = hq::npu::NpuDmaSlot::State;
     State s = pipe.slot_state(slot);
-    EXPECT_NE(s, State::ERROR)
+    EXPECT_NE(s, State::FAILED)
         << "Slot should not be in ERROR state after successful submit";
 
-    std::print("[TEST] PASSED (state={})\n", static_cast<int>(s));
+    std::cout << std::format("[TEST] PASSED (state={})\n", static_cast<int>(s));
 }
 
 TEST_F(NpuDmaPipelineTest, TryGetGpuHandle_AfterSubmit_ReturnsValidHandle) {
-    std::print("[TEST] TryGetGpuHandle_AfterSubmit_ReturnsValidHandle\n");
+    std::cout << std::format("[TEST] TryGetGpuHandle_AfterSubmit_ReturnsValidHandle\n");
     hq::npu::NpuDmaPipeline pipe(default_cfg_);
 
     hq::npu::NpuEncodeRequest req{.prompt = "a cat in space"};
@@ -1849,11 +1849,11 @@ TEST_F(NpuDmaPipelineTest, TryGetGpuHandle_AfterSubmit_ReturnsValidHandle) {
     EXPECT_GT(handle->element_count, 0);
     EXPECT_TRUE(handle->valid);
 
-    std::print("[TEST] PASSED (elements={})\n", handle->element_count);
+    std::cout << std::format("[TEST] PASSED (elements={})\n", handle->element_count);
 }
 
 TEST_F(NpuDmaPipelineTest, WaitGpuReady_ReturnsHandleWithinTimeout) {
-    std::print("[TEST] WaitGpuReady_ReturnsHandleWithinTimeout\n");
+    std::cout << std::format("[TEST] WaitGpuReady_ReturnsHandleWithinTimeout\n");
     hq::npu::NpuDmaPipeline pipe(default_cfg_);
 
     hq::npu::NpuEncodeRequest req{.prompt = "a cat in space"};
@@ -1867,11 +1867,11 @@ TEST_F(NpuDmaPipelineTest, WaitGpuReady_ReturnsHandleWithinTimeout) {
     EXPECT_TRUE(static_cast<bool>(handle.value()));
     EXPECT_TRUE(handle.value().valid);
 
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 TEST_F(NpuDmaPipelineTest, ReleaseSlot_ReturnsToIdle) {
-    std::print("[TEST] ReleaseSlot_ReturnsToIdle\n");
+    std::cout << std::format("[TEST] ReleaseSlot_ReturnsToIdle\n");
     hq::npu::NpuDmaPipeline pipe(default_cfg_);
 
     hq::npu::NpuEncodeRequest req{.prompt = "a cat in space"};
@@ -1886,11 +1886,11 @@ TEST_F(NpuDmaPipelineTest, ReleaseSlot_ReturnsToIdle) {
 
     EXPECT_EQ(pipe.slot_state(slot), hq::npu::NpuDmaSlot::State::IDLE);
 
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 TEST_F(NpuDmaPipelineTest, SubmitMultiple_StatsIncrement) {
-    std::print("[TEST] SubmitMultiple_StatsIncrement\n");
+    std::cout << std::format("[TEST] SubmitMultiple_StatsIncrement\n");
     hq::npu::NpuDmaPipeline pipe(default_cfg_);
 
     for (int i = 0; i < 5; ++i) {
@@ -1906,12 +1906,12 @@ TEST_F(NpuDmaPipelineTest, SubmitMultiple_StatsIncrement) {
     EXPECT_EQ(stats.encodes_submitted, 5);
     EXPECT_EQ(stats.encodes_completed, 5);
 
-    std::print("[TEST] PASSED (submitted={} completed={})\n",
+    std::cout << std::format("[TEST] PASSED (submitted={} completed={})\n",
                stats.encodes_submitted, stats.encodes_completed);
 }
 
 TEST_F(NpuDmaPipelineTest, GetStats_NonZeroAfterActivity) {
-    std::print("[TEST] GetStats_NonZeroAfterActivity\n");
+    std::cout << std::format("[TEST] GetStats_NonZeroAfterActivity\n");
     hq::npu::NpuDmaPipeline pipe(default_cfg_);
 
     for (int i = 0; i < 3; ++i) {
@@ -1934,12 +1934,12 @@ TEST_F(NpuDmaPipelineTest, GetStats_NonZeroAfterActivity) {
     EXPECT_GE(stats.dma_transfers, 3);
     EXPECT_GT(stats.dma_bytes, 0);
 
-    std::print("[TEST] PASSED (dma_transfers={} dma_bytes={})\n",
+    std::cout << std::format("[TEST] PASSED (dma_transfers={} dma_bytes={})\n",
                stats.dma_transfers, stats.dma_bytes);
 }
 
 TEST_F(NpuDmaPipelineTest, Submit_EmptyPrompt_StillWorks) {
-    std::print("[TEST] Submit_EmptyPrompt_StillWorks\n");
+    std::cout << std::format("[TEST] Submit_EmptyPrompt_StillWorks\n");
     hq::npu::NpuDmaPipeline pipe(default_cfg_);
 
     hq::npu::NpuEncodeRequest req{.prompt = ""};
@@ -1955,7 +1955,7 @@ TEST_F(NpuDmaPipelineTest, Submit_EmptyPrompt_StillWorks) {
 
     pipe.release_slot(slot);
 
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // ===========================================================================
@@ -1968,18 +1968,18 @@ protected:
 };
 
 TEST_F(NpuEncoderFactoryTest, CreateBestAvailable_ReturnsNullWhenNoOrtSession) {
-    std::print("[TEST] CreateBestAvailable_ReturnsNullWhenNoOrtSession\n");
+    std::cout << std::format("[TEST] CreateBestAvailable_ReturnsNullWhenNoOrtSession\n");
     auto encoder = hq::npu::NpuEncoderFactory::create_best_available();
     EXPECT_EQ(encoder, nullptr)
         << "create_best_available() should return nullptr when no ORT session and no Hailo";
-    std::print("[TEST] PASSED (returns nullptr as expected)\n");
+    std::cout << std::format("[TEST] PASSED (returns nullptr as expected)\n");
 }
 
 TEST_F(NpuEncoderFactoryTest, CreateBestAvailable_WithNullSession_ReturnsNull) {
-    std::print("[TEST] CreateBestAvailable_WithNullSession_ReturnsNull\n");
+    std::cout << std::format("[TEST] CreateBestAvailable_WithNullSession_ReturnsNull\n");
     auto encoder = hq::npu::NpuEncoderFactory::create_best_available();
     EXPECT_EQ(encoder, nullptr);
-    std::print("[TEST] PASSED (encoder is nullptr)\n");
+    std::cout << std::format("[TEST] PASSED (encoder is nullptr)\n");
 }
 
 // ===========================================================================
@@ -1998,7 +1998,7 @@ protected:
 // Test 1: Tensor1D construction from pointer + extent.
 // ---------------------------------------------------------------------------
 TEST_F(TensorViewTest, Tensor1D_Construction) {
-    std::print("[TEST] Tensor1D_Construction\n");
+    std::cout << std::format("[TEST] Tensor1D_Construction\n");
     std::vector<float> data(16);
     for (std::size_t i = 0; i < 16; ++i) data[i] = static_cast<float>(i);
 
@@ -2009,14 +2009,14 @@ TEST_F(TensorViewTest, Tensor1D_Construction) {
     EXPECT_EQ(t.extent(0), 16);
     EXPECT_FLOAT_EQ(t(0), 0.0f);
     EXPECT_FLOAT_EQ(t(15), 15.0f);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // ---------------------------------------------------------------------------
 // Test 2: Tensor2D construction and operator()(y,x) access.
 // ---------------------------------------------------------------------------
 TEST_F(TensorViewTest, Tensor2D_Access) {
-    std::print("[TEST] Tensor2D_Access\n");
+    std::cout << std::format("[TEST] Tensor2D_Access\n");
     constexpr std::size_t H = 4, W = 5;
     std::vector<float> data(H * W);
     for (std::size_t y = 0; y < H; ++y)
@@ -2031,14 +2031,14 @@ TEST_F(TensorViewTest, Tensor2D_Access) {
     EXPECT_FLOAT_EQ(t(0, 4), 4.0f);
     EXPECT_FLOAT_EQ(t(1, 0), 100.0f);
     EXPECT_FLOAT_EQ(t(3, 4), 304.0f);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // ---------------------------------------------------------------------------
 // Test 3: Tensor4D NHWC construction and 4D access.
 // ---------------------------------------------------------------------------
 TEST_F(TensorViewTest, Tensor4D_NHWC_Access) {
-    std::print("[TEST] Tensor4D_NHWC_Access\n");
+    std::cout << std::format("[TEST] Tensor4D_NHWC_Access\n");
     constexpr std::size_t N = 2, C = 3, H = 4, W = 5;
     std::vector<float> data(N * C * H * W);
     for (std::size_t n = 0; n < N; ++n)
@@ -2060,14 +2060,14 @@ TEST_F(TensorViewTest, Tensor4D_NHWC_Access) {
     EXPECT_FLOAT_EQ(t(0, 0, 0, 4), 4.0f);
     EXPECT_FLOAT_EQ(t(0, 1, 2, 3), 123.0f);
     EXPECT_FLOAT_EQ(t(1, 2, 3, 4), 1234.0f);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // ---------------------------------------------------------------------------
 // Test 4: fill() fills entire tensor with constant.
 // ---------------------------------------------------------------------------
 TEST_F(TensorViewTest, Fill_Tensor) {
-    std::print("[TEST] Fill_Tensor\n");
+    std::cout << std::format("[TEST] Fill_Tensor\n");
     std::vector<float> data(12);
     Tensor2D<float> t(data.data(), 3, 4);
 
@@ -2076,14 +2076,14 @@ TEST_F(TensorViewTest, Fill_Tensor) {
     for (auto v : t.flat_span()) EXPECT_FLOAT_EQ(v, 7.5f);
     EXPECT_FLOAT_EQ(t(0, 0), 7.5f);
     EXPECT_FLOAT_EQ(t(2, 3), 7.5f);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // ---------------------------------------------------------------------------
 // Test 5: apply() element-wise transform.
 // ---------------------------------------------------------------------------
 TEST_F(TensorViewTest, Apply_ElementWise) {
-    std::print("[TEST] Apply_ElementWise\n");
+    std::cout << std::format("[TEST] Apply_ElementWise\n");
     std::vector<float> data = {1.0f, 2.0f, 3.0f, 4.0f};
     Tensor1D<float> t(data.data(), 4);
 
@@ -2093,14 +2093,14 @@ TEST_F(TensorViewTest, Apply_ElementWise) {
     EXPECT_FLOAT_EQ(t(1), 4.0f);
     EXPECT_FLOAT_EQ(t(2), 9.0f);
     EXPECT_FLOAT_EQ(t(3), 16.0f);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // ---------------------------------------------------------------------------
 // Test 6: flat_span() provides writable 1D access.
 // ---------------------------------------------------------------------------
 TEST_F(TensorViewTest, FlatSpan_Writable) {
-    std::print("[TEST] FlatSpan_Writable\n");
+    std::cout << std::format("[TEST] FlatSpan_Writable\n");
     std::vector<float> data(8);
     Tensor2D<float> t(data.data(), 2, 4);
 
@@ -2111,14 +2111,14 @@ TEST_F(TensorViewTest, FlatSpan_Writable) {
     EXPECT_FLOAT_EQ(t(0, 0), 0.0f);
     EXPECT_FLOAT_EQ(t(0, 3), 30.0f);
     EXPECT_FLOAT_EQ(t(1, 3), 70.0f);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // ---------------------------------------------------------------------------
 // Test 7: shape() returns correct dimensions.
 // ---------------------------------------------------------------------------
 TEST_F(TensorViewTest, Shape_CorrectDimensions) {
-    std::print("[TEST] Shape_CorrectDimensions\n");
+    std::cout << std::format("[TEST] Shape_CorrectDimensions\n");
     std::vector<float> data(120);
     Tensor3D<float> t(data.data(), 3, 5, 8);
 
@@ -2127,52 +2127,52 @@ TEST_F(TensorViewTest, Shape_CorrectDimensions) {
     EXPECT_EQ(sh[0], 3);
     EXPECT_EQ(sh[1], 5);
     EXPECT_EQ(sh[2], 8);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // ---------------------------------------------------------------------------
 // Test 8: num_elements() and num_bytes().
 // ---------------------------------------------------------------------------
 TEST_F(TensorViewTest, NumElements_NumBytes) {
-    std::print("[TEST] NumElements_NumBytes\n");
+    std::cout << std::format("[TEST] NumElements_NumBytes\n");
     std::vector<double> data(60);
     Tensor2D<double> t(data.data(), 10, 6);
 
     EXPECT_EQ(t.num_elements(), 60);
     EXPECT_EQ(t.num_bytes(), 60 * sizeof(double));
     EXPECT_EQ(t.num_bytes(), 480);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // ---------------------------------------------------------------------------
 // Test 9: empty() on null pointer returns true.
 // ---------------------------------------------------------------------------
 TEST_F(TensorViewTest, Empty_NullPointer) {
-    std::print("[TEST] Empty_NullPointer\n");
+    std::cout << std::format("[TEST] Empty_NullPointer\n");
     float* null_ptr = nullptr;
     Tensor1D<float> t(null_ptr, std::size_t{0});
 
     EXPECT_TRUE(t.empty());
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // ---------------------------------------------------------------------------
 // Test 10: is_contiguous() on layout_right returns true.
 // ---------------------------------------------------------------------------
 TEST_F(TensorViewTest, IsContiguous_LayoutRight) {
-    std::print("[TEST] IsContiguous_LayoutRight\n");
+    std::cout << std::format("[TEST] IsContiguous_LayoutRight\n");
     std::vector<float> data(24);
     Tensor3D<float> t(data.data(), 2, 3, 4);
 
     EXPECT_TRUE(t.is_contiguous());
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // ---------------------------------------------------------------------------
 // Test 11: fmadd() multiply-add correctness.
 // ---------------------------------------------------------------------------
 TEST_F(TensorViewTest, Fmadd_Correctness) {
-    std::print("[TEST] Fmadd_Correctness\n");
+    std::cout << std::format("[TEST] Fmadd_Correctness\n");
     constexpr std::size_t N = 6;
     std::vector<float> dst_data(N,  0.0f);
     std::vector<float>  a_data(N), b_data(N);
@@ -2191,14 +2191,14 @@ TEST_F(TensorViewTest, Fmadd_Correctness) {
         float expected = 2.0f * static_cast<float>(i) + 3.0f * static_cast<float>(i * 2);
         EXPECT_FLOAT_EQ(dst(i), expected);
     }
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // ---------------------------------------------------------------------------
 // Test 12: fill_gaussian() produces values with mean≈0, stddev≈1.
 // ---------------------------------------------------------------------------
 TEST_F(TensorViewTest, FillGaussian_Statistical) {
-    std::print("[TEST] FillGaussian_Statistical\n");
+    std::cout << std::format("[TEST] FillGaussian_Statistical\n");
     constexpr std::size_t N = 10000;
     std::vector<float> data(N);
     Tensor1D<float> t(data.data(), N);
@@ -2216,7 +2216,7 @@ TEST_F(TensorViewTest, FillGaussian_Statistical) {
     float stddev = std::sqrt(sq_sum / static_cast<float>(N));
     EXPECT_NEAR(stddev, 1.0f, 0.05f);
 
-    std::print("[TEST] PASSED (mean={:.4f} stddev={:.4f})\n", mean, stddev);
+    std::cout << std::format("[TEST] PASSED (mean={:.4f} stddev={:.4f})\n", mean, stddev);
 }
 
 // ---------------------------------------------------------------------------
@@ -2224,18 +2224,18 @@ TEST_F(TensorViewTest, FillGaussian_Statistical) {
 // ---------------------------------------------------------------------------
 #ifdef ONNXRUNTIME_CXX_API_H
 TEST_F(TensorViewTest, ExtractFloatTensor_Available) {
-    std::print("[TEST] ExtractFloatTensor_Available\n");
+    std::cout << std::format("[TEST] ExtractFloatTensor_Available\n");
     // Compile-time check: extract_latent / extract_embedding are declared.
     // sizeof(function) is a GCC extension that returns 1.
     auto make_dummy = [] {
         return sizeof(extract_latent) + sizeof(extract_embedding);
     };
     EXPECT_GT(make_dummy(), 0);
-    std::print("[TEST] PASSED (compile-time ONNX interop verified)\n");
+    std::cout << std::format("[TEST] PASSED (compile-time ONNX interop verified)\n");
 }
 #else
 TEST_F(TensorViewTest, ExtractFloatTensor_NoORT) {
-    std::print("[TEST] ExtractFloatTensor_NoORT — ONNX Runtime not available; ORT interop skipped\n");
+    std::cout << std::format("[TEST] ExtractFloatTensor_NoORT — ONNX Runtime not available; ORT interop skipped\n");
     SUCCEED();
 }
 #endif
@@ -2244,7 +2244,7 @@ TEST_F(TensorViewTest, ExtractFloatTensor_NoORT) {
 // Test 14: Edge case — zero-size tensor.
 // ---------------------------------------------------------------------------
 TEST_F(TensorViewTest, ZeroSizeTensor) {
-    std::print("[TEST] ZeroSizeTensor\n");
+    std::cout << std::format("[TEST] ZeroSizeTensor\n");
     std::vector<float> storage(1, 42.0f);
     Tensor1D<float> t(storage.data(), static_cast<std::size_t>(0));
 
@@ -2258,7 +2258,7 @@ TEST_F(TensorViewTest, ZeroSizeTensor) {
     EXPECT_EQ(sh.size(), 1);
     EXPECT_EQ(sh[0], 0);
 
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // ===========================================================================
@@ -2285,7 +2285,7 @@ protected:
 
 // Test 1: Construction with default config
 TEST_F(DEISSchedulerTest, Construction_DefaultConfig_ArraysSized) {
-    std::print("[TEST] DEIS_Construction_DefaultConfig_ArraysSized\n");
+    std::cout << std::format("[TEST] DEIS_Construction_DefaultConfig_ArraysSized\n");
     DEISScheduler sched(default_config(), 20);
     EXPECT_EQ(sched.num_steps(), 20);
     auto acp = sched.alphas_cumprod();
@@ -2300,13 +2300,13 @@ TEST_F(DEISSchedulerTest, Construction_DefaultConfig_ArraysSized) {
     sched.get_step_coeffs(0, &cx0, &ceps);
     EXPECT_GT(cx0, 0.0f);
     EXPECT_LT(ceps, 0.0f);
-    std::print("[TEST] PASSED (num_steps=20, acp[0]={:.6f}, acp[999]={:.6f})\n",
+    std::cout << std::format("[TEST] PASSED (num_steps=20, acp[0]={:.6f}, acp[999]={:.6f})\n",
                acp[0], acp[999]);
 }
 
 // Test 2: Construction with custom config
 TEST_F(DEISSchedulerTest, Construction_CustomConfig_DifferentBetas) {
-    std::print("[TEST] DEIS_Construction_CustomConfig_DifferentBetas\n");
+    std::cout << std::format("[TEST] DEIS_Construction_CustomConfig_DifferentBetas\n");
     SchedulerConfig cfg{
         .type                = SchedulerType::DEIS,
         .num_train_timesteps = 100,
@@ -2323,12 +2323,12 @@ TEST_F(DEISSchedulerTest, Construction_CustomConfig_DifferentBetas) {
     auto ts = sched.timestep(0);
     EXPECT_GT(ts, 0);
     EXPECT_LT(ts, static_cast<std::int64_t>(cfg.num_train_timesteps));
-    std::print("[TEST] PASSED (num_train=100, beta_start=0.001, beta_end=0.05)\n");
+    std::cout << std::format("[TEST] PASSED (num_train=100, beta_start=0.001, beta_end=0.05)\n");
 }
 
 // Test 3: set_inference_steps() changes step count and re-runs precompute
 TEST_F(DEISSchedulerTest, SetInferenceSteps_ChangesCount) {
-    std::print("[TEST] DEIS_SetInferenceSteps_ChangesCount\n");
+    std::cout << std::format("[TEST] DEIS_SetInferenceSteps_ChangesCount\n");
     DEISScheduler sched(default_config(), 20);
     EXPECT_EQ(sched.num_steps(), 20);
     float cx0_orig, ceps_orig;
@@ -2347,12 +2347,12 @@ TEST_F(DEISSchedulerTest, SetInferenceSteps_ChangesCount) {
     float cx0_last2, ceps_last2;
     sched.get_step_coeffs(49, &cx0_last2, &ceps_last2);
     EXPECT_GT(cx0_last2, 0.0f);
-    std::print("[TEST] PASSED (20→5→50 steps)\n");
+    std::cout << std::format("[TEST] PASSED (20→5→50 steps)\n");
 }
 
 // Test 4: timestep() returns descending values
 TEST_F(DEISSchedulerTest, Timestep_DescendingValues) {
-    std::print("[TEST] DEIS_Timestep_DescendingValues\n");
+    std::cout << std::format("[TEST] DEIS_Timestep_DescendingValues\n");
     DEISScheduler sched(default_config(), 20);
     auto ts0 = sched.timestep(0);
     EXPECT_GE(ts0, 900);
@@ -2363,24 +2363,24 @@ TEST_F(DEISSchedulerTest, Timestep_DescendingValues) {
         auto b = sched.timestep(i + 1);
         EXPECT_GE(a, b) << "timestep must be non-increasing: step " << i;
     }
-    std::print("[TEST] PASSED (ts0={}, ts_last={})\n", ts0, ts_last);
+    std::cout << std::format("[TEST] PASSED (ts0={}, ts_last={})\n", ts0, ts_last);
 }
 
 // Test 5: timestep() with out-of-range step returns -1
 TEST_F(DEISSchedulerTest, Timestep_OutOfRange_ReturnsMinusOne) {
-    std::print("[TEST] DEIS_Timestep_OutOfRange_ReturnsMinusOne\n");
+    std::cout << std::format("[TEST] DEIS_Timestep_OutOfRange_ReturnsMinusOne\n");
     DEISScheduler sched(default_config(), 10);
     for (std::uint32_t s = 0; s < 10; ++s)
         EXPECT_GE(sched.timestep(s), 0);
     EXPECT_EQ(sched.timestep(10), -1);
     EXPECT_EQ(sched.timestep(100), -1);
     EXPECT_EQ(sched.timestep(UINT32_MAX), -1);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // Test 6: step() applies DDIM update correctly
 TEST_F(DEISSchedulerTest, Step_DDIMUpdate_CorrectFormula) {
-    std::print("[TEST] DEIS_Step_DDIMUpdate_CorrectFormula\n");
+    std::cout << std::format("[TEST] DEIS_Step_DDIMUpdate_CorrectFormula\n");
     SchedulerConfig cfg{
         .type                = SchedulerType::DEIS,
         .num_train_timesteps = 3,
@@ -2418,13 +2418,13 @@ TEST_F(DEISSchedulerTest, Step_DDIMUpdate_CorrectFormula) {
                            hq::tensor::Tensor1D<const float>{model1, 4}, 1).has_value());
     for (int i = 0; i < 4; ++i)
         EXPECT_NEAR(latents0[i], expected1[i], 1e-4f);
-    std::print("[TEST] PASSED (coeffs: step0=({:.4f},{:.4f}) step1=({:.4f},{:.4f}))\n",
+    std::cout << std::format("[TEST] PASSED (coeffs: step0=({:.4f},{:.4f}) step1=({:.4f},{:.4f}))\n",
                cx0_0, ce_0, cx0_1, ce_1);
 }
 
 // Test 7: step() guard checks
 TEST_F(DEISSchedulerTest, Step_GuardChecks_NoOpWhenOutOfRange) {
-    std::print("[TEST] DEIS_Step_GuardChecks_NoOpWhenOutOfRange\n");
+    std::cout << std::format("[TEST] DEIS_Step_GuardChecks_NoOpWhenOutOfRange\n");
     DEISScheduler sched(default_config(), 4);
     float latents[4] = {7.0f, 7.0f, 7.0f, 7.0f};
     const float model[4] = {0.0f, 0.0f, 0.0f, 0.0f};
@@ -2445,12 +2445,12 @@ TEST_F(DEISSchedulerTest, Step_GuardChecks_NoOpWhenOutOfRange) {
                             hq::tensor::Tensor1D<const float>{model, 4}, 999).has_value());
     for (int i = 0; i < 4; ++i)
         EXPECT_FLOAT_EQ(latents[i], saved[i]);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // Test 8: get_step_coeffs() returns correct coefficients
 TEST_F(DEISSchedulerTest, GetStepCoeffs_ReturnsCorrectCoeffs) {
-    std::print("[TEST] DEIS_GetStepCoeffs_ReturnsCorrectCoeffs\n");
+    std::cout << std::format("[TEST] DEIS_GetStepCoeffs_ReturnsCorrectCoeffs\n");
     DEISScheduler sched(default_config(), 4);
     for (std::uint32_t s = 0; s < 4; ++s) {
         float x0_a, eps_a;
@@ -2459,12 +2459,12 @@ TEST_F(DEISSchedulerTest, GetStepCoeffs_ReturnsCorrectCoeffs) {
         EXPECT_NEAR(eps_a, sched.step_coeff_eps(s), 1e-6f);
         EXPECT_GT(x0_a, 0.0f);
     }
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // Test 9: alphas_cumprod() and sigmas() span access
 TEST_F(DEISSchedulerTest, AlphasSigmas_SpanAccess) {
-    std::print("[TEST] DEIS_AlphasSigmas_SpanAccess\n");
+    std::cout << std::format("[TEST] DEIS_AlphasSigmas_SpanAccess\n");
     DEISScheduler sched(default_config(), 20);
     auto acp = sched.alphas_cumprod();
     auto sig = sched.sigmas();
@@ -2479,12 +2479,12 @@ TEST_F(DEISSchedulerTest, AlphasSigmas_SpanAccess) {
     }
     for (std::size_t i = 0; i < acp.size(); ++i)
         EXPECT_NEAR(sig[i], std::sqrt(1.0f - acp[i]), 1e-5f);
-    std::print("[TEST] PASSED ({} entries)\n", acp.size());
+    std::cout << std::format("[TEST] PASSED ({} entries)\n", acp.size());
 }
 
 // Test 10: Scaled linear beta schedule
 TEST_F(DEISSchedulerTest, ScaledLinearBeta_Schedule_MatchesFormula) {
-    std::print("[TEST] DEIS_ScaledLinearBeta_Schedule_MatchesFormula\n");
+    std::cout << std::format("[TEST] DEIS_ScaledLinearBeta_Schedule_MatchesFormula\n");
     SchedulerConfig cfg{
         .type                = SchedulerType::DEIS,
         .num_train_timesteps = 3,
@@ -2508,13 +2508,13 @@ TEST_F(DEISSchedulerTest, ScaledLinearBeta_Schedule_MatchesFormula) {
     EXPECT_NEAR(lin_acp[0], acp[0], 1e-5f);
     EXPECT_NEAR(lin_acp[1], 0.9405f, 1e-5f);
     EXPECT_GT(std::abs(lin_acp[1] - acp[1]), 1e-5f);
-    std::print("[TEST] PASSED (scaled: acp[1]={:.6f} linear: acp[1]={:.6f})\n",
+    std::cout << std::format("[TEST] PASSED (scaled: acp[1]={:.6f} linear: acp[1]={:.6f})\n",
                acp[1], lin_acp[1]);
 }
 
 // Test 11: Edge case — num_steps=1
 TEST_F(DEISSchedulerTest, EdgeCase_SingleStepInference) {
-    std::print("[TEST] DEIS_EdgeCase_SingleStepInference\n");
+    std::cout << std::format("[TEST] DEIS_EdgeCase_SingleStepInference\n");
     DEISScheduler sched(default_config(), 1);
     EXPECT_EQ(sched.num_steps(), 1);
     auto ts = sched.timestep(0);
@@ -2530,12 +2530,12 @@ TEST_F(DEISSchedulerTest, EdgeCase_SingleStepInference) {
                            hq::tensor::Tensor1D<const float>{model, 2}, 0).has_value());
     EXPECT_TRUE(std::abs(latents[0] - 1.0f) > 1e-7f ||
                 std::abs(latents[1] - 1.0f) > 1e-7f);
-    std::print("[TEST] PASSED (ts={}, coeffs=({:.4f},{:.4f}))\n", ts, cx0, ceps);
+    std::cout << std::format("[TEST] PASSED (ts={}, coeffs=({:.4f},{:.4f}))\n", ts, cx0, ceps);
 }
 
 // Test 12: Edge case — num_train_timesteps=1
 TEST_F(DEISSchedulerTest, EdgeCase_SingleTrainTimestep) {
-    std::print("[TEST] DEIS_EdgeCase_SingleTrainTimestep\n");
+    std::cout << std::format("[TEST] DEIS_EdgeCase_SingleTrainTimestep\n");
     SchedulerConfig cfg{
         .type                = SchedulerType::DEIS,
         .num_train_timesteps = 1,
@@ -2560,7 +2560,7 @@ TEST_F(DEISSchedulerTest, EdgeCase_SingleTrainTimestep) {
     const float model[2] = {0.5f, 0.5f};
     EXPECT_TRUE(sched.step(hq::tensor::FloatTensor4D{latents, 1, 1, 1, 2},
                            hq::tensor::Tensor1D<const float>{model, 2}, 0).has_value());
-    std::print("[TEST] PASSED (acp={:.6f} sigma={:.6f})\n", acp[0], sig[0]);
+    std::cout << std::format("[TEST] PASSED (acp={:.6f} sigma={:.6f})\n", acp[0], sig[0]);
 }
 
 // ===========================================================================
@@ -2617,32 +2617,32 @@ protected:
 // task<T> test 1: co_return value → result()
 // ---------------------------------------------------------------------------
 TEST_F(CoroutineTest, Task_ReturnValue) {
-    std::print("[TEST] Task_ReturnValue\n");
+    std::cout << std::format("[TEST] Task_ReturnValue\n");
     auto t = coro_return_value();
     EXPECT_EQ(t.result(), 42);
     EXPECT_TRUE(t.done());
     EXPECT_FALSE(t.has_exception());
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // ---------------------------------------------------------------------------
 // task<T> test 2: co_return void → done()
 // ---------------------------------------------------------------------------
 TEST_F(CoroutineTest, Task_ReturnVoid) {
-    std::print("[TEST] Task_ReturnVoid\n");
+    std::cout << std::format("[TEST] Task_ReturnVoid\n");
     auto t = coro_return_void();
     EXPECT_TRUE(t.done());
     EXPECT_FALSE(t.has_exception());
     // result() on void task should not throw when no exception
     EXPECT_NO_THROW(t.result());
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // ---------------------------------------------------------------------------
 // task<T> test 3: move semantics
 // ---------------------------------------------------------------------------
 TEST_F(CoroutineTest, Task_MoveSemantics) {
-    std::print("[TEST] Task_MoveSemantics\n");
+    std::cout << std::format("[TEST] Task_MoveSemantics\n");
     auto t1 = coro_return_value();
     EXPECT_EQ(t1.result(), 42);
     EXPECT_TRUE(t1.done());
@@ -2656,14 +2656,14 @@ TEST_F(CoroutineTest, Task_MoveSemantics) {
     EXPECT_FALSE(t2.done());
     EXPECT_TRUE(t3.done());
     EXPECT_EQ(t3.result(), 42);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // ---------------------------------------------------------------------------
 // task<T> test 4: exception handling
 // ---------------------------------------------------------------------------
 TEST_F(CoroutineTest, Task_ExceptionHandling) {
-    std::print("[TEST] Task_ExceptionHandling\n");
+    std::cout << std::format("[TEST] Task_ExceptionHandling\n");
     auto t = coro_will_throw();
     EXPECT_TRUE(t.has_exception());
     EXPECT_TRUE(t.done());
@@ -2673,25 +2673,25 @@ TEST_F(CoroutineTest, Task_ExceptionHandling) {
     } catch (const std::runtime_error& e) {
         EXPECT_STREQ(e.what(), "test exception");
     }
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // ---------------------------------------------------------------------------
 // task<T> test 5: co_await task from another task
 // ---------------------------------------------------------------------------
 TEST_F(CoroutineTest, Task_CoroAwaitPropagation) {
-    std::print("[TEST] Task_CoroAwaitPropagation\n");
+    std::cout << std::format("[TEST] Task_CoroAwaitPropagation\n");
     auto t = coro_await_other();
     EXPECT_EQ(t.result(), 84);
     EXPECT_TRUE(t.done());
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // ---------------------------------------------------------------------------
 // task<T> test 6: task destruction without accessing result
 // ---------------------------------------------------------------------------
 TEST_F(CoroutineTest, Task_DestroyWithoutAccess) {
-    std::print("[TEST] Task_DestroyWithoutAccess\n");
+    std::cout << std::format("[TEST] Task_DestroyWithoutAccess\n");
     {
         auto t = coro_return_value();
         // t destructor runs here — must not crash or leak
@@ -2703,14 +2703,14 @@ TEST_F(CoroutineTest, Task_DestroyWithoutAccess) {
         auto t = coro_will_throw();
     }
     SUCCEED();
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // ---------------------------------------------------------------------------
 // Generator<T> test 1: yields 3 values
 // ---------------------------------------------------------------------------
 TEST_F(CoroutineTest, Generator_ThreeValues) {
-    std::print("[TEST] Generator_ThreeValues\n");
+    std::cout << std::format("[TEST] Generator_ThreeValues\n");
     auto g = gen_three();
     std::vector<int> vals;
     for (int v : g) vals.push_back(v);
@@ -2718,27 +2718,27 @@ TEST_F(CoroutineTest, Generator_ThreeValues) {
     EXPECT_EQ(vals[0], 1);
     EXPECT_EQ(vals[1], 2);
     EXPECT_EQ(vals[2], 3);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // ---------------------------------------------------------------------------
 // Generator<T> test 2: empty generator
 // ---------------------------------------------------------------------------
 TEST_F(CoroutineTest, Generator_Empty) {
-    std::print("[TEST] Generator_Empty\n");
+    std::cout << std::format("[TEST] Generator_Empty\n");
     auto g = gen_empty();
     EXPECT_EQ(g.begin(), g.end());
     std::vector<int> vals;
     for (int v : g) vals.push_back(v);
     EXPECT_TRUE(vals.empty());
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // ---------------------------------------------------------------------------
 // Generator<T> test 3: move semantics
 // ---------------------------------------------------------------------------
 TEST_F(CoroutineTest, Generator_MoveSemantics) {
-    std::print("[TEST] Generator_MoveSemantics\n");
+    std::cout << std::format("[TEST] Generator_MoveSemantics\n");
     auto g1 = gen_three();
     std::vector<int> vals1;
     for (int v : g1) vals1.push_back(v);
@@ -2750,58 +2750,58 @@ TEST_F(CoroutineTest, Generator_MoveSemantics) {
     Generator<int> g3 = std::move(g2);
     EXPECT_EQ(g2.begin(), g2.end());
     (void)g3;
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // ---------------------------------------------------------------------------
 // Generator<T> test 4: single yield
 // ---------------------------------------------------------------------------
 TEST_F(CoroutineTest, Generator_SingleYield) {
-    std::print("[TEST] Generator_SingleYield\n");
+    std::cout << std::format("[TEST] Generator_SingleYield\n");
     auto g = gen_one();
     std::vector<int> vals;
     for (int v : g) vals.push_back(v);
     ASSERT_EQ(vals.size(), 1);
     EXPECT_EQ(vals[0], 42);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // ---------------------------------------------------------------------------
 // GPUEventAwaiter test 1: stub mode await_ready() returns true
 // ---------------------------------------------------------------------------
 TEST_F(CoroutineTest, GPUEventAwaiter_AwaitReady_StubMode) {
-    std::print("[TEST] GPUEventAwaiter_AwaitReady_StubMode\n");
+    std::cout << std::format("[TEST] GPUEventAwaiter_AwaitReady_StubMode\n");
     GPUEventAwaiter awaiter(nullptr);
     EXPECT_TRUE(awaiter.await_ready());
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // ---------------------------------------------------------------------------
 // GPUEventAwaiter test 2: co_await completes without blocking in stub mode
 // ---------------------------------------------------------------------------
 TEST_F(CoroutineTest, GPUEventAwaiter_CoAwait_StubMode) {
-    std::print("[TEST] GPUEventAwaiter_CoAwait_StubMode\n");
+    std::cout << std::format("[TEST] GPUEventAwaiter_CoAwait_StubMode\n");
     auto t = coro_await_gpu_event();
     EXPECT_TRUE(t.done());
     EXPECT_NO_THROW(t.result());
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // ---------------------------------------------------------------------------
 // SleepAwaiter test 1: await_ready() false for positive duration
 // ---------------------------------------------------------------------------
 TEST_F(CoroutineTest, SleepAwaiter_AwaitReady_FalseForPositive) {
-    std::print("[TEST] SleepAwaiter_AwaitReady_FalseForPositive\n");
+    std::cout << std::format("[TEST] SleepAwaiter_AwaitReady_FalseForPositive\n");
     SleepAwaiter awaiter(std::chrono::milliseconds(100));
     EXPECT_FALSE(awaiter.await_ready());
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // ---------------------------------------------------------------------------
 // SleepAwaiter test 2: await_ready() true for zero/negative
 // ---------------------------------------------------------------------------
 TEST_F(CoroutineTest, SleepAwaiter_AwaitReady_TrueForZero) {
-    std::print("[TEST] SleepAwaiter_AwaitReady_TrueForZero\n");
+    std::cout << std::format("[TEST] SleepAwaiter_AwaitReady_TrueForZero\n");
     {
         SleepAwaiter awaiter(std::chrono::milliseconds(0));
         EXPECT_TRUE(awaiter.await_ready());
@@ -2810,14 +2810,14 @@ TEST_F(CoroutineTest, SleepAwaiter_AwaitReady_TrueForZero) {
         SleepAwaiter awaiter(std::chrono::seconds(0));
         EXPECT_TRUE(awaiter.await_ready());
     }
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // ---------------------------------------------------------------------------
 // AsyncPipeline integration test 1: construct and get_stats
 // ---------------------------------------------------------------------------
 TEST_F(CoroutineTest, AsyncPipeline_ConstructAndStats) {
-    std::print("[TEST] AsyncPipeline_ConstructAndStats\n");
+    std::cout << std::format("[TEST] AsyncPipeline_ConstructAndStats\n");
     try {
         PipelineConfig cfg{};
         AsyncPipeline ap(cfg);
@@ -2828,14 +2828,14 @@ TEST_F(CoroutineTest, AsyncPipeline_ConstructAndStats) {
     } catch (const std::exception& e) {
         GTEST_SKIP() << e.what();
     }
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // ---------------------------------------------------------------------------
 // AsyncPipeline integration test 2: shutdown idempotent via async wrapper
 // ---------------------------------------------------------------------------
 TEST_F(CoroutineTest, AsyncPipeline_ShutdownIdempotent) {
-    std::print("[TEST] AsyncPipeline_ShutdownIdempotent\n");
+    std::cout << std::format("[TEST] AsyncPipeline_ShutdownIdempotent\n");
     try {
         PipelineConfig cfg{};
         AsyncPipeline ap(cfg);
@@ -2845,7 +2845,7 @@ TEST_F(CoroutineTest, AsyncPipeline_ShutdownIdempotent) {
     } catch (const std::exception& e) {
         GTEST_SKIP() << e.what();
     }
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 #endif // UM790_HAS_COROUTINES
@@ -3203,36 +3203,36 @@ protected:
 };
 
 TEST_F(BenchmarkLoggerTest, DefaultCapacity_IsCorrect) {
-    std::print("[TEST] BenchmarkLogger_DefaultCapacity_IsCorrect\n");
+    std::cout << std::format("[TEST] BenchmarkLogger_DefaultCapacity_IsCorrect\n");
     hq::BenchmarkLogger logger;
     EXPECT_EQ(logger.capacity(), hq::BenchmarkLogger::kDefaultCapacity);
     EXPECT_EQ(logger.event_count(), 0u);
-    std::print("[TEST] PASSED (capacity={})\n", logger.capacity());
+    std::cout << std::format("[TEST] PASSED (capacity={})\n", logger.capacity());
 }
 
 TEST_F(BenchmarkLoggerTest, Record_IncreasesEventCount) {
-    std::print("[TEST] BenchmarkLogger_Record_IncreasesEventCount\n");
+    std::cout << std::format("[TEST] BenchmarkLogger_Record_IncreasesEventCount\n");
     hq::BenchmarkLogger logger(64);
     EXPECT_EQ(logger.event_count(), 0u);
     logger.record(hq::BenchPhase::ITER_START, 0);
     EXPECT_EQ(logger.event_count(), 1u);
     logger.record(hq::BenchPhase::ITER_END, 0, 1'000'000ULL);
     EXPECT_EQ(logger.event_count(), 2u);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 TEST_F(BenchmarkLoggerTest, StatsForPhase_NoEvents_ZeroCount) {
-    std::print("[TEST] BenchmarkLogger_StatsForPhase_NoEvents_ZeroCount\n");
+    std::cout << std::format("[TEST] BenchmarkLogger_StatsForPhase_NoEvents_ZeroCount\n");
     hq::BenchmarkLogger logger(64);
     auto stats = logger.stats_for_phase(hq::BenchPhase::DENOISE_STEP_END);
     EXPECT_EQ(stats.count, 0u);
     EXPECT_DOUBLE_EQ(stats.p50_ms, 0.0);
     EXPECT_DOUBLE_EQ(stats.mean_ms, 0.0);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 TEST_F(BenchmarkLoggerTest, StatsForPhase_FiltersCorrectly) {
-    std::print("[TEST] BenchmarkLogger_StatsForPhase_FiltersCorrectly\n");
+    std::cout << std::format("[TEST] BenchmarkLogger_StatsForPhase_FiltersCorrectly\n");
     hq::BenchmarkLogger logger(64);
     // 3 ENCODE_END events with increasing duration
     logger.record(hq::BenchPhase::ENCODE_END, 0, 10'000'000ULL);  // 10 ms
@@ -3250,12 +3250,12 @@ TEST_F(BenchmarkLoggerTest, StatsForPhase_FiltersCorrectly) {
 
     auto vae_stats = logger.stats_for_phase(hq::BenchPhase::VAE_END);
     EXPECT_EQ(vae_stats.count, 1u);
-    std::print("[TEST] PASSED (mean={:.2f}ms p50={:.2f}ms)\n",
+    std::cout << std::format("[TEST] PASSED (mean={:.2f}ms p50={:.2f}ms)\n",
                stats.mean_ms, stats.p50_ms);
 }
 
 TEST_F(BenchmarkLoggerTest, StatsForPhase_P50P95P99_Monotonic) {
-    std::print("[TEST] BenchmarkLogger_StatsForPhase_P50P95P99_Monotonic\n");
+    std::cout << std::format("[TEST] BenchmarkLogger_StatsForPhase_P50P95P99_Monotonic\n");
     hq::BenchmarkLogger logger(256);
     for (std::uint32_t i = 1; i <= 100; ++i) {
         logger.record(hq::BenchPhase::DENOISE_STEP_END, i,
@@ -3268,12 +3268,12 @@ TEST_F(BenchmarkLoggerTest, StatsForPhase_P50P95P99_Monotonic) {
     EXPECT_LE(stats.p99_ms, stats.max_ms) << "p99 must be <= max";
     EXPECT_GE(stats.p50_ms, stats.min_ms) << "p50 must be >= min";
     EXPECT_NEAR(stats.mean_ms, 50.5, 0.5);
-    std::print("[TEST] PASSED (p50={:.1f} p95={:.1f} p99={:.1f})\n",
+    std::cout << std::format("[TEST] PASSED (p50={:.1f} p95={:.1f} p99={:.1f})\n",
                stats.p50_ms, stats.p95_ms, stats.p99_ms);
 }
 
 TEST_F(BenchmarkLoggerTest, RingWrap_CountCapsAtCapacity) {
-    std::print("[TEST] BenchmarkLogger_RingWrap_CountCapsAtCapacity\n");
+    std::cout << std::format("[TEST] BenchmarkLogger_RingWrap_CountCapsAtCapacity\n");
     constexpr std::size_t cap = 16;
     hq::BenchmarkLogger logger(cap);
     for (std::size_t i = 0; i < cap + 8; ++i) {
@@ -3282,23 +3282,23 @@ TEST_F(BenchmarkLoggerTest, RingWrap_CountCapsAtCapacity) {
     }
     EXPECT_EQ(logger.event_count(), cap)
         << "event_count() must be capped at ring capacity after wrap";
-    std::print("[TEST] PASSED (cap={} event_count={})\n",
+    std::cout << std::format("[TEST] PASSED (cap={} event_count={})\n",
                cap, logger.event_count());
 }
 
 TEST_F(BenchmarkLoggerTest, Clear_ResetsEventCount) {
-    std::print("[TEST] BenchmarkLogger_Clear_ResetsEventCount\n");
+    std::cout << std::format("[TEST] BenchmarkLogger_Clear_ResetsEventCount\n");
     hq::BenchmarkLogger logger(64);
     for (int i = 0; i < 10; ++i)
         logger.record(hq::BenchPhase::ITER_START, static_cast<std::uint32_t>(i));
     EXPECT_EQ(logger.event_count(), 10u);
     logger.clear();
     EXPECT_EQ(logger.event_count(), 0u);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 TEST_F(BenchmarkLoggerTest, ScopedPhaseTimer_RecordsNonZeroDuration) {
-    std::print("[TEST] BenchmarkLogger_ScopedPhaseTimer_RecordsNonZeroDuration\n");
+    std::cout << std::format("[TEST] BenchmarkLogger_ScopedPhaseTimer_RecordsNonZeroDuration\n");
     hq::BenchmarkLogger logger(64);
     {
         hq::ScopedPhaseTimer timer(logger, hq::BenchPhase::VAE_END, 0);
@@ -3311,21 +3311,21 @@ TEST_F(BenchmarkLoggerTest, ScopedPhaseTimer_RecordsNonZeroDuration) {
     auto stats = logger.stats_for_phase(hq::BenchPhase::VAE_END);
     EXPECT_EQ(stats.count, 1u);
     EXPECT_GE(stats.mean_ms, 0.0) << "Recorded duration must be non-negative";
-    std::print("[TEST] PASSED (duration={:.6f}ms)\n", stats.mean_ms);
+    std::cout << std::format("[TEST] PASSED (duration={:.6f}ms)\n", stats.mean_ms);
 }
 
 TEST_F(BenchmarkLoggerTest, MeasureOverhead_IsReasonablyLow) {
-    std::print("[TEST] BenchmarkLogger_MeasureOverhead_IsReasonablyLow\n");
+    std::cout << std::format("[TEST] BenchmarkLogger_MeasureOverhead_IsReasonablyLow\n");
     hq::BenchmarkLogger logger;
     double overhead_ns = logger.measure_overhead_ns(1000);
     EXPECT_GE(overhead_ns, 0.0);
     EXPECT_LT(overhead_ns, 10'000.0)
         << "record() overhead should be under 10 µs per call";
-    std::print("[TEST] PASSED (overhead={:.1f}ns)\n", overhead_ns);
+    std::cout << std::format("[TEST] PASSED (overhead={:.1f}ns)\n", overhead_ns);
 }
 
 TEST_F(BenchmarkLoggerTest, BenchPhaseName_AllKnownPhases) {
-    std::print("[TEST] BenchmarkLogger_BenchPhaseName_AllKnownPhases\n");
+    std::cout << std::format("[TEST] BenchmarkLogger_BenchPhaseName_AllKnownPhases\n");
     EXPECT_STREQ(hq::bench_phase_name(hq::BenchPhase::CAMPAIGN_START),    "CAMPAIGN_START");
     EXPECT_STREQ(hq::bench_phase_name(hq::BenchPhase::CAMPAIGN_END),      "CAMPAIGN_END");
     EXPECT_STREQ(hq::bench_phase_name(hq::BenchPhase::ENCODE_START),      "ENCODE_START");
@@ -3336,11 +3336,11 @@ TEST_F(BenchmarkLoggerTest, BenchPhaseName_AllKnownPhases) {
     EXPECT_STREQ(hq::bench_phase_name(hq::BenchPhase::VAE_END),           "VAE_END");
     EXPECT_STREQ(hq::bench_phase_name(hq::BenchPhase::TIER_MIGRATE),      "TIER_MIGRATE");
     EXPECT_STREQ(hq::bench_phase_name(hq::BenchPhase::OVERHEAD_PROBE),    "OVERHEAD_PROBE");
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 TEST_F(BenchmarkLoggerTest, ExportCSV_CreatesFile) {
-    std::print("[TEST] BenchmarkLogger_ExportCSV_CreatesFile\n");
+    std::cout << std::format("[TEST] BenchmarkLogger_ExportCSV_CreatesFile\n");
     hq::BenchmarkLogger logger(64);
     logger.record(hq::BenchPhase::ITER_START, 0);
     logger.record(hq::BenchPhase::ITER_END,   0, 5'000'000ULL);
@@ -3351,11 +3351,11 @@ TEST_F(BenchmarkLoggerTest, ExportCSV_CreatesFile) {
     EXPECT_TRUE(ok.has_value()) << "export_csv() must succeed";
     EXPECT_TRUE(fs::exists(tmp)) << "CSV file must exist after export";
     if (fs::exists(tmp)) fs::remove(tmp);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 TEST_F(BenchmarkLoggerTest, ExportJSON_CreatesFile) {
-    std::print("[TEST] BenchmarkLogger_ExportJSON_CreatesFile\n");
+    std::cout << std::format("[TEST] BenchmarkLogger_ExportJSON_CreatesFile\n");
     hq::BenchmarkLogger logger(64);
     logger.record(hq::BenchPhase::CAMPAIGN_START, 0);
     logger.record(hq::BenchPhase::CAMPAIGN_END,   0, 100'000'000ULL);
@@ -3366,7 +3366,7 @@ TEST_F(BenchmarkLoggerTest, ExportJSON_CreatesFile) {
     EXPECT_TRUE(ok.has_value()) << "export_json() must succeed";
     EXPECT_TRUE(fs::exists(tmp)) << "JSON file must exist after export";
     if (fs::exists(tmp)) fs::remove(tmp);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // ===========================================================================
@@ -3389,7 +3389,7 @@ protected:
 // Test 1: TensorView<T,Rank> — rank-1 round-trip write/read via flat_span
 // ---------------------------------------------------------------------------
 TEST_F(Round12EvidenceTest, TensorView_Rank1_WriteReadRoundTrip) {
-    std::print("[TEST] TensorView_Rank1_WriteReadRoundTrip\n");
+    std::cout << std::format("[TEST] TensorView_Rank1_WriteReadRoundTrip\n");
     constexpr std::size_t N = 256;
     std::vector<float> buf(N);
     hq::tensor::Tensor1D<float> tv(buf.data(), N);
@@ -3402,14 +3402,14 @@ TEST_F(Round12EvidenceTest, TensorView_Rank1_WriteReadRoundTrip) {
     EXPECT_TRUE(ok);
     EXPECT_EQ(tv.num_elements(), N);
     EXPECT_TRUE(tv.is_contiguous());
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // ---------------------------------------------------------------------------
 // Test 2: TensorView<T,4> — 4D shape/extent/strides correctness
 // ---------------------------------------------------------------------------
 TEST_F(Round12EvidenceTest, TensorView_Rank4_ShapeExtentStrides) {
-    std::print("[TEST] TensorView_Rank4_ShapeExtentStrides\n");
+    std::cout << std::format("[TEST] TensorView_Rank4_ShapeExtentStrides\n");
     constexpr std::size_t N=1, C=4, H=8, W=8;
     std::vector<float> buf(N*C*H*W, 0.0f);
     hq::tensor::FloatTensor4D tv(buf.data(), N, C, H, W);
@@ -3424,14 +3424,14 @@ TEST_F(Round12EvidenceTest, TensorView_Rank4_ShapeExtentStrides) {
     EXPECT_EQ(tv.stride(1), H*W);
     EXPECT_EQ(tv.stride(0), C*H*W);
     EXPECT_TRUE(tv.is_contiguous());
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // ---------------------------------------------------------------------------
 // Test 3: TensorView<const T> — read-only view from non-const buffer
 // ---------------------------------------------------------------------------
 TEST_F(Round12EvidenceTest, TensorView_ConstView_ReadOnly) {
-    std::print("[TEST] TensorView_ConstView_ReadOnly\n");
+    std::cout << std::format("[TEST] TensorView_ConstView_ReadOnly\n");
     std::vector<float> buf = {1.0f, 2.0f, 3.0f, 4.0f};
     hq::tensor::Tensor1D<const float> cv(buf.data(), buf.size());
 
@@ -3442,14 +3442,14 @@ TEST_F(Round12EvidenceTest, TensorView_ConstView_ReadOnly) {
     // flat_span() on const-T view returns read-only span
     auto sp = cv.flat_span();
     EXPECT_EQ(sp.size(), 4);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // ---------------------------------------------------------------------------
 // Test 4: TieredMemoryManager — alloc + write + free data integrity
 // ---------------------------------------------------------------------------
 TEST_F(Round12EvidenceTest, TMM_AllocWriteRead_DataIntegrity) {
-    std::print("[TEST] TMM_AllocWriteRead_DataIntegrity\n");
+    std::cout << std::format("[TEST] TMM_AllocWriteRead_DataIntegrity\n");
     hq::TieredMemoryManager mgr{hq::TieredMemoryConfig{}};
     constexpr std::size_t N = 1024;
 
@@ -3466,14 +3466,14 @@ TEST_F(Round12EvidenceTest, TMM_AllocWriteRead_DataIntegrity) {
     for (std::size_t i = 0; i < N; ++i)
         ok = ok && (ptr[i] == static_cast<float>(i) * 0.5f);
     EXPECT_TRUE(ok) << "All written floats must read back correctly";
-    std::print("[TEST] PASSED (Cool-tier alloc + write + readback OK)\n");
+    std::cout << std::format("[TEST] PASSED (Cool-tier alloc + write + readback OK)\n");
 }
 
 // ---------------------------------------------------------------------------
 // Test 5: TieredMemoryManager — checkpoint save/restore round-trip
 // ---------------------------------------------------------------------------
 TEST_F(Round12EvidenceTest, TMM_Checkpoint_SaveRestoreRoundTrip) {
-    std::print("[TEST] TMM_Checkpoint_SaveRestoreRoundTrip\n");
+    std::cout << std::format("[TEST] TMM_Checkpoint_SaveRestoreRoundTrip\n");
     hq::TieredMemoryManager mgr{hq::TieredMemoryConfig{}};
     constexpr std::size_t N = 512;
 
@@ -3504,14 +3504,14 @@ TEST_F(Round12EvidenceTest, TMM_Checkpoint_SaveRestoreRoundTrip) {
     for (std::size_t i = 0; i < N; ++i)
         ok = ok && (latents[i] == static_cast<float>(i));
     EXPECT_TRUE(ok) << "Checkpoint restore must recover original latent values";
-    std::print("[TEST] PASSED (checkpoint save/restore round-trip OK)\n");
+    std::cout << std::format("[TEST] PASSED (checkpoint save/restore round-trip OK)\n");
 }
 
 // ---------------------------------------------------------------------------
 // Test 6: TieredMemoryManager — two separate allocations don't overlap
 // ---------------------------------------------------------------------------
 TEST_F(Round12EvidenceTest, TMM_TwoAllocations_NoOverlap) {
-    std::print("[TEST] TMM_TwoAllocations_NoOverlap\n");
+    std::cout << std::format("[TEST] TMM_TwoAllocations_NoOverlap\n");
     hq::TieredMemoryManager mgr{hq::TieredMemoryConfig{}};
     constexpr std::size_t N = 256;
 
@@ -3531,27 +3531,27 @@ TEST_F(Round12EvidenceTest, TMM_TwoAllocations_NoOverlap) {
     std::fill(pb, pb + N, 2.0f);
     EXPECT_FLOAT_EQ(pa[0], 1.0f);
     EXPECT_FLOAT_EQ(pb[0], 2.0f);
-    std::print("[TEST] PASSED (two Cool-tier allocations do not overlap)\n");
+    std::cout << std::format("[TEST] PASSED (two Cool-tier allocations do not overlap)\n");
 }
 
 // ---------------------------------------------------------------------------
 // Test 7: NpuBackend concept — all encoder types satisfy it
 // ---------------------------------------------------------------------------
 TEST_F(Round12EvidenceTest, NpuBackend_Concept_AllTypesSatisfied) {
-    std::print("[TEST] NpuBackend_Concept_AllTypesSatisfied\n");
+    std::cout << std::format("[TEST] NpuBackend_Concept_AllTypesSatisfied\n");
     // Compile-time proof that the remaining three encoder types satisfy NpuBackend<T>.
     static_assert(hq::npu::NpuBackend<hq::npu::Hailo8lEncoder>);
     static_assert(hq::npu::NpuBackend<hq::npu::CpuFallbackEncoder>);
     static_assert(hq::npu::NpuBackend<hq::npu::WindowsNpuBackend>);
     SUCCEED() << "All 3 NPU backend types satisfy NpuBackend<T> at compile time";
-    std::print("[TEST] PASSED (3 backend types satisfy NpuBackend<T>)\n");
+    std::cout << std::format("[TEST] PASSED (3 backend types satisfy NpuBackend<T>)\n");
 }
 
 // ---------------------------------------------------------------------------
 // Test 8: WindowsNpuBackend stub — is_available() false, encode() returns error
 // ---------------------------------------------------------------------------
 TEST_F(Round12EvidenceTest, WindowsNpuBackend_StubBehavior) {
-    std::print("[TEST] WindowsNpuBackend_StubBehavior\n");
+    std::cout << std::format("[TEST] WindowsNpuBackend_StubBehavior\n");
     hq::npu::WindowsNpuBackend backend;
     EXPECT_FALSE(backend.is_available()) << "Stub must report unavailable";
     EXPECT_EQ(backend.utilization(), 0.0f);
@@ -3563,14 +3563,14 @@ TEST_F(Round12EvidenceTest, WindowsNpuBackend_StubBehavior) {
     auto result = backend.encode(req);
     EXPECT_FALSE(result.has_value()) << "Stub encode() must return error";
     EXPECT_FALSE(result.error().empty()) << "Error message must not be empty";
-    std::print("[TEST] PASSED (WindowsNpuBackend stub behaves correctly)\n");
+    std::cout << std::format("[TEST] PASSED (WindowsNpuBackend stub behaves correctly)\n");
 }
 
 // ---------------------------------------------------------------------------
 // Test 9: make_npu_backend<T>() — factory creates correct concrete type
 // ---------------------------------------------------------------------------
 TEST_F(Round12EvidenceTest, MakeNpuBackend_Factory_ReturnsCorrectType) {
-    std::print("[TEST] MakeNpuBackend_Factory_ReturnsCorrectType\n");
+    std::cout << std::format("[TEST] MakeNpuBackend_Factory_ReturnsCorrectType\n");
     auto enc = hq::npu::make_npu_backend<hq::npu::CpuFallbackEncoder>(nullptr, nullptr);
     ASSERT_NE(enc, nullptr);
     EXPECT_FALSE(enc->is_available());
@@ -3579,14 +3579,14 @@ TEST_F(Round12EvidenceTest, MakeNpuBackend_Factory_ReturnsCorrectType) {
     auto win = hq::npu::make_npu_backend<hq::npu::WindowsNpuBackend>();
     ASSERT_NE(win, nullptr);
     EXPECT_FALSE(win->is_available());
-    std::print("[TEST] PASSED (make_npu_backend<T> factory produces correct types)\n");
+    std::cout << std::format("[TEST] PASSED (make_npu_backend<T> factory produces correct types)\n");
 }
 
 // ---------------------------------------------------------------------------
 // Test 10: Watchdog recovery stress — repeated low-util triggers count
 // ---------------------------------------------------------------------------
 TEST_F(Round12EvidenceTest, Watchdog_RepeatedLowUtil_RecoveryCount) {
-    std::print("[TEST] Watchdog_RepeatedLowUtil_RecoveryCount\n");
+    std::cout << std::format("[TEST] Watchdog_RepeatedLowUtil_RecoveryCount\n");
     int recovery_count = 0;
 
     hq::WatchdogConfig cfg{
@@ -3627,7 +3627,7 @@ TEST_F(Round12EvidenceTest, Watchdog_RepeatedLowUtil_RecoveryCount) {
 
     EXPECT_GT(recovery_count, 0)
         << "At least one recovery must be triggered by sustained low GPU util";
-    std::print("[TEST] PASSED (recovery_count={} after 10 low-util steps)\n",
+    std::cout << std::format("[TEST] PASSED (recovery_count={} after 10 low-util steps)\n",
                recovery_count);
 }
 
@@ -3635,7 +3635,7 @@ TEST_F(Round12EvidenceTest, Watchdog_RepeatedLowUtil_RecoveryCount) {
 // Test 11: BenchmarkLogger std::expected export — error path
 // ---------------------------------------------------------------------------
 TEST_F(Round12EvidenceTest, BenchmarkLogger_ExportErrorPath) {
-    std::print("[TEST] BenchmarkLogger_ExportErrorPath\n");
+    std::cout << std::format("[TEST] BenchmarkLogger_ExportErrorPath\n");
     hq::BenchmarkLogger logger(16);
     logger.record(hq::BenchPhase::ENCODE_START, 0, 1000ULL);
 
@@ -3645,14 +3645,14 @@ TEST_F(Round12EvidenceTest, BenchmarkLogger_ExportErrorPath) {
     EXPECT_FALSE(result.has_value())
         << "export_json() to invalid path must return error";
     EXPECT_TRUE(result.error()) << "error_code must be non-zero";
-    std::print("[TEST] PASSED (export to invalid path returns error_code)\n");
+    std::cout << std::format("[TEST] PASSED (export to invalid path returns error_code)\n");
 }
 
 // ---------------------------------------------------------------------------
 // Test 12: TensorView + TMM — construct FloatTensor4D over TMM buffer
 // ---------------------------------------------------------------------------
 TEST_F(Round12EvidenceTest, TensorView_TMM_Integration) {
-    std::print("[TEST] TensorView_TMM_Integration\n");
+    std::cout << std::format("[TEST] TensorView_TMM_Integration\n");
     hq::TieredMemoryManager mgr{hq::TieredMemoryConfig{}};
 
     // Simulate latent allocation: [1, 4, 8, 8] = 256 floats
@@ -3677,7 +3677,7 @@ TEST_F(Round12EvidenceTest, TensorView_TMM_Integration) {
     for (std::size_t i = 0; i < N_floats; ++i)
         ok = ok && (raw[i] == 3.14f);
     EXPECT_TRUE(ok) << "TensorView writes must be visible via raw TMM pointer";
-    std::print("[TEST] PASSED (TensorView + TMM integration: fill via view, verify via raw ptr)\n");
+    std::cout << std::format("[TEST] PASSED (TensorView + TMM integration: fill via view, verify via raw ptr)\n");
 }
 
 // ===========================================================================
@@ -3694,7 +3694,7 @@ public:
 
 // Test 1: step() TensorView API — valid step returns has_value()=true
 TEST_F(Round13EvidenceTest, DEISScheduler_StepExpected_ValidStep_HasValue) {
-    std::print("[TEST] DEISScheduler_StepExpected_ValidStep_HasValue\n");
+    std::cout << std::format("[TEST] DEISScheduler_StepExpected_ValidStep_HasValue\n");
     hq::DEISScheduler sched(hq::SchedulerConfig{}, 10);
     float lat[16]{};
     float mdl[16]{};
@@ -3703,12 +3703,12 @@ TEST_F(Round13EvidenceTest, DEISScheduler_StepExpected_ValidStep_HasValue) {
     auto r = sched.step(hq::tensor::FloatTensor4D{lat, 1, 1, 1, 16},
                         hq::tensor::Tensor1D<const float>{mdl, 16}, 0);
     EXPECT_TRUE(r.has_value()) << "Valid step must succeed";
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // Test 2: step() TensorView API — OOB step returns StepOutOfRange error
 TEST_F(Round13EvidenceTest, DEISScheduler_StepExpected_OutOfRange_Error) {
-    std::print("[TEST] DEISScheduler_StepExpected_OutOfRange_Error\n");
+    std::cout << std::format("[TEST] DEISScheduler_StepExpected_OutOfRange_Error\n");
     hq::DEISScheduler sched(hq::SchedulerConfig{}, 5);
     float lat[4]{1.0f, 2.0f, 3.0f, 4.0f};
     float mdl[4]{0.0f};
@@ -3719,12 +3719,12 @@ TEST_F(Round13EvidenceTest, DEISScheduler_StepExpected_OutOfRange_Error) {
     // Latents must be unchanged on error
     EXPECT_FLOAT_EQ(lat[0], 1.0f);
     EXPECT_FLOAT_EQ(lat[3], 4.0f);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // Test 3: step() math correctness — [1,4,1,1] shape, verify DEIS update formula
 TEST_F(Round13EvidenceTest, DEISScheduler_StepExpected_MathCorrectness_4D) {
-    std::print("[TEST] DEISScheduler_StepExpected_MathCorrectness_4D\n");
+    std::cout << std::format("[TEST] DEISScheduler_StepExpected_MathCorrectness_4D\n");
     hq::DEISScheduler sched(hq::SchedulerConfig{}, 4);
     float cx0, ceps;
     sched.get_step_coeffs(0, &cx0, &ceps);
@@ -3742,12 +3742,12 @@ TEST_F(Round13EvidenceTest, DEISScheduler_StepExpected_MathCorrectness_4D) {
     ASSERT_TRUE(r.has_value());
     for (int i = 0; i < 4; ++i)
         EXPECT_NEAR(lat[i], expected[i], 1e-4f);
-    std::print("[TEST] PASSED (cx0={:.4f} ceps={:.4f})\n", cx0, ceps);
+    std::cout << std::format("[TEST] PASSED (cx0={:.4f} ceps={:.4f})\n", cx0, ceps);
 }
 
 // Test 4: step() min-count safety — Tensor1D smaller than latents is safe
 TEST_F(Round13EvidenceTest, DEISScheduler_StepExpected_MinCountSafety) {
-    std::print("[TEST] DEISScheduler_StepExpected_MinCountSafety\n");
+    std::cout << std::format("[TEST] DEISScheduler_StepExpected_MinCountSafety\n");
     hq::DEISScheduler sched(hq::SchedulerConfig{}, 4);
     float lat[8] = {1,2,3,4,5,6,7,8};
     const float mdl[4] = {0,0,0,0};
@@ -3755,12 +3755,12 @@ TEST_F(Round13EvidenceTest, DEISScheduler_StepExpected_MinCountSafety) {
     auto r = sched.step(hq::tensor::FloatTensor4D{lat, 1, 1, 2, 4},
                         hq::tensor::Tensor1D<const float>{mdl, 4}, 0);
     EXPECT_TRUE(r.has_value()) << "min-count safety must not crash";
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // Test 5: complete multi-step cycle — all 5 steps return has_value()=true
 TEST_F(Round13EvidenceTest, DEISScheduler_MultiStep_AllExpectedSucceed) {
-    std::print("[TEST] DEISScheduler_MultiStep_AllExpectedSucceed\n");
+    std::cout << std::format("[TEST] DEISScheduler_MultiStep_AllExpectedSucceed\n");
     hq::DEISScheduler sched(hq::SchedulerConfig{}, 5);
     float lat[16]; std::fill(lat, lat + 16, 1.0f);
     float mdl[16]; std::fill(mdl, mdl + 16, 0.3f);
@@ -3769,42 +3769,42 @@ TEST_F(Round13EvidenceTest, DEISScheduler_MultiStep_AllExpectedSucceed) {
                             hq::tensor::Tensor1D<const float>{mdl, 16}, s);
         EXPECT_TRUE(r.has_value()) << "Step " << s << " must succeed";
     }
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // Test 6: SchedulerError to_string() covers all enum values
 TEST_F(Round13EvidenceTest, SchedulerError_ToString_Coverage) {
-    std::print("[TEST] SchedulerError_ToString_Coverage\n");
+    std::cout << std::format("[TEST] SchedulerError_ToString_Coverage\n");
     EXPECT_EQ(hq::to_string(hq::SchedulerError::NotPrecomputed),
               "NotPrecomputed");
     EXPECT_EQ(hq::to_string(hq::SchedulerError::StepOutOfRange),
               "StepOutOfRange");
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // Test 7: WindowsNpuBackend — probe_result().reason is never empty
 TEST_F(Round13EvidenceTest, WindowsNpuBackend_Probe_ReasonNonEmpty) {
-    std::print("[TEST] WindowsNpuBackend_Probe_ReasonNonEmpty\n");
+    std::cout << std::format("[TEST] WindowsNpuBackend_Probe_ReasonNonEmpty\n");
     hq::npu::WindowsNpuBackend backend;
     const auto& probe = backend.probe_result();
     EXPECT_FALSE(probe.reason.empty())
         << "ProbeResult::reason must always describe availability state";
-    std::print("[TEST] PASSED (reason=\"{}\")\n", probe.reason);
+    std::cout << std::format("[TEST] PASSED (reason=\"{}\")\n", probe.reason);
 }
 
 // Test 8: WindowsNpuBackend — directml_ep_linked=false on non-DML builds
 TEST_F(Round13EvidenceTest, WindowsNpuBackend_Probe_DirectML_False) {
-    std::print("[TEST] WindowsNpuBackend_Probe_DirectML_False\n");
+    std::cout << std::format("[TEST] WindowsNpuBackend_Probe_DirectML_False\n");
     hq::npu::WindowsNpuBackend backend;
     // ONNXRUNTIME_DML_EP_AVAILABLE is not defined in this build
     EXPECT_FALSE(backend.probe_result().directml_ep_linked);
     EXPECT_FALSE(backend.is_available());
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // Test 9: WindowsNpuBackend — encode() error message contains probe reason
 TEST_F(Round13EvidenceTest, WindowsNpuBackend_Encode_ContainsProbeReason) {
-    std::print("[TEST] WindowsNpuBackend_Encode_ContainsProbeReason\n");
+    std::cout << std::format("[TEST] WindowsNpuBackend_Encode_ContainsProbeReason\n");
     hq::npu::WindowsNpuBackend backend;
     hq::npu::NpuEncodeRequest req{};
     auto result = backend.encode(req);
@@ -3814,12 +3814,12 @@ TEST_F(Round13EvidenceTest, WindowsNpuBackend_Encode_ContainsProbeReason) {
     EXPECT_NE(err.find(reason), std::string::npos)
         << "encode() error must embed the probe reason: err=\"" << err
         << "\" reason=\"" << reason << "\"";
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // Test 10: WindowsNpuBackend — probe_result() accessor returns consistent data
 TEST_F(Round13EvidenceTest, WindowsNpuBackend_ProbeResult_Accessor_Consistent) {
-    std::print("[TEST] WindowsNpuBackend_ProbeResult_Accessor_Consistent\n");
+    std::cout << std::format("[TEST] WindowsNpuBackend_ProbeResult_Accessor_Consistent\n");
     hq::npu::WindowsNpuBackend b;
     // Probe data must be consistent between is_available() and probe_result()
     EXPECT_EQ(b.is_available(), b.probe_result().directml_ep_linked);
@@ -3829,12 +3829,12 @@ TEST_F(Round13EvidenceTest, WindowsNpuBackend_ProbeResult_Accessor_Consistent) {
     } else {
         EXPECT_NE(b.name().find("stub"), std::string::npos);
     }
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // Test 11: full [1,4,8,8] latent shape through scheduler — realistic size
 TEST_F(Round13EvidenceTest, DEISScheduler_FullLatentShape_256Elements) {
-    std::print("[TEST] DEISScheduler_FullLatentShape_256Elements\n");
+    std::cout << std::format("[TEST] DEISScheduler_FullLatentShape_256Elements\n");
     hq::DEISScheduler sched(hq::SchedulerConfig{}, 20);
 
     constexpr std::size_t N = 1 * 4 * 8 * 8;  // 256 floats
@@ -3854,12 +3854,12 @@ TEST_F(Round13EvidenceTest, DEISScheduler_FullLatentShape_256Elements) {
         if (s == 0) { EXPECT_TRUE(changed)
             << "Latents must be modified by scheduler at step 0"; }
     }
-    std::print("[TEST] PASSED (256-element latent, 3 DEIS steps)\n");
+    std::cout << std::format("[TEST] PASSED (256-element latent, 3 DEIS steps)\n");
 }
 
 // Test 12: NpuBackend concept — WindowsNpuBackend with probe still satisfies concept
 TEST_F(Round13EvidenceTest, WindowsNpuBackend_WithProbe_SatisfiesConcept) {
-    std::print("[TEST] WindowsNpuBackend_WithProbe_SatisfiesConcept\n");
+    std::cout << std::format("[TEST] WindowsNpuBackend_WithProbe_SatisfiesConcept\n");
     // Compile-time proof: static_assert at namespace scope (npu_backend.hpp)
     // Runtime proof: backend with probe fields still satisfies all concept requirements
     hq::npu::WindowsNpuBackend backend;
@@ -3872,7 +3872,7 @@ TEST_F(Round13EvidenceTest, WindowsNpuBackend_WithProbe_SatisfiesConcept) {
     (void)backend.is_available();
     // If any of the above failed to compile, this test would not exist.
     SUCCEED() << "WindowsNpuBackend with ProbeResult satisfies NpuBackend<T>";
-    std::print("[TEST] PASSED (concept satisfied with probe fields)\n");
+    std::cout << std::format("[TEST] PASSED (concept satisfied with probe fields)\n");
 }
 
 // ===========================================================================
@@ -3883,47 +3883,47 @@ TEST_F(Round13EvidenceTest, WindowsNpuBackend_WithProbe_SatisfiesConcept) {
 class Round14EvidenceTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        std::print("[TEST] Round14EvidenceTest setup\n");
+        std::cout << std::format("[TEST] Round14EvidenceTest setup\n");
     }
 };
 
 // Test 1: HIPGraphDenoiser accepts std::span<const float> — no vector copy needed
 TEST_F(Round14EvidenceTest, HIPGraphDenoiser_SpanAPI_AcceptsSpan) {
-    std::print("[TEST] HIPGraphDenoiser_SpanAPI_AcceptsSpan\n");
+    std::cout << std::format("[TEST] HIPGraphDenoiser_SpanAPI_AcceptsSpan\n");
     // Verify span overloads compile and are callable (HIP unavailable on this host,
     // so we check the non-HIP path via execute_full with invalid session)
     std::vector<float> emb_data(77 * 768, 0.1f);
     std::span<const float> emb_span{emb_data};
     EXPECT_EQ(emb_span.size(), emb_data.size());
     EXPECT_EQ(emb_span.data(), emb_data.data());
-    std::print("[TEST] PASSED (span wraps vector without copy)\n");
+    std::cout << std::format("[TEST] PASSED (span wraps vector without copy)\n");
 }
 
 // Test 2: Span non-owning: data pointer equality
 TEST_F(Round14EvidenceTest, Span_NonOwning_DataPointerEquality) {
-    std::print("[TEST] Span_NonOwning_DataPointerEquality\n");
+    std::cout << std::format("[TEST] Span_NonOwning_DataPointerEquality\n");
     std::vector<float> buf(256, 1.0f);
     float* raw = buf.data();
     std::span<const float> sp{buf.data(), buf.size()};
     EXPECT_EQ(sp.data(), raw) << "span must not copy; data pointer must match";
     EXPECT_EQ(sp.size(), buf.size());
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // Test 3: WindowsNpuBackend name() no longer contains "stub"
 TEST_F(Round14EvidenceTest, WindowsNpuBackend_Name_NoStubWord) {
-    std::print("[TEST] WindowsNpuBackend_Name_NoStubWord\n");
+    std::cout << std::format("[TEST] WindowsNpuBackend_Name_NoStubWord\n");
     hq::npu::WindowsNpuBackend backend;
     const std::string n = backend.name();
     EXPECT_EQ(n.find("stub"), std::string::npos)
         << "name() must not contain 'stub'; got: " << n;
     EXPECT_FALSE(n.empty());
-    std::print("[TEST] PASSED (name='{}', no 'stub' word)\n", n);
+    std::cout << std::format("[TEST] PASSED (name='{}', no 'stub' word)\n", n);
 }
 
 // Test 5: DEISScheduler memory layout — precomputed table sizes match
 TEST_F(Round14EvidenceTest, DEISScheduler_PrecomputedTables_SizeConsistency) {
-    std::print("[TEST] DEISScheduler_PrecomputedTables_SizeConsistency\n");
+    std::cout << std::format("[TEST] DEISScheduler_PrecomputedTables_SizeConsistency\n");
     hq::SchedulerConfig cfg;
     hq::DEISScheduler sched{cfg, 10};
     EXPECT_EQ(sched.alphas_cumprod().size(), cfg.num_train_timesteps);
@@ -3935,12 +3935,12 @@ TEST_F(Round14EvidenceTest, DEISScheduler_PrecomputedTables_SizeConsistency) {
         EXPECT_TRUE(std::isfinite(cx0))  << "coeff_x0 must be finite at step " << i;
         EXPECT_TRUE(std::isfinite(ceps)) << "coeff_eps must be finite at step " << i;
     }
-    std::print("[TEST] PASSED (10-step scheduler tables all finite)\n");
+    std::cout << std::format("[TEST] PASSED (10-step scheduler tables all finite)\n");
 }
 
 // Test 6: Latent checkpoint round-trip integrity — memcpy to/from TMM
 TEST_F(Round14EvidenceTest, LatentCheckpoint_RoundTrip_DataIntegrity) {
-    std::print("[TEST] LatentCheckpoint_RoundTrip_DataIntegrity\n");
+    std::cout << std::format("[TEST] LatentCheckpoint_RoundTrip_DataIntegrity\n");
     // Simulate the checkpoint save/restore pattern without a full pipeline
     constexpr std::size_t N = 256;
     std::vector<float> latents_orig(N);
@@ -3962,12 +3962,12 @@ TEST_F(Round14EvidenceTest, LatentCheckpoint_RoundTrip_DataIntegrity) {
         EXPECT_FLOAT_EQ(latents_restored[i], latents_orig[i])
             << "Checkpoint round-trip failed at index " << i;
     }
-    std::print("[TEST] PASSED (256-element checkpoint round-trip exact)\n");
+    std::cout << std::format("[TEST] PASSED (256-element checkpoint round-trip exact)\n");
 }
 
 // Test 7: Recovery round-trip — partial restore (min of checkpoint vs latent size)
 TEST_F(Round14EvidenceTest, LatentCheckpoint_PartialRestore_MinCount) {
-    std::print("[TEST] LatentCheckpoint_PartialRestore_MinCount\n");
+    std::cout << std::format("[TEST] LatentCheckpoint_PartialRestore_MinCount\n");
     constexpr std::size_t CKPT_N = 128;
     constexpr std::size_t LAT_N  = 256;
     std::vector<float> checkpoint(CKPT_N);
@@ -3984,12 +3984,12 @@ TEST_F(Round14EvidenceTest, LatentCheckpoint_PartialRestore_MinCount) {
     // Remaining elements untouched
     for (std::size_t i = restore_n; i < LAT_N; ++i)
         EXPECT_FLOAT_EQ(latents[i], -1.0f);
-    std::print("[TEST] PASSED (partial restore: min({},{})={})\n", CKPT_N, LAT_N, restore_n);
+    std::cout << std::format("[TEST] PASSED (partial restore: min({},{})={})\n", CKPT_N, LAT_N, restore_n);
 }
 
 // Test 8: std::expected error propagation chain — SchedulerError surfaces correctly
 TEST_F(Round14EvidenceTest, ExpectedChain_SchedulerError_Surfaces) {
-    std::print("[TEST] ExpectedChain_SchedulerError_Surfaces\n");
+    std::cout << std::format("[TEST] ExpectedChain_SchedulerError_Surfaces\n");
     hq::SchedulerConfig cfg;
     hq::DEISScheduler sched{cfg, 5};
     std::vector<float> lat(4, 1.0f);
@@ -4007,21 +4007,21 @@ TEST_F(Round14EvidenceTest, ExpectedChain_SchedulerError_Surfaces) {
         hq::tensor::Tensor1D<const float>{mdl.data(), 4}, 999);
     EXPECT_FALSE(err.has_value());
     EXPECT_EQ(err.error(), hq::SchedulerError::StepOutOfRange);
-    std::print("[TEST] PASSED (expected chain propagates StepOutOfRange)\n");
+    std::cout << std::format("[TEST] PASSED (expected chain propagates StepOutOfRange)\n");
 }
 
 // Test 9: NpuBackend concept — all 3 remaining backends satisfy it at compile time
 TEST_F(Round14EvidenceTest, NpuBackend_Concept_AllThreeBackends) {
-    std::print("[TEST] NpuBackend_Concept_AllThreeBackends\n");
+    std::cout << std::format("[TEST] NpuBackend_Concept_AllThreeBackends\n");
     static_assert(hq::npu::NpuBackend<hq::npu::Hailo8lEncoder>,       "Hailo8lEncoder");
     static_assert(hq::npu::NpuBackend<hq::npu::CpuFallbackEncoder>,   "CpuFallbackEncoder");
     static_assert(hq::npu::NpuBackend<hq::npu::WindowsNpuBackend>,    "WindowsNpuBackend");
-    std::print("[TEST] PASSED (3 static_assert proofs)\n");
+    std::cout << std::format("[TEST] PASSED (3 static_assert proofs)\n");
 }
 
 // Test 10: Span from raw TMM pointer — verify construction without copy
 TEST_F(Round14EvidenceTest, SpanFromRawPointer_NoCopy) {
-    std::print("[TEST] SpanFromRawPointer_NoCopy\n");
+    std::cout << std::format("[TEST] SpanFromRawPointer_NoCopy\n");
     constexpr std::size_t N = 64;
     alignas(alignof(float)) std::byte storage[N * sizeof(float)];
     float* raw = reinterpret_cast<float*>(storage);
@@ -4033,12 +4033,12 @@ TEST_F(Round14EvidenceTest, SpanFromRawPointer_NoCopy) {
     float sum = 0.0f;
     for (auto v : sp) sum += v;
     EXPECT_FLOAT_EQ(sum, static_cast<float>(N * (N - 1)) / 2.0f);
-    std::print("[TEST] PASSED (span from raw pointer, sum={})\n", sum);
+    std::cout << std::format("[TEST] PASSED (span from raw pointer, sum={})\n", sum);
 }
 
 // Test 11: TensorView + span interop — extract span from FloatTensor4D
 TEST_F(Round14EvidenceTest, TensorView_Span_Interop) {
-    std::print("[TEST] TensorView_Span_Interop\n");
+    std::cout << std::format("[TEST] TensorView_Span_Interop\n");
     std::vector<float> buf(1 * 4 * 8 * 8, 2.0f);
     hq::tensor::FloatTensor4D tv{buf.data(), 1, 4, 8, 8};
     EXPECT_EQ(tv.num_elements(), 256u);
@@ -4051,12 +4051,12 @@ TEST_F(Round14EvidenceTest, TensorView_Span_Interop) {
     float sum = 0.0f;
     for (auto v : sp) sum += v;
     EXPECT_FLOAT_EQ(sum, 512.0f);
-    std::print("[TEST] PASSED (FloatTensor4D → span, sum={})\n", sum);
+    std::cout << std::format("[TEST] PASSED (FloatTensor4D → span, sum={})\n", sum);
 }
 
 // Test 12: Stress — 20 DEISScheduler steps, all expected succeed, coefficients monotone
 TEST_F(Round14EvidenceTest, DEISScheduler_20Steps_AllExpectedSucceed_CoeffsFinite) {
-    std::print("[TEST] DEISScheduler_20Steps_AllExpectedSucceed_CoeffsFinite\n");
+    std::cout << std::format("[TEST] DEISScheduler_20Steps_AllExpectedSucceed_CoeffsFinite\n");
     hq::SchedulerConfig cfg;
     hq::DEISScheduler sched{cfg, 20};
     constexpr std::size_t N = 64;
@@ -4071,7 +4071,7 @@ TEST_F(Round14EvidenceTest, DEISScheduler_20Steps_AllExpectedSucceed_CoeffsFinit
         for (std::size_t i = 0; i < N; ++i)
             ASSERT_TRUE(std::isfinite(lat[i])) << "NaN/Inf at step " << s << " index " << i;
     }
-    std::print("[TEST] PASSED (20 steps, all finite)\n");
+    std::cout << std::format("[TEST] PASSED (20 steps, all finite)\n");
 }
 
 // ===========================================================================
@@ -4083,7 +4083,7 @@ class Round15EvidenceTest : public ::testing::Test {};
 
 // Test 1: ClusterTransport LoopbackUnix start/stop succeeds
 TEST_F(Round15EvidenceTest, ClusterTransport_LoopbackUnix_StartStop) {
-    std::print("[TEST] ClusterTransport_LoopbackUnix_StartStop\n");
+    std::cout << std::format("[TEST] ClusterTransport_LoopbackUnix_StartStop\n");
     hq::cluster::TransportConfig cfg;
     cfg.preferred_link  = hq::cluster::LinkType::LoopbackUnix;
     cfg.this_node_id    = 1;
@@ -4094,12 +4094,12 @@ TEST_F(Round15EvidenceTest, ClusterTransport_LoopbackUnix_StartStop) {
     EXPECT_TRUE(transport.is_running());
     transport.stop();
     EXPECT_FALSE(transport.is_running());
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // Test 2: Worker registration deduplication
 TEST_F(Round15EvidenceTest, ClusterTransport_WorkerRegistration_DuplicatePrevented) {
-    std::print("[TEST] ClusterTransport_WorkerRegistration_DuplicatePrevented\n");
+    std::cout << std::format("[TEST] ClusterTransport_WorkerRegistration_DuplicatePrevented\n");
     hq::cluster::TransportConfig cfg;
     cfg.preferred_link = hq::cluster::LinkType::LoopbackUnix;
     cfg.is_coordinator = true;
@@ -4107,12 +4107,12 @@ TEST_F(Round15EvidenceTest, ClusterTransport_WorkerRegistration_DuplicatePrevent
     hq::cluster::ClusterNode node{.node_id = 42, .reachable = true};
     EXPECT_TRUE(transport.register_worker(node))   << "first register must succeed";
     EXPECT_FALSE(transport.register_worker(node))  << "duplicate must return false";
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // Test 3: select_worker returns NoWorkers when roster is empty
 TEST_F(Round15EvidenceTest, ClusterTransport_SelectWorker_NoWorkers_Error) {
-    std::print("[TEST] ClusterTransport_SelectWorker_NoWorkers_Error\n");
+    std::cout << std::format("[TEST] ClusterTransport_SelectWorker_NoWorkers_Error\n");
     hq::cluster::TransportConfig cfg;
     cfg.preferred_link = hq::cluster::LinkType::LoopbackUnix;
     cfg.is_coordinator = true;
@@ -4120,12 +4120,12 @@ TEST_F(Round15EvidenceTest, ClusterTransport_SelectWorker_NoWorkers_Error) {
     auto r = transport.select_worker();
     ASSERT_FALSE(r.has_value());
     EXPECT_EQ(r.error(), hq::cluster::ClusterError::NoWorkers);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // Test 4: select_worker picks the node with the highest health score
 TEST_F(Round15EvidenceTest, ClusterTransport_SelectWorker_PrefersHighHealth) {
-    std::print("[TEST] ClusterTransport_SelectWorker_PrefersHighHealth\n");
+    std::cout << std::format("[TEST] ClusterTransport_SelectWorker_PrefersHighHealth\n");
     hq::cluster::TransportConfig cfg;
     cfg.preferred_link = hq::cluster::LinkType::LoopbackUnix;
     cfg.is_coordinator = true;
@@ -4136,12 +4136,12 @@ TEST_F(Round15EvidenceTest, ClusterTransport_SelectWorker_PrefersHighHealth) {
     auto r = transport.select_worker();
     ASSERT_TRUE(r.has_value());
     EXPECT_EQ(r->target_node_id, 1u) << "node 1 has highest health (90.0)";
-    std::print("[TEST] PASSED (selected node {})\n", r->target_node_id);
+    std::cout << std::format("[TEST] PASSED (selected node {})\n", r->target_node_id);
 }
 
 // Test 5: unreachable nodes are skipped in select_worker
 TEST_F(Round15EvidenceTest, ClusterTransport_SelectWorker_UnreachableSkipped) {
-    std::print("[TEST] ClusterTransport_SelectWorker_UnreachableSkipped\n");
+    std::cout << std::format("[TEST] ClusterTransport_SelectWorker_UnreachableSkipped\n");
     hq::cluster::TransportConfig cfg;
     cfg.preferred_link = hq::cluster::LinkType::LoopbackUnix;
     cfg.is_coordinator = true;
@@ -4151,13 +4151,13 @@ TEST_F(Round15EvidenceTest, ClusterTransport_SelectWorker_UnreachableSkipped) {
     auto r = transport.select_worker();
     ASSERT_TRUE(r.has_value());
     EXPECT_EQ(r->target_node_id, 11u) << "node 10 is unreachable and must be skipped";
-    std::print("[TEST] PASSED (selected node {}, not unreachable node 10)\n",
+    std::cout << std::format("[TEST] PASSED (selected node {}, not unreachable node 10)\n",
                r->target_node_id);
 }
 
 // Test 6: send() on LoopbackUnix increments stats
 TEST_F(Round15EvidenceTest, ClusterTransport_SendLoopback_StatsTracked) {
-    std::print("[TEST] ClusterTransport_SendLoopback_StatsTracked\n");
+    std::cout << std::format("[TEST] ClusterTransport_SendLoopback_StatsTracked\n");
     hq::cluster::TransportConfig cfg;
     cfg.preferred_link = hq::cluster::LinkType::LoopbackUnix;
     cfg.is_coordinator = true;
@@ -4172,13 +4172,13 @@ TEST_F(Round15EvidenceTest, ClusterTransport_SendLoopback_StatsTracked) {
     const auto s = transport.stats();
     EXPECT_GE(s.messages_sent, 1u);
     EXPECT_GE(s.bytes_sent, sizeof(hq::cluster::MessageHeader));
-    std::print("[TEST] PASSED (messages_sent={} bytes_sent={})\n",
+    std::cout << std::format("[TEST] PASSED (messages_sent={} bytes_sent={})\n",
                s.messages_sent, s.bytes_sent);
 }
 
 // Test 7: collect_telemetry on LoopbackUnix returns neutral default for unknown workers
 TEST_F(Round15EvidenceTest, ClusterTransport_CollectTelemetry_LoopbackDefault) {
-    std::print("[TEST] ClusterTransport_CollectTelemetry_LoopbackDefault\n");
+    std::cout << std::format("[TEST] ClusterTransport_CollectTelemetry_LoopbackDefault\n");
     hq::cluster::TransportConfig cfg;
     cfg.preferred_link = hq::cluster::LinkType::LoopbackUnix;
     cfg.is_coordinator = true;
@@ -4190,22 +4190,22 @@ TEST_F(Round15EvidenceTest, ClusterTransport_CollectTelemetry_LoopbackDefault) {
     ASSERT_EQ(r->size(), 1u);
     EXPECT_EQ((*r)[0].node_id, 7u);
     EXPECT_GT((*r)[0].composite_health, 0.0f) << "default health must be > 0";
-    std::print("[TEST] PASSED (node {} health={:.1f})\n",
+    std::cout << std::format("[TEST] PASSED (node {} health={:.1f})\n",
                (*r)[0].node_id, (*r)[0].composite_health);
 }
 
 // Test 8: MessageHeader is exactly 12 bytes (wire protocol stability)
 TEST_F(Round15EvidenceTest, ClusterTransport_MessageHeader_ExactSize) {
-    std::print("[TEST] ClusterTransport_MessageHeader_ExactSize\n");
+    std::cout << std::format("[TEST] ClusterTransport_MessageHeader_ExactSize\n");
     static_assert(sizeof(hq::cluster::MessageHeader) == 12,
                   "MessageHeader must be exactly 12 bytes");
     EXPECT_EQ(sizeof(hq::cluster::MessageHeader), 12u);
-    std::print("[TEST] PASSED (sizeof(MessageHeader) == 12)\n");
+    std::cout << std::format("[TEST] PASSED (sizeof(MessageHeader) == 12)\n");
 }
 
 // Test 9: stats are all zero on construction (before start)
 TEST_F(Round15EvidenceTest, ClusterTransport_Stats_ZeroOnInit) {
-    std::print("[TEST] ClusterTransport_Stats_ZeroOnInit\n");
+    std::cout << std::format("[TEST] ClusterTransport_Stats_ZeroOnInit\n");
     hq::cluster::TransportConfig cfg;
     cfg.preferred_link = hq::cluster::LinkType::LoopbackUnix;
     hq::cluster::ClusterTransport transport{cfg};
@@ -4217,39 +4217,39 @@ TEST_F(Round15EvidenceTest, ClusterTransport_Stats_ZeroOnInit) {
     EXPECT_EQ(s.send_errors, 0u);
     EXPECT_EQ(s.recv_errors, 0u);
     EXPECT_EQ(s.heartbeats_sent, 0u);
-    std::print("[TEST] PASSED (all stats zero on construction)\n");
+    std::cout << std::format("[TEST] PASSED (all stats zero on construction)\n");
 }
 
 // Test 10: WindowsNpuBackend name() reflects probe result — no "stub", no stray spaces
 TEST_F(Round15EvidenceTest, WindowsNpuBackend_Name_Clean) {
-    std::print("[TEST] WindowsNpuBackend_Name_Clean\n");
+    std::cout << std::format("[TEST] WindowsNpuBackend_Name_Clean\n");
     hq::npu::WindowsNpuBackend backend;
     const std::string n = backend.name();
     EXPECT_EQ(n.find("stub"),           std::string::npos) << "no 'stub'";
     EXPECT_EQ(n.find("placeholder"),    std::string::npos) << "no 'placeholder'";
     EXPECT_FALSE(n.empty()) << "name must not be empty";
     EXPECT_LT(n.size(), 64u)           << "name must be reasonably short";
-    std::print("[TEST] PASSED (name='{}')\n", n);
+    std::cout << std::format("[TEST] PASSED (name='{}')\n", n);
 }
 
 // Test 11: WindowsNpuBackend::encode() returns unexpected when unavailable
 TEST_F(Round15EvidenceTest, WindowsNpuBackend_EncodeUnavailable_ReturnsError) {
-    std::print("[TEST] WindowsNpuBackend_EncodeUnavailable_ReturnsError\n");
+    std::cout << std::format("[TEST] WindowsNpuBackend_EncodeUnavailable_ReturnsError\n");
     hq::npu::WindowsNpuBackend backend;
     if (!backend.is_available()) {
         hq::npu::NpuEncodeRequest req{.prompt = "test", .guidance_scale = 1.0f};
         auto r = backend.encode(req);
         EXPECT_FALSE(r.has_value()) << "unavailable backend must return unexpected";
         EXPECT_FALSE(r.error().empty()) << "error string must not be empty";
-        std::print("[TEST] PASSED (error='{}')\n", r.error());
+        std::cout << std::format("[TEST] PASSED (error='{}')\n", r.error());
     } else {
-        std::print("[TEST] SKIPPED (DirectML EP is available on this build)\n");
+        std::cout << std::format("[TEST] SKIPPED (DirectML EP is available on this build)\n");
     }
 }
 
 // Test 12: NpuBackend concept satisfied by all four backends (compile-time proof)
 TEST_F(Round15EvidenceTest, NpuBackend_AllFour_ConceptSatisfied) {
-    std::print("[TEST] NpuBackend_AllFour_ConceptSatisfied\n");
+    std::cout << std::format("[TEST] NpuBackend_AllFour_ConceptSatisfied\n");
     static_assert(hq::npu::NpuBackend<hq::npu::Hailo8lEncoder>,
                   "Hailo8lEncoder must satisfy NpuBackend");
     static_assert(hq::npu::NpuBackend<hq::npu::CpuFallbackEncoder>,
@@ -4261,7 +4261,7 @@ TEST_F(Round15EvidenceTest, NpuBackend_AllFour_ConceptSatisfied) {
     auto enc = hq::npu::CpuFallbackEncoder(nullptr, nullptr);
     EXPECT_FALSE(enc.name().empty());
     EXPECT_FALSE(hq::npu::WindowsNpuBackend{}.name().empty());
-    std::print("[TEST] PASSED (3 static_asserts + runtime name checks)\n");
+    std::cout << std::format("[TEST] PASSED (3 static_asserts + runtime name checks)\n");
 }
 
 // ===========================================================================
@@ -4273,53 +4273,53 @@ class Round16EvidenceTest : public ::testing::Test {};
 
 // Test 1: updating GPU metrics changes the health score from zero
 TEST_F(Round16EvidenceTest, HealthScore_UpdateGpu_IncreasesScore) {
-    std::print("[TEST] HealthScore_UpdateGpu_IncreasesScore\n");
+    std::cout << std::format("[TEST] HealthScore_UpdateGpu_IncreasesScore\n");
     hq::PipelineHealthScore h1, h2;
     const auto r1 = h1.compute();
     h2.update_gpu(72.5f, 70.0f);
     const auto r2 = h2.compute();
     EXPECT_GE(r2.overall_score, r1.overall_score);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // Test 2: updating Hailo metrics changes the health score
 TEST_F(Round16EvidenceTest, HealthScore_UpdateHailo_IncreasesScore) {
-    std::print("[TEST] HealthScore_UpdateHailo_IncreasesScore\n");
+    std::cout << std::format("[TEST] HealthScore_UpdateHailo_IncreasesScore\n");
     hq::PipelineHealthScore h1, h2;
     const auto r1 = h1.compute();
     h2.update_hailo(84.0f, 40.0f);
     const auto r2 = h2.compute();
     EXPECT_GE(r2.overall_score, r1.overall_score);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // Test 3: score 95 → grade A
 TEST_F(Round16EvidenceTest, HealthScore_GradeBoundary_A) {
-    std::print("[TEST] HealthScore_GradeBoundary_A\n");
+    std::cout << std::format("[TEST] HealthScore_GradeBoundary_A\n");
     EXPECT_EQ(hq::PipelineHealthScore::score_to_grade(95.0f), hq::HealthGrade::A);
     EXPECT_EQ(hq::PipelineHealthScore::score_to_grade(100.0f), hq::HealthGrade::A);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // Test 4: score 82 → grade B
 TEST_F(Round16EvidenceTest, HealthScore_GradeBoundary_B) {
-    std::print("[TEST] HealthScore_GradeBoundary_B\n");
+    std::cout << std::format("[TEST] HealthScore_GradeBoundary_B\n");
     EXPECT_EQ(hq::PipelineHealthScore::score_to_grade(82.0f), hq::HealthGrade::B);
     EXPECT_EQ(hq::PipelineHealthScore::score_to_grade(75.0f), hq::HealthGrade::B);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // Test 5: score 30 → grade F
 TEST_F(Round16EvidenceTest, HealthScore_GradeBoundary_F) {
-    std::print("[TEST] HealthScore_GradeBoundary_F\n");
+    std::cout << std::format("[TEST] HealthScore_GradeBoundary_F\n");
     EXPECT_EQ(hq::PipelineHealthScore::score_to_grade(30.0f), hq::HealthGrade::F);
     EXPECT_EQ(hq::PipelineHealthScore::score_to_grade(0.0f), hq::HealthGrade::F);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // Test 6: grade_name and grade_description return clean, non-empty strings
 TEST_F(Round16EvidenceTest, HealthScore_GradeNames_Clean) {
-    std::print("[TEST] HealthScore_GradeNames_Clean\n");
+    std::cout << std::format("[TEST] HealthScore_GradeNames_Clean\n");
     for (auto g : {hq::HealthGrade::A, hq::HealthGrade::B, hq::HealthGrade::C,
                    hq::HealthGrade::D, hq::HealthGrade::F}) {
         const char* name = hq::PipelineHealthScore::grade_name(g);
@@ -4329,12 +4329,12 @@ TEST_F(Round16EvidenceTest, HealthScore_GradeNames_Clean) {
         EXPECT_GT(std::strlen(name), 0u);
         EXPECT_GT(std::strlen(desc), 0u);
     }
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // Test 7: reset() brings metrics back to initial state
 TEST_F(Round16EvidenceTest, HealthScore_Reset_ClearsMetrics) {
-    std::print("[TEST] HealthScore_Reset_ClearsMetrics\n");
+    std::cout << std::format("[TEST] HealthScore_Reset_ClearsMetrics\n");
     hq::PipelineHealthScore health;
     health.update_gpu(90.0f, 85.0f);
     health.update_hailo(95.0f, 60.0f);
@@ -4342,12 +4342,12 @@ TEST_F(Round16EvidenceTest, HealthScore_Reset_ClearsMetrics) {
     health.reset();
     const float score_after = health.compute().overall_score;
     EXPECT_LT(score_after, score_before);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // Test 8: all sub_scores are in [0, 100] after a full metric update
 TEST_F(Round16EvidenceTest, HealthScore_SubScores_AllInRange) {
-    std::print("[TEST] HealthScore_SubScores_AllInRange\n");
+    std::cout << std::format("[TEST] HealthScore_SubScores_AllInRange\n");
     hq::PipelineHealthScore health;
     health.update_gpu(72.5f, 71.0f);
     health.update_hailo(84.0f, 42.0f);
@@ -4367,12 +4367,12 @@ TEST_F(Round16EvidenceTest, HealthScore_SubScores_AllInRange) {
     EXPECT_LE(r.sub_scores.memory, 100.0f);
     EXPECT_GE(r.sub_scores.stability, 0.0f);
     EXPECT_LE(r.sub_scores.stability, 100.0f);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // Test 9: export_markdown to a temp path succeeds
 TEST_F(Round16EvidenceTest, BenchmarkLogger_ExportMarkdown_Succeeds) {
-    std::print("[TEST] BenchmarkLogger_ExportMarkdown_Succeeds\n");
+    std::cout << std::format("[TEST] BenchmarkLogger_ExportMarkdown_Succeeds\n");
     hq::BenchmarkLogger logger;
     logger.record(hq::BenchPhase::ITER_END, 0, 1234567890ULL);
     logger.record(hq::BenchPhase::ITER_END, 1, 2345678901ULL);
@@ -4380,12 +4380,12 @@ TEST_F(Round16EvidenceTest, BenchmarkLogger_ExportMarkdown_Succeeds) {
     const auto result = logger.export_markdown(path);
     EXPECT_TRUE(result.has_value());
     std::filesystem::remove(path);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // Test 10: exported Markdown file is non-empty and contains expected headers
 TEST_F(Round16EvidenceTest, BenchmarkLogger_ExportMarkdown_ContainsHeaders) {
-    std::print("[TEST] BenchmarkLogger_ExportMarkdown_ContainsHeaders\n");
+    std::cout << std::format("[TEST] BenchmarkLogger_ExportMarkdown_ContainsHeaders\n");
     hq::BenchmarkLogger logger;
     logger.record(hq::BenchPhase::ITER_END, 0, 999999999ULL);
     const auto path = std::filesystem::temp_directory_path() / "cerberus_test_r16_headers.md";
@@ -4398,24 +4398,24 @@ TEST_F(Round16EvidenceTest, BenchmarkLogger_ExportMarkdown_ContainsHeaders) {
     EXPECT_NE(content.find("Phase"), std::string::npos);
     EXPECT_NE(content.find("P50"), std::string::npos);
     std::filesystem::remove(path);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // Test 11: export_markdown on an empty logger succeeds and produces a non-empty file
 TEST_F(Round16EvidenceTest, BenchmarkLogger_ExportMarkdown_EmptyLog_Works) {
-    std::print("[TEST] BenchmarkLogger_ExportMarkdown_EmptyLog_Works\n");
+    std::cout << std::format("[TEST] BenchmarkLogger_ExportMarkdown_EmptyLog_Works\n");
     hq::BenchmarkLogger logger;
     const auto path = std::filesystem::temp_directory_path() / "cerberus_test_r16_empty.md";
     const auto result = logger.export_markdown(path);
     EXPECT_TRUE(result.has_value());
     EXPECT_GT(std::filesystem::file_size(path), 0u);
     std::filesystem::remove(path);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // Test 12: all three export formats (JSON, CSV, Markdown) succeed on the same logger
 TEST_F(Round16EvidenceTest, BenchmarkLogger_AllThreeFormats_AllSucceed) {
-    std::print("[TEST] BenchmarkLogger_AllThreeFormats_AllSucceed\n");
+    std::cout << std::format("[TEST] BenchmarkLogger_AllThreeFormats_AllSucceed\n");
     hq::BenchmarkLogger logger;
     for (std::uint32_t i = 0; i < 5; ++i)
         logger.record(hq::BenchPhase::ITER_END, i, static_cast<std::uint64_t>(i + 1) * 1000000ULL);
@@ -4429,7 +4429,7 @@ TEST_F(Round16EvidenceTest, BenchmarkLogger_AllThreeFormats_AllSucceed) {
     std::filesystem::remove(tmp / "cerberus_r16_all.json");
     std::filesystem::remove(tmp / "cerberus_r16_all.csv");
     std::filesystem::remove(tmp / "cerberus_r16_all.md");
-    std::print("[TEST] PASSED (JSON + CSV + Markdown)\n");
+    std::cout << std::format("[TEST] PASSED (JSON + CSV + Markdown)\n");
 }
 
 // ===========================================================================
@@ -4443,38 +4443,38 @@ protected:
 
 // Test 1: NpuEncoderFactory with null session returns nullptr
 TEST_F(Round17EvidenceTest, NpuEncoderFactory_NullSession_ReturnsNull) {
-    std::print("[TEST] NpuEncoderFactory_NullSession_ReturnsNull\n");
+    std::cout << std::format("[TEST] NpuEncoderFactory_NullSession_ReturnsNull\n");
     auto enc = hq::npu::NpuEncoderFactory::create_best_available(nullptr, nullptr);
     EXPECT_EQ(enc, nullptr)
         << "Factory should return nullptr when no ORT session and no Hailo";
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // Test 2: NpuEncoderFactory with no arguments returns nullptr
 TEST_F(Round17EvidenceTest, NpuEncoderFactory_NoArgs_ReturnsNull) {
-    std::print("[TEST] NpuEncoderFactory_NoArgs_ReturnsNull\n");
+    std::cout << std::format("[TEST] NpuEncoderFactory_NoArgs_ReturnsNull\n");
     auto enc = hq::npu::NpuEncoderFactory::create_best_available();
     EXPECT_EQ(enc, nullptr);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // Test 3: CpuFallbackEncoder with null session has is_available() == false
 TEST_F(Round17EvidenceTest, CpuFallbackEncoder_NullSession_NotAvailable) {
-    std::print("[TEST] CpuFallbackEncoder_NullSession_NotAvailable\n");
+    std::cout << std::format("[TEST] CpuFallbackEncoder_NullSession_NotAvailable\n");
     hq::npu::CpuFallbackEncoder enc(nullptr, nullptr);
     EXPECT_FALSE(enc.is_available());
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // Test 4: CpuFallbackEncoder with null session returns error from encode()
 TEST_F(Round17EvidenceTest, CpuFallbackEncoder_NullSession_EncodeFails) {
-    std::print("[TEST] CpuFallbackEncoder_NullSession_EncodeFails\n");
+    std::cout << std::format("[TEST] CpuFallbackEncoder_NullSession_EncodeFails\n");
     hq::npu::CpuFallbackEncoder enc(nullptr, nullptr);
     hq::npu::NpuEncodeRequest req{};
     req.prompt = "test";
     const auto result = enc.encode(req);
     EXPECT_FALSE(result.has_value());
-    std::print("[TEST] PASSED — error: {}\n", result.has_value() ? "none" : result.error());
+    std::cout << std::format("[TEST] PASSED — error: {}\n", result.has_value() ? "none" : result.error());
 }
 
 // Test 5-8: (removed — SyntheticNpuEncoder deleted)
@@ -4487,7 +4487,7 @@ TEST_F(Round17EvidenceTest, CpuFallbackEncoder_NullSession_EncodeFails) {
 
 // Test 11: INpuEncoder virtual dispatch works via base pointer using CpuFallbackEncoder
 TEST_F(Round17EvidenceTest, INpuEncoder_VirtualDispatch_WorksViaBasePointer) {
-    std::print("[TEST] INpuEncoder_VirtualDispatch_WorksViaBasePointer\n");
+    std::cout << std::format("[TEST] INpuEncoder_VirtualDispatch_WorksViaBasePointer\n");
     std::unique_ptr<hq::npu::INpuEncoder> enc =
         std::make_unique<hq::npu::CpuFallbackEncoder>(nullptr, nullptr);
     EXPECT_FALSE(enc->is_available());
@@ -4495,18 +4495,18 @@ TEST_F(Round17EvidenceTest, INpuEncoder_VirtualDispatch_WorksViaBasePointer) {
     req.prompt = "virtual dispatch test";
     const auto result = enc->encode(req);
     EXPECT_FALSE(result.has_value());
-    std::print("[TEST] PASSED — encoder via base: {}\n", enc->name());
+    std::cout << std::format("[TEST] PASSED — encoder via base: {}\n", enc->name());
 }
 
 // Test 12: NpuEncodeRequest default values match documented contract
 TEST_F(Round17EvidenceTest, NpuEncodeRequest_DefaultValues_Correct) {
-    std::print("[TEST] NpuEncodeRequest_DefaultValues_Correct\n");
+    std::cout << std::format("[TEST] NpuEncodeRequest_DefaultValues_Correct\n");
     hq::npu::NpuEncodeRequest req{};
     EXPECT_EQ(req.width,        std::uint32_t{512});
     EXPECT_EQ(req.height,       std::uint32_t{512});
     EXPECT_EQ(req.num_steps,    std::uint32_t{20});
     EXPECT_EQ(req.max_seq_len,  std::size_t{77});
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // ===========================================================================
@@ -4520,41 +4520,41 @@ protected:
 
 // Test 1: CpuPostProcessor::is_available() returns false
 TEST_F(Round18EvidenceTest, CpuPostProcessor_IsAvailable_False) {
-    std::print("[TEST] CpuPostProcessor_IsAvailable_False\n");
+    std::cout << std::format("[TEST] CpuPostProcessor_IsAvailable_False\n");
     hq::npu::CpuPostProcessor pp;
     EXPECT_FALSE(pp.is_available());
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // Test 2: CpuPostProcessor::name() returns expected string
 TEST_F(Round18EvidenceTest, CpuPostProcessor_Name) {
-    std::print("[TEST] CpuPostProcessor_Name\n");
+    std::cout << std::format("[TEST] CpuPostProcessor_Name\n");
     hq::npu::CpuPostProcessor pp;
     EXPECT_EQ(pp.name(), "CPU-PassThrough");
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // Test 3: CpuPostProcessor::can_handle() returns FALSE — it does not claim NPU capability
 TEST_F(Round18EvidenceTest, CpuPostProcessor_CanHandle_PostProcess) {
-    std::print("[TEST] CpuPostProcessor_CanHandle_PostProcess\n");
+    std::cout << std::format("[TEST] CpuPostProcessor_CanHandle_PostProcess\n");
     hq::npu::CpuPostProcessor pp;
     // CPU pass-through performs NO NPU acceleration; it must not claim capability.
     // The factory selects it as an explicit fallback, not because can_handle() is true.
     EXPECT_FALSE(pp.can_handle(hq::npu::NpuTaskType::PostProcess));
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // Test 4: CpuPostProcessor::can_handle() returns FALSE for SafetyFilter too
 TEST_F(Round18EvidenceTest, CpuPostProcessor_CanHandle_SafetyFilter) {
-    std::print("[TEST] CpuPostProcessor_CanHandle_SafetyFilter\n");
+    std::cout << std::format("[TEST] CpuPostProcessor_CanHandle_SafetyFilter\n");
     hq::npu::CpuPostProcessor pp;
     EXPECT_FALSE(pp.can_handle(hq::npu::NpuTaskType::SafetyFilter));
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // Test 5: CpuPostProcessor::post_process() returns a valid result
 TEST_F(Round18EvidenceTest, CpuPostProcessor_PostProcess_ReturnsResult) {
-    std::print("[TEST] CpuPostProcessor_PostProcess_ReturnsResult\n");
+    std::cout << std::format("[TEST] CpuPostProcessor_PostProcess_ReturnsResult\n");
     hq::npu::CpuPostProcessor pp;
     std::vector<std::uint8_t> pixels(512u * 512u * 4u, 128u);
     hq::npu::NpuPostProcessRequest req{
@@ -4565,12 +4565,12 @@ TEST_F(Round18EvidenceTest, CpuPostProcessor_PostProcess_ReturnsResult) {
     };
     auto result = pp.post_process(req);
     EXPECT_TRUE(result.has_value());
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // Test 6: post_process() output dimensions match input
 TEST_F(Round18EvidenceTest, CpuPostProcessor_PostProcess_DimensionsPreserved) {
-    std::print("[TEST] CpuPostProcessor_PostProcess_DimensionsPreserved\n");
+    std::cout << std::format("[TEST] CpuPostProcessor_PostProcess_DimensionsPreserved\n");
     hq::npu::CpuPostProcessor pp;
     std::vector<std::uint8_t> pixels(64u * 64u * 4u, 255u);
     hq::npu::NpuPostProcessRequest req{
@@ -4583,12 +4583,12 @@ TEST_F(Round18EvidenceTest, CpuPostProcessor_PostProcess_DimensionsPreserved) {
     EXPECT_EQ(result->width,  64u);
     EXPECT_EQ(result->height, 64u);
     EXPECT_EQ(result->pixels.size(), pixels.size());
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // Test 7: CpuPostProcessor post-process reports was_npu_accelerated = false
 TEST_F(Round18EvidenceTest, CpuPostProcessor_PostProcess_NotNpuAccelerated) {
-    std::print("[TEST] CpuPostProcessor_PostProcess_NotNpuAccelerated\n");
+    std::cout << std::format("[TEST] CpuPostProcessor_PostProcess_NotNpuAccelerated\n");
     hq::npu::CpuPostProcessor pp;
     std::vector<std::uint8_t> pixels(16u, 0u);
     hq::npu::NpuPostProcessRequest req{
@@ -4599,20 +4599,20 @@ TEST_F(Round18EvidenceTest, CpuPostProcessor_PostProcess_NotNpuAccelerated) {
     auto result = pp.post_process(req);
     ASSERT_TRUE(result.has_value());
     EXPECT_FALSE(result->was_npu_accelerated);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // Test 8: HailoNpuPostProcessor::is_available() returns false (HailoRT not installed)
 TEST_F(Round18EvidenceTest, HailoPostProcessor_NotAvailable) {
-    std::print("[TEST] HailoPostProcessor_NotAvailable\n");
+    std::cout << std::format("[TEST] HailoPostProcessor_NotAvailable\n");
     hq::npu::HailoNpuPostProcessor pp;
     EXPECT_FALSE(pp.is_available());
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // Test 9: HailoNpuPostProcessor returns error (not yet implemented)
 TEST_F(Round18EvidenceTest, HailoPostProcessor_ReturnsError_NotWired) {
-    std::print("[TEST] HailoPostProcessor_ReturnsError_NotWired\n");
+    std::cout << std::format("[TEST] HailoPostProcessor_ReturnsError_NotWired\n");
     hq::npu::HailoNpuPostProcessor pp;
     std::vector<std::uint8_t> pixels(64u * 64u * 4u, 42u);
     hq::npu::NpuPostProcessRequest req{
@@ -4623,21 +4623,21 @@ TEST_F(Round18EvidenceTest, HailoPostProcessor_ReturnsError_NotWired) {
     auto result = pp.post_process(req);
     EXPECT_FALSE(result.has_value())
         << "HailoNpuPostProcessor must return error until HailoRT + HEF available";
-    std::print("[TEST] PASSED (honest error returned)\n");
+    std::cout << std::format("[TEST] PASSED (honest error returned)\n");
 }
 
 // Test 10: NpuPostProcessorFactory returns a non-null pointer (falls to CPU fallback)
 TEST_F(Round18EvidenceTest, NpuPostProcessorFactory_ReturnsCpuFallback) {
-    std::print("[TEST] NpuPostProcessorFactory_ReturnsSynthetic\n");
+    std::cout << std::format("[TEST] NpuPostProcessorFactory_ReturnsSynthetic\n");
     auto pp = hq::npu::NpuPostProcessorFactory::create_best_available();
     ASSERT_NE(pp, nullptr);
     EXPECT_EQ(pp->name(), "CPU-PassThrough");
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // Test 11: INpuPostProcessor virtual dispatch works via base pointer
 TEST_F(Round18EvidenceTest, INpuPostProcessor_VirtualDispatch) {
-    std::print("[TEST] INpuPostProcessor_VirtualDispatch\n");
+    std::cout << std::format("[TEST] INpuPostProcessor_VirtualDispatch\n");
     std::unique_ptr<hq::npu::INpuPostProcessor> pp =
         std::make_unique<hq::npu::CpuPostProcessor>();
     std::vector<std::uint8_t> pixels(32u, 1u);
@@ -4647,17 +4647,17 @@ TEST_F(Round18EvidenceTest, INpuPostProcessor_VirtualDispatch) {
     };
     auto result = pp->post_process(req);
     EXPECT_TRUE(result.has_value());
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // Test 12: NpuAccelerator<T> concept is satisfied by CpuPostProcessor
 TEST_F(Round18EvidenceTest, NpuAccelerator_ConceptProofCpuPostProcessor) {
-    std::print("[TEST] NpuAccelerator_ConceptProofSynthetic\n");
+    std::cout << std::format("[TEST] NpuAccelerator_ConceptProofSynthetic\n");
     constexpr bool ok = hq::npu::NpuAccelerator<hq::npu::CpuPostProcessor>;
     EXPECT_TRUE(ok);
     constexpr bool ok2 = hq::npu::NpuAccelerator<hq::npu::HailoNpuPostProcessor>;
     EXPECT_TRUE(ok2);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // ===========================================================================
@@ -4671,7 +4671,7 @@ protected:
 
 // Test 1: blend_noise_cfg — scale=0 → output equals uncond
 TEST_F(Round19EvidenceTest, BlendNoiseCfg_ScaleZero_OutputEqualsUncond) {
-    std::print("[TEST] BlendNoiseCfg_ScaleZero_OutputEqualsUncond\n");
+    std::cout << std::format("[TEST] BlendNoiseCfg_ScaleZero_OutputEqualsUncond\n");
     hq::npu::CpuPostProcessor pp;
     std::vector<float> noise_cond  = {1.0f, 2.0f, 3.0f, 4.0f};
     std::vector<float> noise_uncond = {0.1f, 0.2f, 0.3f, 0.4f};
@@ -4684,12 +4684,12 @@ TEST_F(Round19EvidenceTest, BlendNoiseCfg_ScaleZero_OutputEqualsUncond) {
         EXPECT_NEAR(noise_cond[i], noise_uncond[i], 1e-6f)
             << "at index " << i;
     }
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // Test 2: blend_noise_cfg — scale=1 → output equals cond (original noise_cond)
 TEST_F(Round19EvidenceTest, BlendNoiseCfg_ScaleOne_OutputEqualsCond) {
-    std::print("[TEST] BlendNoiseCfg_ScaleOne_OutputEqualsCond\n");
+    std::cout << std::format("[TEST] BlendNoiseCfg_ScaleOne_OutputEqualsCond\n");
     hq::npu::CpuPostProcessor pp;
     std::vector<float> noise_cond  = {1.0f, 2.0f, 3.0f};
     const std::vector<float> noise_cond_orig = noise_cond;
@@ -4703,12 +4703,12 @@ TEST_F(Round19EvidenceTest, BlendNoiseCfg_ScaleOne_OutputEqualsCond) {
         EXPECT_NEAR(noise_cond[i], noise_cond_orig[i], 1e-5f)
             << "at index " << i;
     }
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // Test 3: blend_noise_cfg — scale=7.5, verify arithmetic at known values
 TEST_F(Round19EvidenceTest, BlendNoiseCfg_ScaleSeven_VerifyArithmetic) {
-    std::print("[TEST] BlendNoiseCfg_ScaleSeven_VerifyArithmetic\n");
+    std::cout << std::format("[TEST] BlendNoiseCfg_ScaleSeven_VerifyArithmetic\n");
     hq::npu::CpuPostProcessor pp;
     // cond=2, uncond=1, scale=7.5 → result = 1 + 7.5*(2-1) = 8.5
     std::vector<float> noise_cond  = {2.0f};
@@ -4719,12 +4719,12 @@ TEST_F(Round19EvidenceTest, BlendNoiseCfg_ScaleSeven_VerifyArithmetic) {
         7.5f);
     ASSERT_TRUE(r.has_value());
     EXPECT_NEAR(noise_cond[0], 8.5f, 1e-5f);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // Test 4: blend_noise_cfg — empty noise_out returns error
 TEST_F(Round19EvidenceTest, BlendNoiseCfg_EmptyInput_ReturnsError) {
-    std::print("[TEST] BlendNoiseCfg_EmptyInput_ReturnsError\n");
+    std::cout << std::format("[TEST] BlendNoiseCfg_EmptyInput_ReturnsError\n");
     hq::npu::CpuPostProcessor pp;
     std::vector<float> empty;
     std::vector<float> uncond = {1.0f};
@@ -4733,12 +4733,12 @@ TEST_F(Round19EvidenceTest, BlendNoiseCfg_EmptyInput_ReturnsError) {
         std::span<const float>{uncond},
         7.5f);
     EXPECT_FALSE(r.has_value());
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // Test 5: blend_noise_cfg — size mismatch returns error
 TEST_F(Round19EvidenceTest, BlendNoiseCfg_SizeMismatch_ReturnsError) {
-    std::print("[TEST] BlendNoiseCfg_SizeMismatch_ReturnsError\n");
+    std::cout << std::format("[TEST] BlendNoiseCfg_SizeMismatch_ReturnsError\n");
     hq::npu::CpuPostProcessor pp;
     std::vector<float> cond  = {1.0f, 2.0f};
     std::vector<float> uncond = {0.5f};  // wrong size
@@ -4747,12 +4747,12 @@ TEST_F(Round19EvidenceTest, BlendNoiseCfg_SizeMismatch_ReturnsError) {
         std::span<const float>{uncond},
         7.5f);
     EXPECT_FALSE(r.has_value());
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // Test 6: HailoNpuPostProcessor::blend_noise_cfg returns error (not yet implemented)
 TEST_F(Round19EvidenceTest, BlendNoiseCfg_Hailo_ReturnsError_NotWired) {
-    std::print("[TEST] BlendNoiseCfg_Hailo_ReturnsError_NotWired\n");
+    std::cout << std::format("[TEST] BlendNoiseCfg_Hailo_ReturnsError_NotWired\n");
     hq::npu::HailoNpuPostProcessor pp;
     std::vector<float> cond  = {2.0f, 4.0f};
     std::vector<float> uncond = {1.0f, 2.0f};
@@ -4762,12 +4762,12 @@ TEST_F(Round19EvidenceTest, BlendNoiseCfg_Hailo_ReturnsError_NotWired) {
         2.0f);
     EXPECT_FALSE(r.has_value())
         << "HailoNpuPostProcessor blend_noise_cfg must return error until HailoRT + HEF available";
-    std::print("[TEST] PASSED (honest error returned)\n");
+    std::cout << std::format("[TEST] PASSED (honest error returned)\n");
 }
 
 // Test 7: blend_noise_cfg via INpuPostProcessor* base pointer (virtual dispatch)
 TEST_F(Round19EvidenceTest, BlendNoiseCfg_VirtualDispatch) {
-    std::print("[TEST] BlendNoiseCfg_VirtualDispatch\n");
+    std::cout << std::format("[TEST] BlendNoiseCfg_VirtualDispatch\n");
     std::unique_ptr<hq::npu::INpuPostProcessor> pp =
         std::make_unique<hq::npu::CpuPostProcessor>();
     std::vector<float> cond  = {3.0f, 6.0f, 9.0f};
@@ -4777,12 +4777,12 @@ TEST_F(Round19EvidenceTest, BlendNoiseCfg_VirtualDispatch) {
         std::span<const float>{uncond},
         1.0f);
     EXPECT_TRUE(r.has_value());
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // Test 8: blend_noise_cfg with realistic latent size (16,384 floats = 512x512 SD1.5 latent)
 TEST_F(Round19EvidenceTest, BlendNoiseCfg_RealisticLatentSize_Succeeds) {
-    std::print("[TEST] BlendNoiseCfg_RealisticLatentSize_Succeeds\n");
+    std::cout << std::format("[TEST] BlendNoiseCfg_RealisticLatentSize_Succeeds\n");
     hq::npu::CpuPostProcessor pp;
     constexpr std::size_t latent_floats = 4u * 64u * 64u;  // SD 1.5 at 512x512
     std::vector<float> cond(latent_floats, 0.5f);
@@ -4796,7 +4796,7 @@ TEST_F(Round19EvidenceTest, BlendNoiseCfg_RealisticLatentSize_Succeeds) {
     // Spot-check: 0.1 + 7.5*(0.5-0.1) = 0.1 + 3.0 = 3.1
     EXPECT_NEAR(cond[0], 3.1f, 1e-4f);
     EXPECT_NEAR(cond[latent_floats / 2], 3.1f, 1e-4f);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // ===========================================================================
@@ -4814,7 +4814,7 @@ protected:
 };
 
 TEST_F(Round20EvidenceTest, CpuSafetyFilter_BasicSafeResult) {
-    std::print("[TEST] CpuSafetyFilter_BasicSafeResult\n");
+    std::cout << std::format("[TEST] CpuSafetyFilter_BasicSafeResult\n");
     hq::npu::CpuPostProcessor pp;
     std::vector<std::uint8_t> pixels(512 * 512 * 4, 128); // gray
     hq::npu::NpuSafetyFilterRequest req{
@@ -4828,11 +4828,11 @@ TEST_F(Round20EvidenceTest, CpuSafetyFilter_BasicSafeResult) {
     EXPECT_LE(r->safety_score, 0.99f);
     EXPECT_FALSE(r->was_npu_accelerated);
     EXPECT_EQ(r->width, 512u);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 TEST_F(Round20EvidenceTest, CpuSafetyFilter_HeuristicProducesScoreInRange) {
-    std::print("[TEST] CpuSafetyFilter_HeuristicProducesScoreInRange\n");
+    std::cout << std::format("[TEST] CpuSafetyFilter_HeuristicProducesScoreInRange\n");
     hq::npu::CpuPostProcessor pp;
     std::vector<std::uint8_t> pixels(64 * 64 * 4, 200); // bright
     hq::npu::NpuSafetyFilterRequest req{ .pixels = std::span<const std::uint8_t>{pixels}, .width=64, .height=64 };
@@ -4841,11 +4841,11 @@ TEST_F(Round20EvidenceTest, CpuSafetyFilter_HeuristicProducesScoreInRange) {
     EXPECT_GE(r->safety_score, 0.70f);
     EXPECT_LE(r->safety_score, 0.99f);
     EXPECT_FALSE(r->was_npu_accelerated);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 TEST_F(Round20EvidenceTest, CpuSafetyFilter_RespectsThreshold) {
-    std::print("[TEST] CpuSafetyFilter_RespectsThreshold\n");
+    std::cout << std::format("[TEST] CpuSafetyFilter_RespectsThreshold\n");
     hq::npu::CpuPostProcessor pp;
     std::vector<std::uint8_t> pixels(32 * 32 * 4, 50);
     hq::npu::NpuSafetyFilterRequest req{
@@ -4855,21 +4855,21 @@ TEST_F(Round20EvidenceTest, CpuSafetyFilter_RespectsThreshold) {
     ASSERT_TRUE(r.has_value());
     // With high threshold, even a "safe" heuristic may flag depending on variance calc
     EXPECT_TRUE(r->safety_score >= 0.0f && r->safety_score <= 1.0f);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 TEST_F(Round20EvidenceTest, CpuSafetyFilter_ErrorOnEmpty) {
-    std::print("[TEST] CpuSafetyFilter_ErrorOnEmpty\n");
+    std::cout << std::format("[TEST] CpuSafetyFilter_ErrorOnEmpty\n");
     hq::npu::CpuPostProcessor pp;
     hq::npu::NpuSafetyFilterRequest req{ .pixels = std::span<const std::uint8_t>{}, .width=0, .height=0 };
     auto r = pp.safety_filter(req);
     EXPECT_FALSE(r.has_value());
     EXPECT_NE(r.error().find("empty"), std::string::npos);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 TEST_F(Round20EvidenceTest, CpuSafetyFilter_DimensionsPreserved) {
-    std::print("[TEST] CpuSafetyFilter_DimensionsPreserved\n");
+    std::cout << std::format("[TEST] CpuSafetyFilter_DimensionsPreserved\n");
     hq::npu::CpuPostProcessor pp;
     std::vector<std::uint8_t> pixels(128 * 128 * 4, 90);
     hq::npu::NpuSafetyFilterRequest req{ .pixels = std::span<const std::uint8_t>{pixels}, .width=128, .height=128 };
@@ -4877,11 +4877,11 @@ TEST_F(Round20EvidenceTest, CpuSafetyFilter_DimensionsPreserved) {
     ASSERT_TRUE(r.has_value());
     EXPECT_EQ(r->width, 128u);
     EXPECT_EQ(r->height, 128u);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 TEST_F(Round20EvidenceTest, CpuSafetyFilter_NotNpuAccelerated) {
-    std::print("[TEST] CpuSafetyFilter_NotNpuAccelerated\n");
+    std::cout << std::format("[TEST] CpuSafetyFilter_NotNpuAccelerated\n");
     hq::npu::CpuPostProcessor pp;
     std::vector<std::uint8_t> pixels(16 * 16 * 4, 255);
     hq::npu::NpuSafetyFilterRequest req{ .pixels = std::span<const std::uint8_t>{pixels}, .width=16, .height=16 };
@@ -4889,11 +4889,11 @@ TEST_F(Round20EvidenceTest, CpuSafetyFilter_NotNpuAccelerated) {
     ASSERT_TRUE(r.has_value());
     EXPECT_FALSE(r->was_npu_accelerated);
     EXPECT_LT(r->npu_utilization, 0.0f); // sentinel
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 TEST_F(Round20EvidenceTest, HailoSafetyFilter_DelegatesOrErrors_NotWired) {
-    std::print("[TEST] HailoSafetyFilter_DelegatesOrErrors_NotWired\n");
+    std::cout << std::format("[TEST] HailoSafetyFilter_DelegatesOrErrors_NotWired\n");
     hq::npu::HailoNpuPostProcessor hailo;
     std::vector<std::uint8_t> pixels(64 * 64 * 4, 100);
     hq::npu::NpuSafetyFilterRequest req{ .pixels = std::span<const std::uint8_t>{pixels}, .width=64, .height=64 };
@@ -4904,21 +4904,21 @@ TEST_F(Round20EvidenceTest, HailoSafetyFilter_DelegatesOrErrors_NotWired) {
     } else {
         EXPECT_FALSE(r.error().empty());
     }
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 TEST_F(Round20EvidenceTest, NpuPostProcessorFactory_SafetyStillCpuFallback) {
-    std::print("[TEST] NpuPostProcessorFactory_SafetyStillCpuFallback\n");
+    std::cout << std::format("[TEST] NpuPostProcessorFactory_SafetyStillCpuFallback\n");
     auto pp = hq::npu::NpuPostProcessorFactory::create_best_available();
     ASSERT_NE(pp, nullptr);
     EXPECT_EQ(pp->name(), "CPU-PassThrough");
     EXPECT_FALSE(pp->is_available());
     EXPECT_TRUE(pp->synthetic_mode());
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 TEST_F(Round20EvidenceTest, SafetyFilter_VirtualDispatch) {
-    std::print("[TEST] SafetyFilter_VirtualDispatch\n");
+    std::cout << std::format("[TEST] SafetyFilter_VirtualDispatch\n");
     std::unique_ptr<hq::npu::INpuPostProcessor> pp =
         std::make_unique<hq::npu::CpuPostProcessor>();
     std::vector<std::uint8_t> pixels(32 * 32 * 4, 80);
@@ -4926,37 +4926,37 @@ TEST_F(Round20EvidenceTest, SafetyFilter_VirtualDispatch) {
     auto r = pp->safety_filter(req);
     ASSERT_TRUE(r.has_value());
     EXPECT_FALSE(r->was_npu_accelerated);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 TEST_F(Round20EvidenceTest, NpuAccelerator_ConceptStillSatisfied_Round20) {
-    std::print("[TEST] NpuAccelerator_ConceptStillSatisfied_Round20\n");
+    std::cout << std::format("[TEST] NpuAccelerator_ConceptStillSatisfied_Round20\n");
     // Compile-time proof that adding safety_filter did not break the concept
     static_assert(hq::npu::NpuAccelerator<hq::npu::CpuPostProcessor>,
                   "CpuPostProcessor must still satisfy NpuAccelerator after Round 20");
     static_assert(hq::npu::NpuAccelerator<hq::npu::HailoNpuPostProcessor>,
                   "HailoNpuPostProcessor must still satisfy NpuAccelerator after Round 20");
     SUCCEED();
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 TEST_F(Round20EvidenceTest, SafetyFilter_TimingPositiveOnSuccess) {
-    std::print("[TEST] SafetyFilter_TimingPositiveOnSuccess\n");
+    std::cout << std::format("[TEST] SafetyFilter_TimingPositiveOnSuccess\n");
     hq::npu::CpuPostProcessor pp;
     std::vector<std::uint8_t> pixels(256 * 256 * 4, 60);
     hq::npu::NpuSafetyFilterRequest req{ .pixels = std::span<const std::uint8_t>{pixels}, .width=256, .height=256 };
     auto r = pp.safety_filter(req);
     ASSERT_TRUE(r.has_value());
     EXPECT_GT(r->processing_time_us, 0.0f);
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 TEST_F(Round20EvidenceTest, SafetyFilter_CanHandle_SafetyFilterReturnsFalseForCpu) {
-    std::print("[TEST] SafetyFilter_CanHandle_SafetyFilterReturnsFalseForCpu\n");
+    std::cout << std::format("[TEST] SafetyFilter_CanHandle_SafetyFilterReturnsFalseForCpu\n");
     hq::npu::CpuPostProcessor pp;
     EXPECT_FALSE(pp.can_handle(hq::npu::NpuTaskType::SafetyFilter));
     // Consistent with PostProcess/SafetyFilter policy: CPU does not claim NPU capability
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // Compile-time concept proof lives alongside the static_asserts in the header.
@@ -4964,7 +4964,7 @@ TEST_F(Round20EvidenceTest, SafetyFilter_CanHandle_SafetyFilterReturnsFalseForCp
 TEST_F(Round20EvidenceTest, SafetyFilter_Integration_SmokeViaAbstraction) {
     // Smoke that the new path is reachable from the same factory-selected object
     // used by Pipeline (even without running full generate on this host).
-    std::print("[TEST] SafetyFilter_Integration_SmokeViaAbstraction\n");
+    std::cout << std::format("[TEST] SafetyFilter_Integration_SmokeViaAbstraction\n");
     auto pp = hq::npu::NpuPostProcessorFactory::create_best_available();
     ASSERT_NE(pp, nullptr);
     std::vector<std::uint8_t> pixels(64 * 64 * 4, 110);
@@ -4972,7 +4972,7 @@ TEST_F(Round20EvidenceTest, SafetyFilter_Integration_SmokeViaAbstraction) {
     auto r = pp->safety_filter(req);
     ASSERT_TRUE(r.has_value());
     EXPECT_GE(pp->utilization(), -1.0f); // sentinel or real
-    std::print("[TEST] PASSED\n");
+    std::cout << std::format("[TEST] PASSED\n");
 }
 
 // ===========================================================================
@@ -4980,6 +4980,7 @@ TEST_F(Round20EvidenceTest, SafetyFilter_Integration_SmokeViaAbstraction) {
 // ===========================================================================
 
 #include "hq/cerberus_local_maintenance_db.hpp"
+#include <iostream>
 
 using hq::cerberus::privacy::LocalMaintenanceDB;
 using hq::cerberus::privacy::RBPCState;
@@ -5246,8 +5247,8 @@ TEST_F(LcmdPersistenceTest, RoundTrip_RevokeLicense) {
 // MAIN
 // ===========================================================================
 int main(int argc, char** argv) {
-    std::print("=== UM790 Pipeline Comprehensive Test Suite ===\n");
-    std::print("  Sections: Watchdog(18) Hailo(7) GPU(4) Tokenizer(7) "
+    std::cout << std::format("=== UM790 Pipeline Comprehensive Test Suite ===\n");
+    std::cout << std::format("  Sections: Watchdog(18) Hailo(7) GPU(4) Tokenizer(7) "
                "Staging(5) HealthScore(2) Integration(8) Bonus(5) "
                "NpuPipeline(9) NpuEncoder(6) Factory(2) "
                "TensorView(14) DEISScheduler(12) Coroutines(16) "
@@ -5255,19 +5256,19 @@ int main(int argc, char** argv) {
                "Round12Evidence(12) Round13Evidence(12) Round14Evidence(12) "
                "Round15Evidence(12) Round16Evidence(12) Round17Evidence(12) "
                "Round18Evidence(12) Round19Evidence(8)\n");
-    std::print("  C++ Standard: {}\n", __cplusplus);
+    std::cout << std::format("  C++ Standard: {}\n", __cplusplus);
 
 #if UM790_HAS_STD_EXPECTED
-    std::print("  std::expected : available\n");
+    std::cout << std::format("  std::expected : available\n");
 #endif
 #if UM790_HAS_STD_PRINT
-    std::print("  std::print    : available\n");
+    std::cout << std::format("  std::print    : available\n");
 #endif
-    std::print("  TensorView    : always-available (self-contained, no std::mdspan needed)\n");
+    std::cout << std::format("  TensorView    : always-available (self-contained, no std::mdspan needed)\n");
 #if UM790_HAS_STD_FORMAT
-    std::print("  std::format   : available\n");
+    std::cout << std::format("  std::format   : available\n");
 #endif
-    std::print("\n");
+    std::cout << std::format("\n");
 
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();

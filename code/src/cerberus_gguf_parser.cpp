@@ -481,17 +481,11 @@ std::optional<std::string> GgufParser::detect_model_family() const {
     return std::nullopt;
 }
 
-} // namespace hq::cerberus
-
-// ==========================================================================
-// Targeted tensor slice loading (for diagnostic/probe use with real Athenea weights via RealQuantWeightDriver)
-// ==========================================================================
-
 size_t GgufParser::load_tensor_slice(const std::string& filepath,
-                                     const std::string& tensor_name,
-                                     size_t byte_offset,
-                                     size_t max_bytes,
-                                     std::vector<uint8_t>& out_data) const {
+                                 const std::string& tensor_name,
+                                 size_t byte_offset,
+                                 size_t max_bytes,
+                                 std::vector<uint8_t>& out_data) const {
     const GgufTensorInfo* info = nullptr;
     for (const auto& t : tensors_) {
         if (t.name == tensor_name) { info = &t; break; }
@@ -515,3 +509,5 @@ size_t GgufParser::load_tensor_slice(const std::string& filepath,
     f.read(reinterpret_cast<char*>(out_data.data()), to_read);
     return static_cast<size_t>(f.gcount());
 }
+
+} // namespace hq::cerberus

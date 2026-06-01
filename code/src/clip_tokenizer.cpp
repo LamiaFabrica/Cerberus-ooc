@@ -17,6 +17,8 @@
 #  include <print>
 #endif
 #include <sstream>
+#include <format>
+#include <iostream>
 
 namespace hq {
 
@@ -157,7 +159,7 @@ CLIPTokenizer::CLIPTokenizer(const std::string& bpe_merges_file,
     // Try file-based loading first; fall back to built-in on error
     auto result = load_from_files_(bpe_merges_file, vocab_file);
     if (!result) {
-        std::print("[CLIPTokenizer] File loading failed ({}), using built-in vocab\n",
+        std::cout << std::format("[CLIPTokenizer] File loading failed ({}), using built-in vocab\n",
                    result.error().message);
         load_builtin_vocab_();
     }

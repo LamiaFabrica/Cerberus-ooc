@@ -232,7 +232,6 @@ IntelNpuTelemetry::IntelNpuTelemetry() {
     const wchar_t* static_candidates[] = {
         L"\\GPU Engine(*NPU*)\\Utilization Percentage",
         L"\\GPU Engine(*AI Boost*)\\Utilization Percentage",
-        L"\\GPU Engine(*)\\Utilization Percentage",  // broad, then we can refine later
         nullptr
     };
 
@@ -258,6 +257,7 @@ IntelNpuTelemetry::IntelNpuTelemetry() {
     }
 #else
     description_ = "Linux LevelZero (dynamic zeLoader + zet metric streamer)";
+    real_source_available_ = false;
     (void)sample_via_level_zero();
     if (g_l0_available.load(std::memory_order_relaxed)) real_source_available_ = true;
 #endif
@@ -342,6 +342,14 @@ bool IntelNpuTelemetry::try_open_pdh_counter(const wchar_t* counter_path) {
 
     // Prime the query
     PdhCollectQueryData(pdh_query_);
+
+    // Verify the counter actually returns data before claiming success.
+    PDH_FMT_COUNTERVALUE test_val{};
+    PDH_STATUS check = PdhGetFormattedCounterValue(pdh_counter_, PDH_FMT_DOUBLE, nullptr, &test_val);
+    if (check != ERROR_SUCCESS || test_val.CStatus != PDH_CSTATUS_VALID_DATA) {
+        close_pdh();
+        return false;
+    }
     return true;
 }
 
@@ -358,56 +366,49 @@ void IntelNpuTelemetry::close_pdh() {
 
 bool IntelNpuTelemetry::try_discover_npu_counter_via_wildcard() {
     // Dynamic discovery: look for any GPU Engine utilization counter whose instance name
-    // contains "NPU". This is a robust way to find the real Intel NPU engine on
+    // contains "NPU" or "AI Boost". This is a robust way to find the real Intel NPU engine on
     // Arrow Lake / Meteor Lake systems where the driver exposes it under GPU Engine.
+    // The broad fallback \GPU Engine(*) is intentionally omitted: on non-NPU hosts it would
+    // match the iGPU and falsely claim a real source.
     close_pdh();
 
     PDH_STATUS status = PdhOpenQueryW(nullptr, 0, &pdh_query_);
     if (status != ERROR_SUCCESS) return false;
 
-    // Use wildcard expansion to find NPU-related GPU engine counters
     wchar_t expanded_path[PDH_MAX_COUNTER_PATH] = {};
     DWORD bufSize = PDH_MAX_COUNTER_PATH;
 
-    // Common pattern on Intel NPU systems
-    status = PdhExpandWildCardPathW(
-        nullptr,
+    static const wchar_t* patterns[] = {
         L"\\GPU Engine(*NPU*)\\Utilization Percentage",
-        expanded_path,
-        &bufSize,
-        0
-    );
+        L"\\GPU Engine(*AI Boost*)\\Utilization Percentage",
+        nullptr
+    };
 
-    if (status == ERROR_SUCCESS) {
-        status = PdhAddCounterW(pdh_query_, expanded_path, 0, &pdh_counter_);
+    for (const wchar_t* pat : patterns) {
+        if (!pat) break;
+        bufSize = PDH_MAX_COUNTER_PATH;
+        expanded_path[0] = L'\0';
+        status = PdhExpandWildCardPathW(nullptr, pat, expanded_path, &bufSize, 0);
         if (status == ERROR_SUCCESS) {
-            PdhCollectQueryData(pdh_query_);
-            return true;
+            // Verify expanded path still relates to NPU / AI Boost (protect against broad wildcard matches)
+            if (std::wcsstr(expanded_path, L"NPU") == nullptr &&
+                std::wcsstr(expanded_path, L"npu") == nullptr &&
+                std::wcsstr(expanded_path, L"AI Boost") == nullptr &&
+                std::wcsstr(expanded_path, L"AI_Boost") == nullptr) {
+                status = PDH_CSTATUS_NO_INSTANCE; // treat as no match
+            }
         }
-    }
-
-    // Broader discovery: any GPU Engine utilization that might be the NPU
-    close_pdh();
-    status = PdhOpenQueryW(nullptr, 0, &pdh_query_);
-    if (status != ERROR_SUCCESS) return false;
-
-    bufSize = PDH_MAX_COUNTER_PATH;
-    status = PdhExpandWildCardPathW(
-        nullptr,
-        L"\\GPU Engine(*)\\Utilization Percentage",
-        expanded_path,
-        &bufSize,
-        0
-    );
-
-    if (status == ERROR_SUCCESS) {
-        // We take the first one that succeeds; in practice on NPU boxes the NPU
-        // engine instance will often appear in the list.
-        status = PdhAddCounterW(pdh_query_, expanded_path, 0, &pdh_counter_);
         if (status == ERROR_SUCCESS) {
-            PdhCollectQueryData(pdh_query_);
-            return true;
+            status = PdhAddCounterW(pdh_query_, expanded_path, 0, &pdh_counter_);
+            if (status == ERROR_SUCCESS) {
+                PdhCollectQueryData(pdh_query_);
+                return true;
+            }
         }
+        // Close and reopen query for next attempt
+        close_pdh();
+        status = PdhOpenQueryW(nullptr, 0, &pdh_query_);
+        if (status != ERROR_SUCCESS) return false;
     }
 
     close_pdh();

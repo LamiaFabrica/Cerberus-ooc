@@ -42,6 +42,10 @@ public:
         bool        enable_quantization{false};  ///< enable INT8 path where possible
         std::size_t warm_capacity_bytes{1ULL << 30}; ///< 1 GiB
         std::size_t cool_capacity_bytes{512ULL << 20}; ///< 512 MiB
+        /// Optional LocalMaintenanceDB (LCMD) — when provided, the runtime owns
+        /// the reference and diagnostic accessors return the real instance.
+        /// Required for Athenea probe endurance path and inference audit endpoints.
+        std::shared_ptr<hq::cerberus::privacy::LocalMaintenanceDB> lcmd;
     };
 
     explicit CerberusRuntime();

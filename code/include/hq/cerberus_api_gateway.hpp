@@ -126,6 +126,9 @@ struct HandshakeCompleteResponse {
 #ifdef ERROR_NOT_FOUND
 #undef ERROR_NOT_FOUND
 #endif
+#ifdef ERROR
+#undef ERROR
+#endif
 
 enum class CerberusOpcode : uint16_t {
     RUN_GRAPH       = 0x1000,
@@ -151,12 +154,12 @@ enum class CerberusOpcode : uint16_t {
     SESSION_AUTH    = 0xF002,
     SESSION_CLOSE   = 0xF003,
 
-    ERROR_GENERAL   = 0xFF00,
-    ERROR_AUTH      = 0xFF01,
-    ERROR_PERMISSION= 0xFF02,
-    ERROR_NOT_FOUND = 0xFF03,
-    ERROR_INVALID   = 0xFF04,
-    ERROR_SESSION   = 0xFF05,
+    ERR_GENERAL   = 0xFF00,
+    ERR_AUTH      = 0xFF01,
+    ERR_PERMISSION= 0xFF02,
+    ERR_NOT_FOUND = 0xFF03,
+    ERR_INVALID   = 0xFF04,
+    ERR_SESSION   = 0xFF05,
     SYS_SHUTDOWN    = 0xFF06,
 };
 
@@ -245,8 +248,8 @@ public:
 
     // Production privacy injection for inference opcodes (LCMD + RBPC).
     // Call before handling traffic if you want real audit + RBPC on EXPORT/CLEAR.
-    void setPrivacyContext(std::shared_ptr<hq::cerberus::LocalMaintenanceDB> lcmd,
-                           std::shared_ptr<hq::cerberus::UserSecurity> us,
+    void setPrivacyContext(std::shared_ptr<hq::cerberus::privacy::LocalMaintenanceDB> lcmd,
+                           std::shared_ptr<hq::cerberus::privacy::UserSecurity> us,
                            std::string node_id = "local");
 
 private:
@@ -256,8 +259,8 @@ private:
     mutable std::mutex sessions_mutex_;
 
     // Privacy surface (optional)
-    std::shared_ptr<hq::cerberus::LocalMaintenanceDB> lcmd_;
-    std::shared_ptr<hq::cerberus::UserSecurity> user_security_;
+    std::shared_ptr<hq::cerberus::privacy::LocalMaintenanceDB> lcmd_;
+    std::shared_ptr<hq::cerberus::privacy::UserSecurity> user_security_;
     std::string rbpc_node_id_{"local"};
 };
 

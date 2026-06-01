@@ -248,7 +248,7 @@ struct NpuDmaSlot {
         ENCODING,     ///< NPU is writing to host buffer
         STAGING,      ///< DMA H2D in flight
         READY,        ///< GPU buffer ready
-        ERROR         ///< Something failed
+        FAILED        ///< Something failed
     };
 
     std::atomic<State> state{State::IDLE};
