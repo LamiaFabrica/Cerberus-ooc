@@ -1,0 +1,43 @@
+[PROPUP] propup_tiered_memory passed in 0.5751953125 ms
+[PROPUP] propup_coordinator_memory_loop passed in 0.059814453125 ms
+[PROPUP] propup_coordinator_tier_decisions passed in 0.021240234375 ms
+[PROPUP] propup_compile_graph_analysis passed in 0.00146484375 ms
+[PROPUP] propup_kernel_matmul passed in 0.002685546875 ms
+[PROPUP] propup_kernel_elementwise passed in 0.000244140625 ms
+[PROPUP] propup_kernel_fma passed in 0.001220703125 ms
+[PROPUP] propup_kernel_matmul_blocked passed in 0.001953125 ms
+[PROPUP] propup_performance_matmul_vs_naive passed in 11.343017578125 ms
+[PROPUP] propup_end_to_end_native passed in 0.125 ms
+[PROPUP] propup_decision_engine_fusion passed in 0.03857421875 ms
+[PROPUP] propup_kernel_relu_negative_input passed in 0 ms
+[PROPUP] propup_kernel_sigmoid_extremes passed in 0.000244140625 ms
+[PROPUP] propup_kernel_quantized_matmul_shape passed in 0.00146484375 ms
+[PROPUP] propup_ranges_adopted_in_kernels passed in 0.00146484375 ms
+[PROPUP] propup_gguf_parser_header_valid skipped: GGUF parser not implemented
+[PROPUP] propup_gguf_parser_metadata_read skipped: GGUF parser not implemented
+[PROPUP] propup_glow_engine_init_deinit skipped: GlowEngine not implemented
+[PROPUP] propup_glow_engine_tensor_create skipped: GlowEngine not implemented
+[PROPUP] propup_adversarial_null_backend passed in 0.022705078125 ms
+[PROPUP] propup_adversarial_corrupt_graph passed in 0.001953125 ms (execute rejected corrupt graph)
+[PROPUP] propup_adversarial_mismatched_tensor_shapes passed in 0.046142578125 ms (no crash on mismatch)
+[PROPUP] propup_adversarial_null_input_buffer passed in 0.000244140625 ms (kernel returned error: null pointer)
+[00:47:32.490] [INFO ] npu_backend_unified.cpp:766 hq::npu::NpuBackendFactory::initialize()::<lambda()>() — [NpuBackendFactory] Probed 3 backends:
+[00:47:32.491] [INFO ] npu_backend_unified.cpp:791 hq::npu::NpuBackendFactory::print_status()::<lambda(hq::npu::INpuBackend*)>() —   ONNX-CPU-Fallback: available=yes, synthetic=yes, can_compile_for(intel_npu)=no, can_compile_for(cuda)=no, can_compile_for(cpu)=yes
+[00:47:32.491] [INFO ] npu_backend_unified.cpp:791 hq::npu::NpuBackendFactory::print_status()::<lambda(hq::npu::INpuBackend*)>() —   NVIDIA-CUDA: available=no, synthetic=yes, can_compile_for(intel_npu)=no, can_compile_for(cuda)=yes, can_compile_for(cpu)=no
+[00:47:32.491] [INFO ] npu_backend_unified.cpp:791 hq::npu::NpuBackendFactory::print_status()::<lambda(hq::npu::INpuBackend*)>() —   Intel-OpenVINO-NPU: available=no, synthetic=yes, can_compile_for(intel_npu)=yes, can_compile_for(cuda)=no, can_compile_for(cpu)=yes
+[PROPUP] propup_execution_coordinator_empty_graph passed in 0.02099609375 ms (empty graph accepted as no-op)
+[PROPUP] propup_runtime_diagnostic_report passed in 0.0419921875 ms
+[PROPUP] propup_decision_engine_empty_graph passed in 0.01318359375 ms
+[PROPUP] propup_decision_engine_pick_backend_cpu_fallback passed in 0.016845703125 ms
+[PROPUP] propup_decision_engine_pick_backend_npu_matmul skipped: No real Intel NPU backend available on this host
+[PROPUP] propup_decision_engine_quant_profile_iq4 passed in 0.01953125 ms
+[PROPUP] propup_decision_engine_unknown_op_fallback passed in 0.013671875 ms
+[PROPUP] propup_staging_manager_lifecycle passed in 1.325927734375 ms
+[PROPUP] propup_tiered_memory_bulk_alloc passed in 0.08203125 ms (16 blocks, 1048576 bytes)
+[HIPGraphDenoiser] created (available=false, capture_enabled=false)
+[PROPUP] propup_hip_graph_denoiser_construction passed in 0.004638671875 ms (available=false)
+[HIPGraphDenoiser] created (available=false, capture_enabled=false)
+[HIPGraphDenoiser] created (available=false, capture_enabled=false)
+[HIPGraphDenoiser] created (available=false, capture_enabled=false)
+[PROPUP] propup_hip_graph_denoiser_state_machine passed in 0.192138671875 ms
+[HIPGraphDenoiser] created (available=false, capture_enabled=false)

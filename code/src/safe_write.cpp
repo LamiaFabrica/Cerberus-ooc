@@ -39,6 +39,11 @@ std::size_t hq_safe_write(int fd, const char* data, std::size_t len) {
     if (WriteFile(h, data, static_cast<DWORD>(len), &written, nullptr)) {
         return static_cast<std::size_t>(written);
     }
+    // Broken pipe (e.g., reader closed) — silently drop to avoid SIGPIPE/segfault
+    DWORD err = GetLastError();
+    if (err == ERROR_BROKEN_PIPE || err == ERROR_NO_DATA || err == ERROR_INVALID_HANDLE) {
+        return 0;
+    }
     return std::fwrite(data, 1, len, fd == 1 ? stdout : stderr);
 }
 #else

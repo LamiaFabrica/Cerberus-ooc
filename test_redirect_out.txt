@@ -1,0 +1,2 @@
+Hello from WriteFile
+Hello from std::cout
