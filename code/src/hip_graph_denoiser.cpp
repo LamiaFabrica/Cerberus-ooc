@@ -5,6 +5,8 @@
 ///
 /// @version 3.1.0 -- C02 fix: replay() re-runs UNet per step, proper timestep
 ///                   mapping via DEISScheduler, CFG support in fallback path.
+///                   C03 fix: eliminated goto in capture(); replaced with
+///                   std::expected monadic chaining (.and_then() / .or_else()).
 ///
 /// Architecture:
 ///   1. GPU UNet inference runs outside the graph (ORT is not capturable)
@@ -390,6 +392,11 @@ HIPGraphDenoiser::run_unet(std::span<const float> latents,
 //     CFG-aware fallback).
 //   - Sets h_timestep_ from scheduler_->timestep(0) when a scheduler is
 //     attached; otherwise uses 0 (legacy).
+//
+// C03 changes:
+//   - Eliminated all goto labels.  The HIP path is now expressed as a chain
+//     of std::expected-returning lambdas wired with .and_then() / .or_else().
+//   - On any failure, the HIP state is reset and the fallback path is invoked.
 // ===========================================================================
 
 std::expected<void, GraphErrorInfo>
@@ -438,125 +445,212 @@ HIPGraphDenoiser::capture(hq::tensor::FloatTensor4D latents,
                                   cfg_scale_,
                                   std::span<const float>{uncond_embeddings_});
 #else
-    {
-        hipError_t herr;
+    // ------------------------------------------------------------------
+    // Helper lambdas that each return std::expected<void, GraphErrorInfo>
+    // so they can be chained with .and_then() / .or_else().
+    // ------------------------------------------------------------------
 
-        herr = hipStreamCreate(&hip_state_->stream);
+    auto create_stream = [this]() -> std::expected<void, GraphErrorInfo> {
+        hipError_t herr = hipStreamCreate(&hip_state_->stream);
         if (herr != hipSuccess) {
             hq_println("[HIPGraphDenoiser] Stream create failed, fallback");
-            goto fallback_step0;
+            return std::unexpected{GraphErrorInfo{GraphError::HipError,
+                std::format("hipStreamCreate: {}", hipGetErrorString(herr)),
+                static_cast<int>(herr)}};
         }
         hip_state_->owns_stream = true;
+        return {};
+    };
 
+    auto alloc_buffers = [this]() -> std::expected<void, GraphErrorInfo> {
         if (auto r = allocate_device_buffers_(); !r) {
             hq_println("[HIPGraphDenoiser] Alloc failed, fallback");
             hip_state_->reset();
-            goto fallback_step0;
+            return std::unexpected{r.error()};
         }
+        return {};
+    };
 
-        // Step 0: set timestep from scheduler or use default
-        // C02 fix: use scheduler timestep to match Pipeline::denoise_step_
+    auto set_timestep = [this]() -> std::expected<void, GraphErrorInfo> {
         if (scheduler_) {
             h_timestep_ = scheduler_->timestep(0);
         } else {
             h_timestep_ = 0;
         }
+        return {};
+    };
 
-        // Step 0: run UNet (outside graph) with conditional embeddings
+    auto run_unet_step0 = [&](std::vector<float>& noise_pred,
+                               std::size_t& noise_count)
+        -> std::expected<void, GraphErrorInfo> {
         auto unet_result = run_unet(
             std::span<const float>(latents_raw, latent_count_),
             embeddings, onnx_session, memory_info);
         if (!unet_result) {
             hip_state_->reset();
-            goto fallback_step0;
+            return std::unexpected{unet_result.error()};
         }
+        noise_pred = std::move(*unet_result);
+        noise_count = std::min(noise_pred.size(), latent_count_);
+        return {};
+    };
 
-        std::vector<float> noise_pred = std::move(*unet_result);
-        const std::size_t noise_count = std::min(
-            noise_pred.size(), latent_count_);
-
-        // Upload DDIM params for step 0
+    auto upload_scalars = [this]() -> std::expected<void, GraphErrorInfo> {
         if (auto r = upload_step_scalars_(0); !r) {
             hip_state_->reset();
-            goto fallback_step0;
+            return std::unexpected{r.error()};
         }
+        return {};
+    };
 
-        // Copy noise_pred to device
-        herr = hipMemcpyAsync(d_noise_pred_, noise_pred.data(),
-                               noise_count * sizeof(float),
-                               hipMemcpyHostToDevice, hip_state_->stream);
-        if (herr != hipSuccess) { hip_state_->reset(); goto fallback_step0; }
+    auto copy_noise_h2d = [&](const std::vector<float>& noise_pred,
+                               std::size_t noise_count)
+        -> std::expected<void, GraphErrorInfo> {
+        hipError_t herr = hipMemcpyAsync(
+            d_noise_pred_, noise_pred.data(), noise_count * sizeof(float),
+            hipMemcpyHostToDevice, hip_state_->stream);
+        if (herr != hipSuccess) {
+            hip_state_->reset();
+            return std::unexpected{GraphErrorInfo{GraphError::HipError,
+                std::format("noise_pred H2D: {}", hipGetErrorString(herr)),
+                static_cast<int>(herr)}};
+        }
+        return {};
+    };
 
-        // Copy latents to device
-        herr = hipMemcpyAsync(d_latents_, latents_raw, latent_count_ * sizeof(float),
-                               hipMemcpyHostToDevice, hip_state_->stream);
-        if (herr != hipSuccess) { hip_state_->reset(); goto fallback_step0; }
+    auto copy_latents_h2d = [this](float* src) -> std::expected<void, GraphErrorInfo> {
+        hipError_t herr = hipMemcpyAsync(
+            d_latents_, src, latent_count_ * sizeof(float),
+            hipMemcpyHostToDevice, hip_state_->stream);
+        if (herr != hipSuccess) {
+            hip_state_->reset();
+            return std::unexpected{GraphErrorInfo{GraphError::HipError,
+                std::format("latents H2D: {}", hipGetErrorString(herr)),
+                static_cast<int>(herr)}};
+        }
+        return {};
+    };
 
-        hipStreamSynchronize(hip_state_->stream);
+    auto sync_stream = [this]() -> std::expected<void, GraphErrorInfo> {
+        hipError_t herr = hipStreamSynchronize(hip_state_->stream);
+        if (herr != hipSuccess) {
+            hip_state_->reset();
+            return std::unexpected{GraphErrorInfo{GraphError::HipError,
+                std::format("hipStreamSynchronize: {}", hipGetErrorString(herr)),
+                static_cast<int>(herr)}};
+        }
+        return {};
+    };
 
-        // BEGIN GRAPH CAPTURE: DDIM kernel + D2H only
-        herr = hipStreamBeginCapture(hip_state_->stream,
-                                      hipStreamCaptureModeGlobal);
+    auto begin_capture = [this]() -> std::expected<void, GraphErrorInfo> {
+        hipError_t herr = hipStreamBeginCapture(hip_state_->stream,
+                                                 hipStreamCaptureModeGlobal);
         if (herr != hipSuccess) {
             hq_println("[HIPGraphDenoiser] BeginCapture failed, fallback");
-            goto graph_fail_and_fallback;
+            return std::unexpected{GraphErrorInfo{GraphError::CaptureFailed,
+                std::format("hipStreamBeginCapture: {}", hipGetErrorString(herr)),
+                static_cast<int>(herr)}};
         }
+        return {};
+    };
 
-        {
-            constexpr int kBlock = 256;
-            const int grid = static_cast<int>(
-                (latent_count_ + kBlock - 1) / kBlock);
-            hipLaunchKernelGGL(
-                ddim_update_kernel,
-                dim3(grid), dim3(kBlock), 0, hip_state_->stream,
-                d_latents_, d_noise_pred_,
-                static_cast<DdimDeviceParams*>(d_ddim_params_),
-                latent_count_);
+    auto record_graph_ops = [this]() -> std::expected<void, GraphErrorInfo> {
+        constexpr int kBlock = 256;
+        const int grid = static_cast<int>((latent_count_ + kBlock - 1) / kBlock);
+        hipLaunchKernelGGL(
+            ddim_update_kernel,
+            dim3(grid), dim3(kBlock), 0, hip_state_->stream,
+            d_latents_, d_noise_pred_,
+            static_cast<DdimDeviceParams*>(d_ddim_params_),
+            latent_count_);
 
-            hipMemcpyAsync(latents_raw, d_latents_, latent_count_ * sizeof(float),
-                            hipMemcpyDeviceToHost, hip_state_->stream);
-        }
+        hipMemcpyAsync(latents_raw, d_latents_, latent_count_ * sizeof(float),
+                        hipMemcpyDeviceToHost, hip_state_->stream);
+        return {};
+    };
 
-        herr = hipStreamEndCapture(hip_state_->stream, &hip_state_->graph);
+    auto end_capture = [this]() -> std::expected<void, GraphErrorInfo> {
+        hipError_t herr = hipStreamEndCapture(hip_state_->stream, &hip_state_->graph);
         if (herr != hipSuccess || !hip_state_->graph) {
-    graph_fail_and_fallback:
             hq_println("[HIPGraphDenoiser] Graph capture failed, fallback");
             hip_state_->graph = nullptr;
             hip_state_->reset();
-            goto fallback_done;
+            return std::unexpected{GraphErrorInfo{GraphError::CaptureFailed,
+                std::format("hipStreamEndCapture: {}",
+                    hipGetErrorString(herr)), static_cast<int>(herr)}};
         }
+        return {};
+    };
 
-        herr = hipGraphInstantiate(&hip_state_->exec, hip_state_->graph,
-                                    nullptr, nullptr, 0);
+    auto instantiate_graph = [this]() -> std::expected<void, GraphErrorInfo> {
+        hipError_t herr = hipGraphInstantiate(&hip_state_->exec,
+                                               hip_state_->graph,
+                                               nullptr, nullptr, 0);
         if (herr != hipSuccess) {
             hq_println("[HIPGraphDenoiser] Instantiate failed, fallback");
             hip_state_->exec = nullptr;
             hip_state_->reset();
-            goto fallback_done;
+            return std::unexpected{GraphErrorInfo{GraphError::CaptureFailed,
+                std::format("hipGraphInstantiate: {}", hipGetErrorString(herr)),
+                static_cast<int>(herr)}};
         }
+        return {};
+    };
 
+    auto finalize = [this]() -> std::expected<void, GraphErrorInfo> {
         captured_ = true;
         steps_replayed_ = 0;
         hipStreamSynchronize(hip_state_->stream);
 
         std::size_t n_nodes = 0;
         hipGraphGetNodes(hip_state_->graph, nullptr, &n_nodes);
-        hq_println(std::format("[HIPGraphDenoiser] Captured {} nodes (DDIM+D2H, step 0 done)",
-                   n_nodes));
+        hq_println(std::format(
+            "[HIPGraphDenoiser] Captured {} nodes (DDIM+D2H, step 0 done)",
+            n_nodes));
         return {};
-    }
+    };
 
-fallback_step0:
-    return execute_step_fallback_(latents_raw, embeddings, onnx_session,
-                                  memory_info, latent_shape, 0,
-                                  cfg_scale_,
-                                  std::span<const float>{uncond_embeddings_});
+    auto fallback = [this, latents_raw, embeddings, onnx_session,
+                     memory_info, &latent_shape]() -> std::expected<void, GraphErrorInfo> {
+        return execute_step_fallback_(latents_raw, embeddings, onnx_session,
+                                      memory_info, latent_shape, 0,
+                                      cfg_scale_,
+                                      std::span<const float>{uncond_embeddings_});
+    };
 
-fallback_done:
-    return execute_step_fallback_(latents_raw, embeddings, onnx_session,
-                                  memory_info, latent_shape, 0,
-                                  cfg_scale_,
-                                  std::span<const float>{uncond_embeddings_});
+    // ------------------------------------------------------------------
+    // Monadic chain: each step feeds into the next via .and_then().
+    // Any failure short-circuits to .or_else(fallback).
+    // ------------------------------------------------------------------
+
+    std::vector<float> noise_pred;
+    std::size_t noise_count = 0;
+
+    return create_stream()
+        .and_then(alloc_buffers)
+        .and_then(set_timestep)
+        .and_then([&](void) -> std::expected<void, GraphErrorInfo> {
+            return run_unet_step0(noise_pred, noise_count);
+        })
+        .and_then(upload_scalars)
+        .and_then([&](void) -> std::expected<void, GraphErrorInfo> {
+            return copy_noise_h2d(noise_pred, noise_count);
+        })
+        .and_then([&](void) -> std::expected<void, GraphErrorInfo> {
+            return copy_latents_h2d(latents_raw);
+        })
+        .and_then(sync_stream)
+        .and_then(begin_capture)
+        .and_then(record_graph_ops)
+        .and_then(end_capture)
+        .and_then(instantiate_graph)
+        .and_then(finalize)
+        .or_else([&](GraphErrorInfo err) -> std::expected<void, GraphErrorInfo> {
+            // If we already fell back inside a lambda, err may be a sentinel.
+            // In all cases, delegate to the CPU fallback path.
+            (void)err;
+            return fallback();
+        });
 #endif
 }
 
@@ -729,7 +823,7 @@ HIPGraphDenoiser::execute_full(hq::tensor::FloatTensor4D latents,
 //     same linear coefficient formula used in upload_step_scalars_().
 //   - When a scheduler is attached: uses scheduler_->timestep(step) for
 //     the ONNX input and delegates the latent update to scheduler_->step()
-//     (AVX-512 accelerated when available).
+//   (AVX-512 accelerated when available).
 // ===========================================================================
 
 std::expected<void, GraphErrorInfo>
@@ -742,6 +836,11 @@ HIPGraphDenoiser::execute_step_fallback_(float* latents,
                                           std::uint32_t step,
                                           float cfg_scale,
                                           std::span<const float> uncond_embeddings) {
+    if (!latents || !onnx_session || !memory_info) {
+        return std::unexpected{GraphErrorInfo{GraphError::ONNXError,
+            "null argument in execute_step_fallback_"}};
+    }
+
     const std::size_t ls0 = static_cast<std::size_t>(latent_shape[0]);
     const std::size_t ls1 = static_cast<std::size_t>(latent_shape[1]);
     const std::size_t ls2 = static_cast<std::size_t>(latent_shape[2]);
