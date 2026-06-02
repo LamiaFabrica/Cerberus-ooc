@@ -308,11 +308,10 @@ bool GgufParser::parse_from_memory(std::span<const std::uint8_t> data) {
 bool GgufParser::parse_stream(std::istream& in) {
     // Magic
     header_.magic = read_u32_le(in);
-    if (!header_.isValid()) return false;
 
-    // Version
+    // Version (must be read before isValid() check)
     header_.version = read_u32_le(in);
-    if (header_.version != GGUF_VERSION_V3) return false;
+    if (!header_.isValid()) return false;
 
     // Tensor count
     header_.tensor_count = read_u64_le(in);
