@@ -215,15 +215,15 @@ if(NOT OPENVINO_ROOT)
     set(OPENVINO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../openvino" CACHE PATH "OpenVINO runtime root directory")
 endif()
 
-find_path(OPENVINO_INCLUDE NAMES openvino/c/ov_c_api.h
+find_path(OPENVINO_INCLUDE NAMES openvino/c/openvino.h
     HINTS
         ${OPENVINO_ROOT}/runtime/include
+        ${OPENVINO_ROOT}/include
     DOC "OpenVINO C API headers"
 )
 
 if(OPENVINO_INCLUDE)
     message(STATUS "OpenVINO C API: found (include=${OPENVINO_INCLUDE})")
-    target_include_directories(um790_includes SYSTEM INTERFACE ${OPENVINO_INCLUDE})
 else()
     message(STATUS "OpenVINO: NOT found — Intel NPU backend disabled")
     message(STATUS "  Set OPENVINO_ROOT to the extracted ZIP directory")
@@ -382,6 +382,7 @@ target_include_directories(um790_includes SYSTEM INTERFACE
     $<$<BOOL:${HAILORT_FOUND}>:${HAILORT_INCLUDE_DIRS}>
     $<$<BOOL:${ONNXRUNTIME_INCLUDE}>:${ONNXRUNTIME_INCLUDE}>
     $<$<BOOL:${NVML_INCLUDE_DIR}>:${NVML_INCLUDE_DIR}>
+    $<$<BOOL:${OPENVINO_INCLUDE}>:${OPENVINO_INCLUDE}>
 )
 
 # --- PsiForceDB ecosystem includes (deferred until um790_includes exists) ---
@@ -586,7 +587,10 @@ target_link_libraries(test_lcmd_e2e PRIVATE um790_pipeline um790_compile_options
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND WIN32)
     target_link_options(test_lcmd_e2e PRIVATE -static-libgcc -static-libstdc++)
 endif()
-add_library(cerberus_npu SHARED src/cerberus_api.cpp)
+# Build cerberus_npu as STATIC to avoid MinGW duplicate-symbol segfault.
+# When SHARED, um790_pipeline (static) is linked into BOTH the DLL and
+# the executable, causing ABI mismatch crashes (0xc0000139) on Windows.
+add_library(cerberus_npu STATIC src/cerberus_api.cpp)
 
 target_sources(cerberus_npu PRIVATE
     include/hq/cerberus_api.h

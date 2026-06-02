@@ -78,6 +78,7 @@ namespace hq::npu { class INpuEncoder; }
 #include <hip/hip_runtime_api.h>
 #endif
 
+#define ORT_API_VERSION 17
 #include <onnxruntime_cxx_api.h>
 
 namespace hq::npu {
