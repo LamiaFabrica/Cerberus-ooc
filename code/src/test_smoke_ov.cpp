@@ -142,7 +142,7 @@ int main() {
                        std::span<const std::byte*>(ins),
                        std::span<std::byte*>(outs),
                        &f);
-    if (!er) { wl("execution failed: " + er.error()); return 1; }
+    if (!er) { wl(std::format("execution failed: {}", hq::to_string(er.error()))); return 1; }
     wl("execution ok");
 
     float expected[] = {3.0f, 5.0f, 7.0f, 9.0f};
