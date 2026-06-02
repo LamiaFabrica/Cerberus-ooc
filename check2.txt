@@ -1,0 +1,36 @@
+The requested API version [21] is not available, only API versions [1, 17] are supported in this build. Current ORT Version is: 1.17.1
+The requested API version [21] is not available, only API versions [1, 17] are supported in this build. Current ORT Version is: 1.17.1
+[PROPUP] propup_tiered_memory passed in 0.4453125 ms
+[PROPUP] propup_coordinator_memory_loop passed in 0.051025390625 ms
+[PROPUP] propup_coordinator_tier_decisions passed in 0.019775390625 ms
+[PROPUP] propup_compile_graph_analysis passed in 0.00146484375 ms
+[PROPUP] propup_kernel_matmul passed in 0.002197265625 ms
+[PROPUP] propup_kernel_elementwise passed in 0.00048828125 ms
+[PROPUP] propup_kernel_fma passed in 0.001220703125 ms
+[PROPUP] propup_kernel_matmul_blocked passed in 0.001953125 ms
+[PROPUP] propup_performance_matmul_vs_naive passed in 11.352783203125 ms
+[PROPUP] propup_end_to_end_native passed in 0.0673828125 ms
+[PROPUP] propup_decision_engine_fusion passed in 0.0361328125 ms
+[PROPUP] propup_kernel_relu_negative_input passed in 0 ms
+[PROPUP] propup_kernel_sigmoid_extremes passed in 0.000244140625 ms
+[PROPUP] propup_kernel_quantized_matmul_shape passed in 0.001953125 ms
+[PROPUP] propup_ranges_adopted_in_kernels passed in 0.00146484375 ms
+[PROPUP] propup_gguf_parser_header_valid skipped: GGUF parser not implemented
+[PROPUP] propup_gguf_parser_metadata_read skipped: GGUF parser not implemented
+[PROPUP] propup_glow_engine_init_deinit skipped: GlowEngine not implemented
+[PROPUP] propup_glow_engine_tensor_create skipped: GlowEngine not implemented
+[PROPUP] propup_adversarial_null_backend passed in 0.01953125 ms
+[PROPUP] propup_adversarial_corrupt_graph passed in 0.001953125 ms (execute rejected corrupt graph)
+[PROPUP] propup_adversarial_mismatched_tensor_shapes passed in 0.018798828125 ms (no crash on mismatch)
+[PROPUP] propup_adversarial_null_input_buffer passed in 0 ms (kernel returned error: null pointer)
+[03:29:19.342] [INFO ] npu_backend_unified.cpp:766 hq::npu::NpuBackendFactory::initialize()::<lambda()>() — [NpuBackendFactory] Probed 3 backends:
+[03:29:19.342] [INFO ] npu_backend_unified.cpp:791 hq::npu::NpuBackendFactory::print_status()::<lambda(hq::npu::INpuBackend*)>() —   ONNX-CPU-Fallback: available=yes, synthetic=yes, can_compile_for(intel_npu)=no, can_compile_for(cuda)=no, can_compile_for(cpu)=yes
+[03:29:19.343] [INFO ] npu_backend_unified.cpp:791 hq::npu::NpuBackendFactory::print_status()::<lambda(hq::npu::INpuBackend*)>() —   NVIDIA-CUDA: available=no, synthetic=yes, can_compile_for(intel_npu)=no, can_compile_for(cuda)=yes, can_compile_for(cpu)=no
+[03:29:19.343] [INFO ] npu_backend_unified.cpp:791 hq::npu::NpuBackendFactory::print_status()::<lambda(hq::npu::INpuBackend*)>() —   Intel-OpenVINO-NPU: available=no, synthetic=yes, can_compile_for(intel_npu)=yes, can_compile_for(cuda)=no, can_compile_for(cpu)=yes
+[PROPUP] propup_execution_coordinator_empty_graph passed in 0.023681640625 ms (empty graph accepted as no-op)
+[PROPUP] propup_runtime_diagnostic_report passed in 0.041015625 ms
+[PROPUP] propup_decision_engine_empty_graph passed in 0.01318359375 ms
+[PROPUP] propup_decision_engine_pick_backend_cpu_fallback passed in 0.019287109375 ms
+[PROPUP] propup_decision_engine_pick_backend_npu_matmul skipped: No real Intel NPU backend available on this host
+[PROPUP] propup_decision_engine_quant_profile_iq4 passed in 0.014404296875 ms
+[PROPUP] propup_decision_engine_unknown_op_fallback passed in 0.01416015625 ms
