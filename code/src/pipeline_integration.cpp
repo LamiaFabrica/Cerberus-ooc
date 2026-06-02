@@ -34,6 +34,7 @@
 #include <thread>
 
 // ONNX Runtime C++ API
+#define ORT_API_VERSION 17
 #include <onnxruntime_cxx_api.h>
 
 // HIP runtime (for GPU memory management)

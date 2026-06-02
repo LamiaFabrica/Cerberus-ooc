@@ -44,6 +44,7 @@
 #include <string>
 #include <vector>
 
+#define ORT_API_VERSION 17
 #include <onnxruntime_cxx_api.h>
 
 #ifdef __HIP_PLATFORM_AMD__

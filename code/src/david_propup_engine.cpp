@@ -16,7 +16,6 @@
 #include "hq/cerberus_graph_engine.hpp"
 #include "hq/cerberus_predictor.hpp"
 #include "hq/cerberus_execution_coordinator.hpp"
-#include "hq/cerberus_decision_engine.hpp"
 #include "hq/cerberus_runtime.hpp"
 #include "hq/cerberus_shadow_state.hpp"
 #include "hq/cerberus_glow_engine.hpp"
@@ -44,6 +43,7 @@
 #include "hq/gpu_monitor.hpp"
 #include "hq/hip_graph_denoiser.hpp"
 #include "hq/async_pipeline.hpp"
+#include "hq/boundary_contract.hpp"
 
 // C API header for propup tests (extern "C" linkage)
 extern "C" {
@@ -104,6 +104,8 @@ using hq::cerberus::CerberusGraph;
 using hq::cerberus::GraphNode;
 using hq::cerberus::GraphTensor;
 using hq::cerberus::CerberusRuntime;
+using hq::cerberus::GlowEngine;
+using hq::cerberus::GlowStats;
 
 // Targeted using-declarations — replaces broad using-namespace directives
 using hq::propup::PropupResult;
@@ -260,14 +262,14 @@ hq::propup::PropupResult hq::propup::propup_kernel_matmul([[maybe_unused]] std::
     float expected[] = {19,22,43,50};
     for (std::size_t i = 0; i < 4; ++i) {
         if (std::fabs(C[i] - expected[i]) > 1e-4f) {
-            auto diag = std::format("C[{}]={} expected {}", i, C[i], expected[i]);
+            auto diag = "C[" + std::to_string(i) + "]=" + std::to_string(C[i]) + " expected " + std::to_string(expected[i]);
             return PropupResult::fail(name, diag);
         }
     }
 
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    hq_println(std::format("[PROPUP] {} passed in {} ms", name, res.elapsed_ms));
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms");
     return res;
 }
 
@@ -297,7 +299,7 @@ hq::propup::PropupResult hq::propup::propup_kernel_elementwise([[maybe_unused]] 
 
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    hq_println(std::format("[PROPUP] {} passed in {} ms", name, res.elapsed_ms));
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms");
     return res;
 }
 
@@ -361,7 +363,7 @@ hq::propup::PropupResult hq::propup::propup_tiered_memory([[maybe_unused]] std::
 
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    hq_println(std::format("[PROPUP] {} passed in {} ms", name, res.elapsed_ms));
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms");
     return res;
 }
 
@@ -406,7 +408,7 @@ hq::propup::PropupResult hq::propup::propup_coordinator_memory_loop([[maybe_unus
 
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    hq_println(std::format("[PROPUP] {} passed in {} ms", name, res.elapsed_ms));
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms");
     return res;
 }
 
@@ -452,7 +454,7 @@ hq::propup::PropupResult hq::propup::propup_coordinator_tier_decisions([[maybe_u
 
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    hq_println(std::format("[PROPUP] {} passed in {} ms", name, res.elapsed_ms));
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms");
     return res;
 }
 
@@ -482,7 +484,7 @@ hq::propup::PropupResult hq::propup::propup_compile_graph_analysis([[maybe_unuse
 
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    hq_println(std::format("[PROPUP] {} passed in {} ms", name, res.elapsed_ms));
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms");
     return res;
 }
 
@@ -535,14 +537,14 @@ hq::propup::PropupResult hq::propup::propup_end_to_end_native([[maybe_unused]] s
     float expected[] = {3,5,7,9};
     for (std::size_t i = 0; i < 4; ++i) {
         if (std::fabs(out_buf[i] - expected[i]) > 1e-4f) {
-            auto diag = std::format("output[{}]={} expected {}", i, out_buf[i], expected[i]);
+            auto diag = "output[" + std::to_string(i) + "]=" + std::to_string(out_buf[i]) + " expected " + std::to_string(expected[i]);
             return PropupResult::fail(name, diag);
         }
     }
 
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    hq_println(std::format("[PROPUP] {} passed in {} ms", name, res.elapsed_ms));
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms");
     return res;
 }
 
@@ -609,7 +611,7 @@ hq::propup::PropupResult hq::propup::propup_decision_engine_fusion([[maybe_unuse
 
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    hq_println(std::format("[PROPUP] {} passed in {} ms", name, res.elapsed_ms));
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms");
     return res;
 }
 
@@ -638,7 +640,7 @@ hq::propup::PropupResult hq::propup::propup_kernel_fma([[maybe_unused]] std::ost
 
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    hq_println(std::format("[PROPUP] {} passed in {} ms", name, res.elapsed_ms));
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms");
     return res;
 }
 
@@ -658,14 +660,14 @@ hq::propup::PropupResult hq::propup::propup_kernel_matmul_blocked([[maybe_unused
     float expected[] = {19,22,43,50};
     for (std::size_t i = 0; i < 4; ++i) {
         if (std::fabs(C[i] - expected[i]) > 1e-4f) {
-            auto diag = std::format("C[{}]={} expected {}", i, C[i], expected[i]);
+            auto diag = "C[" + std::to_string(i) + "]=" + std::to_string(C[i]) + " expected " + std::to_string(expected[i]);
             return PropupResult::fail(name, diag);
         }
     }
 
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    hq_println(std::format("[PROPUP] {} passed in {} ms", name, res.elapsed_ms));
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms");
     return res;
 }
 
@@ -705,19 +707,19 @@ hq::propup::PropupResult hq::propup::propup_performance_matmul_vs_naive([[maybe_
     double speedup = naive_ms / blocked_ms;
 
     if (log) {
-        hq_println(std::format("[PROPUP] {} naive={} ms blocked={} ms speedup={}", name, naive_ms, blocked_ms, speedup));
+        hq_println("[PROPUP] " + name + " naive=" + std::to_string(naive_ms) + " ms blocked=" + std::to_string(blocked_ms) + " ms speedup=" + std::to_string(speedup));
     }
 
     // The blocked version should be faster on matrices >64x64.
     // On very small matrices it might tie, so require >= 1.0x (not slower).
     if (speedup < 1.0) {
-        auto diag = std::format("blocked slower than naive: speedup={}", speedup);
+        auto diag = "blocked slower than naive: speedup=" + std::to_string(speedup);
         return PropupResult::fail(name, diag);
     }
 
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    hq_println(std::format("[PROPUP] {} passed in {} ms", name, res.elapsed_ms));
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms");
     return res;
 }
 
@@ -757,7 +759,7 @@ hq::propup::PropupResult hq::propup::propup_kernel_matmul_avx2([[maybe_unused]] 
 
     double avx_ms = std::chrono::duration<double, std::milli>(t_avx_1 - t_avx_0).count();
     if (log) {
-        hq_println(std::format("[PROPUP] {} avx2={} ms max_err={}", name, avx_ms, max_err));
+        hq_println("[PROPUP] " + name + " avx2=" + std::to_string(avx_ms) + " ms max_err=" + std::to_string(max_err));
     }
 #endif
     (void)log;
@@ -863,18 +865,180 @@ hq::propup::PropupResult hq::propup::propup_ranges_adopted_in_kernels(std::ostre
 
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    hq_println(std::format("[PROPUP] {} passed in {} ms", name, res.elapsed_ms));
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms");
     return res;
+}
+
+// Helper: build a synthetic GGUF v3 file in memory.
+// Layout: magic(4) + version(4) + tensor_count(8) + metadata_kv_count(8)
+//         metadata KVs...
+//         tensor infos...
+static std::vector<std::uint8_t> build_synthetic_gguf(
+    uint64_t tensor_count,
+    uint64_t metadata_kv_count,
+    const std::vector<std::pair<std::string, std::variant<std::string, uint64_t, int64_t, double>>>& metadata,
+    const std::vector<std::tuple<std::string, std::vector<uint64_t>, uint32_t, uint64_t>>& tensors)
+{
+    std::vector<std::uint8_t> out;
+    auto append_u32 = [&](uint32_t v) {
+        out.insert(out.end(), reinterpret_cast<const uint8_t*>(&v),
+                   reinterpret_cast<const uint8_t*>(&v) + sizeof(v));
+    };
+    auto append_u64 = [&](uint64_t v) {
+        out.insert(out.end(), reinterpret_cast<const uint8_t*>(&v),
+                   reinterpret_cast<const uint8_t*>(&v) + sizeof(v));
+    };
+    auto append_str = [&](const std::string& s) {
+        append_u64(static_cast<uint64_t>(s.size()));
+        out.insert(out.end(), s.begin(), s.end());
+    };
+
+    append_u32(hq::cerberus::GGUF_MAGIC_LE);
+    append_u32(hq::cerberus::GGUF_VERSION_V3);
+    append_u64(tensor_count);
+    append_u64(metadata_kv_count);
+
+    for (const auto& kv : metadata) {
+        append_str(kv.first);
+        std::visit([&](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                append_u32(static_cast<uint32_t>(hq::cerberus::GgufMetadataType::STRING));
+                append_str(arg);
+            } else if constexpr (std::is_same_v<T, uint64_t>) {
+                append_u32(static_cast<uint32_t>(hq::cerberus::GgufMetadataType::UINT64));
+                append_u64(arg);
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                append_u32(static_cast<uint32_t>(hq::cerberus::GgufMetadataType::INT64));
+                append_u64(static_cast<uint64_t>(arg));
+            } else if constexpr (std::is_same_v<T, double>) {
+                append_u32(static_cast<uint32_t>(hq::cerberus::GgufMetadataType::FLOAT64));
+                uint64_t bits;
+                static_assert(sizeof(bits) == sizeof(arg));
+                std::memcpy(&bits, &arg, sizeof(arg));
+                append_u64(bits);
+            }
+        }, kv.second);
+    }
+
+    for (const auto& t : tensors) {
+        append_str(std::get<0>(t));
+        const auto& shape = std::get<1>(t);
+        append_u32(static_cast<uint32_t>(shape.size()));
+        for (uint64_t dim : shape) append_u64(dim);
+        append_u32(std::get<2>(t)); // dtype raw
+        append_u64(std::get<3>(t)); // offset
+    }
+
+    return out;
 }
 
 hq::propup::PropupResult hq::propup::propup_gguf_parser_header_valid([[maybe_unused]] std::ostream* log) {
     const std::string name = "propup_gguf_parser_header_valid";
     auto t0 = now_ms();
     (void)log;
-    // Synthetic: no GGUF parser implementation yet; mark as skipped
-    auto res = PropupResult::skip(name, "GGUF parser not implemented");
+
+    using hq::cerberus::GgufParser;
+    using hq::cerberus::GgufHeader;
+    using hq::cerberus::GGUF_MAGIC_LE;
+    using hq::cerberus::GGUF_VERSION_V3;
+
+    // --- Test 1: valid minimal header (no metadata, no tensors) ---
+    {
+        auto data = build_synthetic_gguf(0, 0, {}, {});
+        GgufParser parser;
+        if (!parser.parse_from_memory(data)) {
+            return PropupResult::fail(name, "parse_from_memory failed on valid minimal header");
+        }
+        const GgufHeader& h = parser.header();
+        if (h.magic != GGUF_MAGIC_LE) {
+            return PropupResult::fail(name, "magic mismatch: expected GGUF_MAGIC_LE");
+        }
+        if (h.version != GGUF_VERSION_V3) {
+            return PropupResult::fail(name, std::format("version mismatch: expected {} got {}", GGUF_VERSION_V3, h.version));
+        }
+        if (h.tensor_count != 0) {
+            return PropupResult::fail(name, std::format("tensor_count expected 0, got {}", h.tensor_count));
+        }
+        if (h.metadata_kv_count != 0) {
+            return PropupResult::fail(name, std::format("metadata_kv_count expected 0, got {}", h.metadata_kv_count));
+        }
+        if (!h.isValid()) {
+            return PropupResult::fail(name, "isValid() returned false on valid header");
+        }
+        if (!h.isLittleEndian()) {
+            return PropupResult::fail(name, "isLittleEndian() returned false on LE magic");
+        }
+    }
+
+    // --- Test 2: valid header with 2 tensors and 1 metadata KV ---
+    {
+        std::vector<std::pair<std::string, std::variant<std::string, uint64_t, int64_t, double>>> meta;
+        meta.emplace_back("general.architecture", std::string("qwen3"));
+        std::vector<std::tuple<std::string, std::vector<uint64_t>, uint32_t, uint64_t>> tensors;
+        tensors.emplace_back("token_embd.weight", std::vector<uint64_t>{151936, 4096}, 7, 0); // Q8_0
+        tensors.emplace_back("output_norm.weight", std::vector<uint64_t>{4096}, 0, 1234);      // F32
+
+        auto data = build_synthetic_gguf(2, 1, meta, tensors);
+        GgufParser parser;
+        if (!parser.parse_from_memory(data)) {
+            return PropupResult::fail(name, "parse_from_memory failed on valid header with tensors");
+        }
+        const auto& h = parser.header();
+        if (h.tensor_count != 2) {
+            return PropupResult::fail(name, std::format("tensor_count expected 2, got {}", h.tensor_count));
+        }
+        if (h.metadata_kv_count != 1) {
+            return PropupResult::fail(name, std::format("metadata_kv_count expected 1, got {}", h.metadata_kv_count));
+        }
+        if (parser.tensors().size() != 2) {
+            return PropupResult::fail(name, std::format("tensors vector size expected 2, got {}", parser.tensors().size()));
+        }
+        if (parser.tensors()[0].name != "token_embd.weight") {
+            return PropupResult::fail(name, "first tensor name mismatch");
+        }
+        if (parser.tensors()[0].shape.size() != 2 || parser.tensors()[0].shape[0] != 151936 || parser.tensors()[0].shape[1] != 4096) {
+            return PropupResult::fail(name, "first tensor shape mismatch");
+        }
+        if (parser.tensors()[1].name != "output_norm.weight") {
+            return PropupResult::fail(name, "second tensor name mismatch");
+        }
+    }
+
+    // --- Test 3: invalid magic should fail ---
+    {
+        std::vector<std::uint8_t> bad(64, 0);
+        uint32_t bad_magic = 0xDEADBEEF;
+        std::memcpy(bad.data(), &bad_magic, sizeof(bad_magic));
+        GgufParser parser;
+        if (parser.parse_from_memory(bad)) {
+            return PropupResult::fail(name, "parse_from_memory should have rejected bad magic");
+        }
+    }
+
+    // --- Test 4: wrong version should fail ---
+    {
+        auto data = build_synthetic_gguf(0, 0, {}, {});
+        // Patch version to 2
+        uint32_t wrong_ver = 2;
+        std::memcpy(data.data() + 4, &wrong_ver, sizeof(wrong_ver));
+        GgufParser parser;
+        if (parser.parse_from_memory(data)) {
+            return PropupResult::fail(name, "parse_from_memory should have rejected version != v3");
+        }
+    }
+
+    // --- Test 5: empty buffer should fail ---
+    {
+        GgufParser parser;
+        if (parser.parse_from_memory({})) {
+            return PropupResult::fail(name, "parse_from_memory should have rejected empty buffer");
+        }
+    }
+
+    auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    hq_println(std::format("[PROPUP] {} skipped: {}", name, res.diagnostic));
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms");
     return res;
 }
 
@@ -882,10 +1046,146 @@ hq::propup::PropupResult hq::propup::propup_gguf_parser_metadata_read([[maybe_un
     const std::string name = "propup_gguf_parser_metadata_read";
     auto t0 = now_ms();
     (void)log;
-    // Synthetic: no GGUF parser implementation yet; mark as skipped
-    auto res = PropupResult::skip(name, "GGUF parser not implemented");
+
+    using hq::cerberus::GgufParser;
+    using hq::cerberus::GgufMetadataType;
+
+    // --- Build a rich synthetic GGUF with multiple metadata types ---
+    std::vector<std::pair<std::string, std::variant<std::string, uint64_t, int64_t, double>>> meta;
+    meta.emplace_back("general.architecture", std::string("qwen3"));
+    meta.emplace_back("general.name", std::string("Athenea-Test"));
+    meta.emplace_back("qwen3.block_count", static_cast<uint64_t>(36));
+    meta.emplace_back("qwen3.embedding_length", static_cast<uint64_t>(4096));
+    meta.emplace_back("qwen3.context_length", static_cast<uint64_t>(32768));
+    meta.emplace_back("qwen3.vocab_size", static_cast<uint64_t>(151936));
+    meta.emplace_back("general.quantization_version", static_cast<uint64_t>(2));
+    meta.emplace_back("general.file_type", std::string("Q4_K_M"));
+    meta.emplace_back("qwen3.rope.freq_base", static_cast<double>(1000000.0));
+    meta.emplace_back("general.alignment", static_cast<uint64_t>(32));
+
+    std::vector<std::tuple<std::string, std::vector<uint64_t>, uint32_t, uint64_t>> tensors;
+    tensors.emplace_back("blk.0.attn_q.weight", std::vector<uint64_t>{4096, 4096}, 12, 0);   // Q4_K
+    tensors.emplace_back("blk.0.attn_k.weight", std::vector<uint64_t>{4096, 4096}, 12, 8192); // Q4_K
+    tensors.emplace_back("blk.0.attn_v.weight", std::vector<uint64_t>{4096, 4096}, 13, 16384); // Q5_K
+
+    auto data = build_synthetic_gguf(3, 10, meta, tensors);
+
+    GgufParser parser;
+    if (!parser.parse_from_memory(data)) {
+        return PropupResult::fail(name, "parse_from_memory failed on rich synthetic GGUF");
+    }
+
+    // --- Verify string metadata ---
+    auto arch = parser.get_metadata_string("general.architecture");
+    if (!arch || *arch != "qwen3") {
+        return PropupResult::fail(name, "get_metadata_string('general.architecture') mismatch");
+    }
+    auto mname = parser.get_metadata_string("general.name");
+    if (!mname || *mname != "Athenea-Test") {
+        return PropupResult::fail(name, "get_metadata_string('general.name') mismatch");
+    }
+    auto ftype = parser.get_metadata_string("general.file_type");
+    if (!ftype || *ftype != "Q4_K_M") {
+        return PropupResult::fail(name, "get_metadata_string('general.file_type') mismatch");
+    }
+
+    // --- Verify uint64 metadata ---
+    auto block_count = parser.get_metadata_uint64("qwen3.block_count");
+    if (!block_count || *block_count != 36) {
+        return PropupResult::fail(name, "get_metadata_uint64('qwen3.block_count') mismatch");
+    }
+    auto emb_len = parser.get_metadata_uint64("qwen3.embedding_length");
+    if (!emb_len || *emb_len != 4096) {
+        return PropupResult::fail(name, "get_metadata_uint64('qwen3.embedding_length') mismatch");
+    }
+    auto ctx_len = parser.get_metadata_uint64("qwen3.context_length");
+    if (!ctx_len || *ctx_len != 32768) {
+        return PropupResult::fail(name, "get_metadata_uint64('qwen3.context_length') mismatch");
+    }
+    auto vocab = parser.get_metadata_uint64("qwen3.vocab_size");
+    if (!vocab || *vocab != 151936) {
+        return PropupResult::fail(name, "get_metadata_uint64('qwen3.vocab_size') mismatch");
+    }
+
+    // --- Verify double metadata ---
+    auto rope = parser.get_metadata_double("qwen3.rope.freq_base");
+    if (!rope || std::fabs(*rope - 1000000.0) > 1e-6) {
+        return PropupResult::fail(name, "get_metadata_double('qwen3.rope.freq_base') mismatch");
+    }
+
+    // --- Verify missing key returns nullopt ---
+    auto missing = parser.get_metadata_string("nonexistent.key");
+    if (missing.has_value()) {
+        return PropupResult::fail(name, "get_metadata_string('nonexistent.key') should return nullopt");
+    }
+    auto missing_uint = parser.get_metadata_uint64("general.name"); // wrong type
+    if (missing_uint.has_value()) {
+        return PropupResult::fail(name, "get_metadata_uint64 on string key should return nullopt");
+    }
+
+    // --- Verify LLM-specialized accessors ---
+    auto sarch = parser.get_architecture();
+    if (!sarch || *sarch != "qwen3") {
+        return PropupResult::fail(name, "get_architecture() mismatch");
+    }
+    auto sblocks = parser.get_block_count();
+    if (!sblocks || *sblocks != 36) {
+        return PropupResult::fail(name, "get_block_count() mismatch");
+    }
+    auto semb = parser.get_embedding_length();
+    if (!semb || *semb != 4096) {
+        return PropupResult::fail(name, "get_embedding_length() mismatch");
+    }
+    auto sctx = parser.get_context_length();
+    if (!sctx || *sctx != 32768) {
+        return PropupResult::fail(name, "get_context_length() mismatch");
+    }
+    auto srope = parser.get_rope_freq_base();
+    if (!srope || std::fabs(*srope - 1000000.0) > 1e-6) {
+        return PropupResult::fail(name, "get_rope_freq_base() mismatch");
+    }
+    auto svocab = parser.get_vocab_size();
+    if (!svocab || *svocab != 151936) {
+        return PropupResult::fail(name, "get_vocab_size() mismatch");
+    }
+
+    // --- Verify quantization family detection ---
+    auto qfam = parser.detect_quantization_family();
+    if (!qfam || *qfam != "Q4_K_M") {
+        return PropupResult::fail(name, std::format("detect_quantization_family() expected Q4_K_M, got {}", qfam.value_or("nullopt")));
+    }
+
+    // --- Verify model family detection ---
+    auto mfam = parser.detect_model_family();
+    if (!mfam || *mfam != "qwen3") {
+        return PropupResult::fail(name, std::format("detect_model_family() expected qwen3, got {}", mfam.value_or("nullopt")));
+    }
+
+    // --- Verify tensor metadata ---
+    if (parser.tensors().size() != 3) {
+        return PropupResult::fail(name, std::format("tensor count expected 3, got {}", parser.tensors().size()));
+    }
+    const auto& t0_info = parser.tensors()[0];
+    if (t0_info.name != "blk.0.attn_q.weight" || t0_info.shape.size() != 2 || t0_info.shape[0] != 4096 || t0_info.shape[1] != 4096) {
+        return PropupResult::fail(name, "tensor[0] metadata mismatch");
+    }
+    if (!t0_info.is_quantized()) {
+        return PropupResult::fail(name, "tensor[0] should be quantized (Q4_K)");
+    }
+
+    // --- Verify tensors_with_type filter ---
+    auto q4k_tensors = parser.tensors_with_type(hq::cerberus::GgmlType::Q4_K);
+    if (q4k_tensors.size() != 2) {
+        return PropupResult::fail(name, std::format("tensors_with_type(Q4_K) expected 2, got {}", q4k_tensors.size()));
+    }
+    auto q5k_tensors = parser.tensors_with_type(hq::cerberus::GgmlType::Q5_K);
+    if (q5k_tensors.size() != 1) {
+        return PropupResult::fail(name, std::format("tensors_with_type(Q5_K) expected 1, got {}", q5k_tensors.size()));
+    }
+
+    auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    hq_println(std::format("[PROPUP] {} skipped: {}", name, res.diagnostic));
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms");
     return res;
 }
 
@@ -893,10 +1193,41 @@ hq::propup::PropupResult hq::propup::propup_glow_engine_init_deinit([[maybe_unus
     const std::string name = "propup_glow_engine_init_deinit";
     auto t0 = now_ms();
     (void)log;
-    // Synthetic: no GlowEngine implementation yet; mark as skipped
-    auto res = PropupResult::skip(name, "GlowEngine not implemented");
+
+    GlowEngine engine;
+
+    // Record a simple execution path: 0 -> 1 -> 2 -> 3
+    engine.record_execution({0, 1, 2, 3});
+    engine.record_execution({0, 1, 2, 3});
+    engine.record_execution({0, 1, 3});
+
+    auto s = engine.stats();
+    if (s.paths_learned != 3)
+        return PropupResult::fail(name, "paths_learned expected 3, got " + std::to_string(s.paths_learned));
+    if (s.active_bond_count == 0)
+        return PropupResult::fail(name, "active_bond_count should be > 0 after recordings");
+
+    // Reinforce a path and verify stats update
+    engine.reinforce_path({0, 1, 2}, 0.5f);
+    auto s2 = engine.stats();
+    if (s2.reinforcements_applied != 2)
+        return PropupResult::fail(name, "reinforcements_applied expected 2, got " + std::to_string(s2.reinforcements_applied));
+
+    // Reset and verify zeroed stats
+    engine.reset();
+    auto s3 = engine.stats();
+    if (s3.paths_learned != 0)
+        return PropupResult::fail(name, "paths_learned after reset expected 0, got " + std::to_string(s3.paths_learned));
+    if (s3.active_bond_count != 0)
+        return PropupResult::fail(name, "active_bond_count after reset expected 0, got " + std::to_string(s3.active_bond_count));
+    if (s3.reinforcements_applied != 0)
+        return PropupResult::fail(name, "reinforcements_applied after reset expected 0, got " + std::to_string(s3.reinforcements_applied));
+    if (s3.decay_cycles_completed != 0)
+        return PropupResult::fail(name, "decay_cycles_completed after reset expected 0, got " + std::to_string(s3.decay_cycles_completed));
+
+    auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    hq_println(std::format("[PROPUP] {} skipped: {}", name, res.diagnostic));
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms");
     return res;
 }
 
@@ -904,10 +1235,67 @@ hq::propup::PropupResult hq::propup::propup_glow_engine_tensor_create([[maybe_un
     const std::string name = "propup_glow_engine_tensor_create";
     auto t0 = now_ms();
     (void)log;
-    // Synthetic: no GlowEngine implementation yet; mark as skipped
-    auto res = PropupResult::skip(name, "GlowEngine not implemented");
+
+    GlowEngine engine;
+
+    // Record execution paths to create bonds
+    engine.record_execution({10, 20, 30, 40});
+    engine.record_execution({10, 20, 30, 40});
+    engine.record_execution({10, 20, 40});
+
+    // Verify bonds exist with correct dimensions (from_node, to_node)
+    auto bond_10_20 = engine.get_bond(10, 20);
+    if (!bond_10_20)
+        return PropupResult::fail(name, "bond 10->20 missing after record_execution");
+    if (bond_10_20->from_node != 10 || bond_10_20->to_node != 20)
+        return PropupResult::fail(name, "bond 10->20 has wrong node ids");
+    if (bond_10_20->traversal_count != 3)
+        return PropupResult::fail(name, "bond 10->20 traversal_count expected 3, got " + std::to_string(bond_10_20->traversal_count));
+
+    auto bond_20_30 = engine.get_bond(20, 30);
+    if (!bond_20_30)
+        return PropupResult::fail(name, "bond 20->30 missing after record_execution");
+    if (bond_20_30->traversal_count != 2)
+        return PropupResult::fail(name, "bond 20->30 traversal_count expected 2, got " + std::to_string(bond_20_30->traversal_count));
+
+    auto bond_30_40 = engine.get_bond(30, 40);
+    if (!bond_30_40)
+        return PropupResult::fail(name, "bond 30->40 missing after record_execution");
+
+    auto bond_20_40 = engine.get_bond(20, 40);
+    if (!bond_20_40)
+        return PropupResult::fail(name, "bond 20->40 missing after record_execution");
+    if (bond_20_40->traversal_count != 1)
+        return PropupResult::fail(name, "bond 20->40 traversal_count expected 1, got " + std::to_string(bond_20_40->traversal_count));
+
+    // Query hot paths from node 10 and verify results
+    auto hot_paths = engine.query_hot_paths(10, 0.1f, 12, 10);
+    if (hot_paths.empty())
+        return PropupResult::fail(name, "query_hot_paths returned empty after recordings");
+
+    // The hottest path should contain the reinforced nodes
+    bool found_full_path = false;
+    for (const auto& path : hot_paths) {
+        if (path.nodes.size() >= 4 &&
+            path.nodes[0] == 10 && path.nodes[1] == 20 &&
+            path.nodes[2] == 30 && path.nodes[3] == 40) {
+            found_full_path = true;
+            break;
+        }
+    }
+    if (!found_full_path)
+        return PropupResult::fail(name, "query_hot_paths did not return expected 10->20->30->40 path");
+
+    // Verify best_next_hop from node 10
+    auto next_hop = engine.best_next_hop(10, 0.1f);
+    if (!next_hop)
+        return PropupResult::fail(name, "best_next_hop from 10 returned nullopt");
+    if (*next_hop != 20)
+        return PropupResult::fail(name, "best_next_hop from 10 expected 20, got " + std::to_string(*next_hop));
+
+    auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    hq_println(std::format("[PROPUP] {} skipped: {}", name, res.diagnostic));
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms");
     return res;
 }
 
@@ -921,7 +1309,7 @@ hq::propup::PropupResult hq::propup::propup_kernel_avx512_detect([[maybe_unused]
     bool has_avx2 = cerberus::native::cpu_has_avx2();
     bool has_avx512 = cerberus::native::cpu_has_avx512f();
     if (log) {
-        hq_println(std::format("[PROPUP] {} avx2={} avx512f={}", name, has_avx2 ? "yes" : "no", has_avx512 ? "yes" : "no"));
+        hq_println("[PROPUP] " + name + " avx2=" + (has_avx2 ? "yes" : "no") + " avx512f=" + (has_avx512 ? "yes" : "no"));
     }
     // Detection must be consistent: if compile-time AVX512 is set but cpuid says no, that's fine on non-AVX512 host
     auto res = PropupResult::pass(name);
@@ -1717,40 +2105,46 @@ static hq::Expected<int> expected_fail_always() {
 // ===========================================================================
 // C ABI surface propups (cerberus_api.cpp)
 // ===========================================================================
+// C API propups — using C++26 wrapper (std::expected, [[nodiscard]], std::span)
+// ===========================================================================
+
+#include "hq/cerberus_api_wrapper.hpp"
 
 hq::propup::PropupResult hq::propup::propup_c_api_init_shutdown_cycle([[maybe_unused]] std::ostream* log) {
     (void)log;
     const std::string name = "propup_c_api_init_shutdown_cycle";
     auto t0 = now_ms();
 
-    auto s1 = cerberus_init();
-    if (s1 != CERBERUS_OK && s1 != CERBERUS_ALREADY_SHUTDOWN) {
-        auto res = PropupResult::fail(name, std::format("first init failed: {}", static_cast<int>(s1)));
+    using hq::cerberus::c_api::init;
+    using hq::cerberus::c_api::shutdown;
+
+    // First cycle via wrapper — [[nodiscard]] enforced
+    if (auto r1 = init(); !r1) {
+        auto res = PropupResult::fail(name, "first init failed: " + r1.error().message);
         res.elapsed_ms = now_ms() - t0;
         return res;
     }
-    auto s2 = cerberus_shutdown();
-    if (s2 != CERBERUS_OK) {
-        auto res = PropupResult::fail(name, std::format("first shutdown failed: {}", static_cast<int>(s2)));
+    if (auto r2 = shutdown(); !r2) {
+        auto res = PropupResult::fail(name, "first shutdown failed: " + r2.error().message);
         res.elapsed_ms = now_ms() - t0;
         return res;
     }
-    auto s3 = cerberus_init();
-    if (s3 != CERBERUS_OK) {
-        auto res = PropupResult::fail(name, std::format("second init failed: {}", static_cast<int>(s3)));
+
+    // Second cycle — verify idempotency / cleanup
+    if (auto r3 = init(); !r3) {
+        auto res = PropupResult::fail(name, "second init failed: " + r3.error().message);
         res.elapsed_ms = now_ms() - t0;
         return res;
     }
-    auto s4 = cerberus_shutdown();
-    if (s4 != CERBERUS_OK) {
-        auto res = PropupResult::fail(name, std::format("second shutdown failed: {}", static_cast<int>(s4)));
+    if (auto r4 = shutdown(); !r4) {
+        auto res = PropupResult::fail(name, "second shutdown failed: " + r4.error().message);
         res.elapsed_ms = now_ms() - t0;
         return res;
     }
 
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    hq_println(std::format("[PROPUP] {} passed in {} ms", name, res.elapsed_ms));
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms");
     return res;
 }
 
@@ -1759,22 +2153,22 @@ hq::propup::PropupResult hq::propup::propup_c_api_version_string([[maybe_unused]
     const std::string name = "propup_c_api_version_string";
     auto t0 = now_ms();
 
-    const char* ver = cerberus_get_version();
-    if (!ver || std::strlen(ver) == 0) {
+    std::string_view ver = hq::cerberus::c_api::version();
+    if (ver.empty()) {
         auto res = PropupResult::fail(name, "version string is null or empty");
         res.elapsed_ms = now_ms() - t0;
         return res;
     }
-    if (std::string_view(ver).find("Cerberus") == std::string_view::npos &&
-        std::string_view(ver).find("cerberus") == std::string_view::npos) {
-        auto res = PropupResult::fail(name, std::format("version string lacks 'Cerberus' prefix: {}", ver));
+    if (ver.find("Cerberus") == std::string_view::npos &&
+        ver.find("cerberus") == std::string_view::npos) {
+        auto res = PropupResult::fail(name, "version string lacks 'Cerberus' prefix: " + std::string(ver));
         res.elapsed_ms = now_ms() - t0;
         return res;
     }
 
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    hq_println(std::format("[PROPUP] {} passed in {} ms (version={})", name, res.elapsed_ms, ver));
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms (version=" + std::string(ver) + ")");
     return res;
 }
 
@@ -1783,7 +2177,15 @@ hq::propup::PropupResult hq::propup::propup_c_api_load_model_rejects_invalid_pat
     const std::string name = "propup_c_api_load_model_rejects_invalid_path";
     auto t0 = now_ms();
 
-    cerberus_init();
+    using hq::cerberus::c_api::init;
+    using hq::cerberus::c_api::shutdown;
+    using hq::cerberus::c_api::create_session;
+
+    if (auto r = init(); !r) {
+        auto res = PropupResult::fail(name, "init failed: " + r.error().message);
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
 
     cerberus_session_config_t cfg{};
     cfg.model_path = "/nonexistent/path/to/model.onnx";
@@ -1793,22 +2195,27 @@ hq::propup::PropupResult hq::propup::propup_c_api_load_model_rejects_invalid_pat
     cfg.guidance_scale = 7.5f;
     cfg.preferred_device = CERBERUS_DEVICE_CPU;
 
-    cerberus_handle_t session = nullptr;
-    auto status = cerberus_create_session(&cfg, &session);
-
-    if (status == CERBERUS_OK) {
-        cerberus_destroy_session(session);
+    auto session_r = create_session(cfg);
+    if (session_r.has_value()) {
+        // Should not succeed — if it did, clean up and fail
         auto res = PropupResult::fail(name, "create_session succeeded with invalid path");
+        res.elapsed_ms = now_ms() - t0;
+        (void)shutdown();
+        return res;
+    }
+
+    auto status = session_r.error().code;
+
+    if (auto r = shutdown(); !r) {
+        auto res = PropupResult::fail(name, "shutdown failed: " + r.error().message);
         res.elapsed_ms = now_ms() - t0;
         return res;
     }
 
-    cerberus_shutdown();
-
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    res.diagnostic = std::format("correctly rejected with status {}", static_cast<int>(status));
-    hq_println(std::format("[PROPUP] {} passed in {} ms (status={})", name, res.elapsed_ms, static_cast<int>(status)));
+    res.diagnostic = "correctly rejected with status " + std::to_string(static_cast<int>(status));
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms (status=" + std::to_string(static_cast<int>(status)) + ")");
     return res;
 }
 
@@ -1817,26 +2224,38 @@ hq::propup::PropupResult hq::propup::propup_c_api_run_inference_rejects_null_han
     const std::string name = "propup_c_api_run_inference_rejects_null_handle";
     auto t0 = now_ms();
 
-    cerberus_init();
+    using hq::cerberus::c_api::init;
+    using hq::cerberus::c_api::shutdown;
+    using hq::cerberus::c_api::run;
 
-    float dummy_input[4] = {1.0f, 2.0f, 3.0f, 4.0f};
-    float* output = nullptr;
-    size_t output_size = 0;
-
-    auto status = cerberus_run(nullptr, dummy_input, 4, &output, &output_size);
-
-    if (status == CERBERUS_OK) {
-        auto res = PropupResult::fail(name, "cerberus_run succeeded with null session");
+    if (auto r = init(); !r) {
+        auto res = PropupResult::fail(name, "init failed: " + r.error().message);
         res.elapsed_ms = now_ms() - t0;
         return res;
     }
 
-    cerberus_shutdown();
+    float dummy_input[4] = {1.0f, 2.0f, 3.0f, 4.0f};
+    auto run_r = run(nullptr, std::span<const float>{dummy_input, 4});
+
+    if (run_r.has_value()) {
+        auto res = PropupResult::fail(name, "cerberus_run succeeded with null session");
+        res.elapsed_ms = now_ms() - t0;
+        (void)shutdown();
+        return res;
+    }
+
+    auto status = run_r.error().code;
+
+    if (auto r = shutdown(); !r) {
+        auto res = PropupResult::fail(name, "shutdown failed: " + r.error().message);
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
 
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    res.diagnostic = std::format("correctly rejected with status {}", static_cast<int>(status));
-    hq_println(std::format("[PROPUP] {} passed in {} ms (status={})", name, res.elapsed_ms, static_cast<int>(status)));
+    res.diagnostic = "correctly rejected with status " + std::to_string(static_cast<int>(status));
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms (status=" + std::to_string(static_cast<int>(status)) + ")");
     return res;
 }
 
@@ -1845,35 +2264,47 @@ hq::propup::PropupResult hq::propup::propup_c_api_get_last_error_consistent([[ma
     const std::string name = "propup_c_api_get_last_error_consistent";
     auto t0 = now_ms();
 
-    cerberus_init();
+    using hq::cerberus::c_api::init;
+    using hq::cerberus::c_api::shutdown;
+    using hq::cerberus::c_api::run;
+    using hq::cerberus::c_api::last_error;
+
+    if (auto r = init(); !r) {
+        auto res = PropupResult::fail(name, "init failed: " + r.error().message);
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
 
     float dummy_input[4] = {1.0f};
-    float* output = nullptr;
-    size_t output_size = 0;
-    cerberus_run(nullptr, dummy_input, 1, &output, &output_size);
+    (void)run(nullptr, std::span<const float>{dummy_input, 1}); // force error
 
-    const char* err1 = cerberus_get_last_error();
-    if (!err1 || std::strlen(err1) == 0) {
-        cerberus_shutdown();
+    std::string_view err1 = last_error();
+    if (err1.empty()) {
+        (void)shutdown();
         auto res = PropupResult::fail(name, "get_last_error returned null/empty after failed run");
         res.elapsed_ms = now_ms() - t0;
         return res;
     }
 
-    const char* err2 = cerberus_get_last_error();
-    if (std::strcmp(err1, err2) != 0) {
-        cerberus_shutdown();
-        auto res = PropupResult::fail(name, std::format("error string inconsistent: '{}' vs '{}'", err1, err2));
+    std::string_view err2 = last_error();
+    if (err1 != err2) {
+        (void)shutdown();
+        auto diag = std::string("error string inconsistent: '") + std::string(err1) + "' vs '" + std::string(err2) + "'";
+        auto res = PropupResult::fail(name, diag);
         res.elapsed_ms = now_ms() - t0;
         return res;
     }
 
-    cerberus_shutdown();
+    if (auto r = shutdown(); !r) {
+        auto res = PropupResult::fail(name, "shutdown failed: " + r.error().message);
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
 
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    res.diagnostic = std::format("error='{}'", err1);
-    hq_println(std::format("[PROPUP] {} passed in {} ms", name, res.elapsed_ms));
+    res.diagnostic = std::string("error='") + std::string(err1) + "'";
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms");
     return res;
 }
 
@@ -1953,20 +2384,20 @@ hq::propup::PropupReport hq::propup::run_all_propups() {
             report.total_ms += r.elapsed_ms;
             // ostream flush removed — no longer needed
         } catch (const std::bad_alloc& e) {
-            auto s = std::format("[PROPUP] {} FAILED — std::bad_alloc: {}\n",
-                         name_hint.empty() ? "<unknown>" : name_hint, e.what());
+            auto name = name_hint.empty() ? std::string("<unknown>") : name_hint;
+            auto s = std::string("[PROPUP] ") + name + " FAILED — std::bad_alloc: " + e.what() + "\n";
             hq_safe_write(1, s.data(), s.size());
             report.results.push_back(PropupResult::fail(name_hint.empty() ? "<enter>" : name_hint, e.what()));
             ++report.failed_count;
         } catch (const std::exception& e) {
-            auto s = std::format("[PROPUP] {} FAILED — exception: {}\n",
-                         name_hint.empty() ? "<unknown>" : name_hint, e.what());
+            auto name = name_hint.empty() ? std::string("<unknown>") : name_hint;
+            auto s = std::string("[PROPUP] ") + name + " FAILED — exception: " + e.what() + "\n";
             hq_safe_write(1, s.data(), s.size());
             report.results.push_back(PropupResult::fail(name_hint.empty() ? "<error>" : name_hint, e.what()));
             ++report.failed_count;
         } catch (...) {
-            auto s = std::format("[PROPUP] {} FAILED — unknown exception\n",
-                         name_hint.empty() ? "<unknown>" : name_hint);
+            auto name = name_hint.empty() ? std::string("<unknown>") : name_hint;
+            auto s = std::string("[PROPUP] ") + name + " FAILED — unknown exception\n";
             hq_safe_write(1, s.data(), s.size());
             report.results.push_back(PropupResult::fail(name_hint.empty() ? "<error>" : name_hint, "unknown exception"));
             ++report.failed_count;
@@ -2259,7 +2690,7 @@ hq::propup::PropupResult hq::propup::propup_adversarial_null_backend([[maybe_unu
 
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    hq_println(std::format("[PROPUP] {} passed in {} ms", name, res.elapsed_ms));
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms");
     return res;
 }
 
@@ -2289,7 +2720,7 @@ hq::propup::PropupResult hq::propup::propup_adversarial_corrupt_graph([[maybe_un
     if (!compile_r) {
         auto res = PropupResult::pass(name);
         res.elapsed_ms = now_ms() - t0;
-        hq_println(std::format("[PROPUP] {} passed in {} ms (compile rejected corrupt graph)", name, res.elapsed_ms));
+        hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms (compile rejected corrupt graph)");
         return res;
     }
 
@@ -2304,13 +2735,13 @@ hq::propup::PropupResult hq::propup::propup_adversarial_corrupt_graph([[maybe_un
     if (!exec_r) {
         auto res = PropupResult::pass(name);
         res.elapsed_ms = now_ms() - t0;
-        hq_println(std::format("[PROPUP] {} passed in {} ms (execute rejected corrupt graph)", name, res.elapsed_ms));
+        hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms (execute rejected corrupt graph)");
         return res;
     }
 
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    hq_println(std::format("[PROPUP] {} passed in {} ms (no crash on corrupt graph)", name, res.elapsed_ms));
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms (no crash on corrupt graph)");
     return res;
 }
 
@@ -2341,7 +2772,7 @@ hq::propup::PropupResult hq::propup::propup_adversarial_mismatched_tensor_shapes
     if (!ck) {
         auto res = PropupResult::pass(name);
         res.elapsed_ms = now_ms() - t0;
-        hq_println(std::format("[PROPUP] {} passed in {} ms (compile rejected mismatch)", name, res.elapsed_ms));
+        hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms (compile rejected mismatch)");
         return res;
     }
 
@@ -2359,13 +2790,13 @@ hq::propup::PropupResult hq::propup::propup_adversarial_mismatched_tensor_shapes
     if (!run_r) {
         auto res = PropupResult::pass(name);
         res.elapsed_ms = now_ms() - t0;
-        hq_println(std::format("[PROPUP] {} passed in {} ms (coordinator rejected mismatch)", name, res.elapsed_ms));
+        hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms (coordinator rejected mismatch)");
         return res;
     }
 
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    hq_println(std::format("[PROPUP] {} passed in {} ms (no crash on mismatch)", name, res.elapsed_ms));
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms (no crash on mismatch)");
     return res;
 }
 
@@ -2383,7 +2814,7 @@ hq::propup::PropupResult hq::propup::propup_adversarial_null_input_buffer([[mayb
     if (!r) {
         auto res = PropupResult::pass(name);
         res.elapsed_ms = now_ms() - t0;
-        hq_println(std::format("[PROPUP] {} passed in {} ms (kernel returned error: {})", name, res.elapsed_ms, r.error()));
+        hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms (kernel returned error: " + r.error() + ")");
         return res;
     }
 
@@ -2540,17 +2971,17 @@ hq::propup::PropupResult hq::propup::propup_kernel_relu_negative_input([[maybe_u
     auto r = cerberus::native::kernel_relu(in.data(), out.data(), in.size());
     if (!r) return PropupResult::fail(name, r.error());
     if (out[0] != 0.0f) {
-        auto diag = std::format("ReLU(-1.0) = {} expected 0.0", out[0]);
+        auto diag = "ReLU(-1.0) = " + std::to_string(out[0]) + " expected 0.0";
         return PropupResult::fail(name, diag);
     }
     if (out[1] != 5.0f) {
-        auto diag = std::format("ReLU(5.0) = {} expected 5.0", out[1]);
+        auto diag = "ReLU(5.0) = " + std::to_string(out[1]) + " expected 5.0";
         return PropupResult::fail(name, diag);
     }
 
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    hq_println(std::format("[PROPUP] {} passed in {} ms", name, res.elapsed_ms));
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms");
     return res;
 }
 
@@ -2564,17 +2995,17 @@ hq::propup::PropupResult hq::propup::propup_kernel_sigmoid_extremes([[maybe_unus
     auto r = cerberus::native::kernel_sigmoid(in.data(), out.data(), in.size());
     if (!r) return PropupResult::fail(name, r.error());
     if (out[0] > 0.0005f) {
-        auto diag = std::format("sigmoid(-10) = {} expected ~0", out[0]);
+        auto diag = "sigmoid(-10) = " + std::to_string(out[0]) + " expected ~0";
         return PropupResult::fail(name, diag);
     }
     if (out[1] < 0.9995f) {
-        auto diag = std::format("sigmoid(10) = {} expected ~1", out[1]);
+        auto diag = "sigmoid(10) = " + std::to_string(out[1]) + " expected ~1";
         return PropupResult::fail(name, diag);
     }
 
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    hq_println(std::format("[PROPUP] {} passed in {} ms", name, res.elapsed_ms));
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms");
     return res;
 }
 
@@ -2594,20 +3025,20 @@ hq::propup::PropupResult hq::propup::propup_kernel_quantized_matmul_shape([[mayb
 
     // Verify output shape semantics: C should have 8 elements (2x4)
     if (C.size() != 8) {
-        auto diag = std::format("output size {} expected 8", C.size());
+        auto diag = "output size " + std::to_string(C.size()) + " expected 8";
         return PropupResult::fail(name, diag);
     }
 
     // Verify A's first row maps to C's first row (B is partial identity)
     if (std::fabs(C[0] - 1.0f) > 0.5f || std::fabs(C[1] - 2.0f) > 0.5f ||
         std::fabs(C[2] - 3.0f) > 0.5f) {
-        auto diag = std::format("C[0..2] = {},{},{} expected ~1,2,3", C[0], C[1], C[2]);
+        auto diag = "C[0..2] = " + std::to_string(C[0]) + "," + std::to_string(C[1]) + "," + std::to_string(C[2]) + " expected ~1,2,3";
         return PropupResult::fail(name, diag);
     }
 
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    hq_println(std::format("[PROPUP] {} passed in {} ms", name, res.elapsed_ms));
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms");
     return res;
 }
 
@@ -2630,7 +3061,7 @@ hq::propup::PropupResult hq::propup::propup_execution_coordinator_empty_graph([[
         // compile itself may fail on empty graph — that is acceptable
         auto res = PropupResult::pass(name);
         res.elapsed_ms = now_ms() - t0;
-        hq_println(std::format("[PROPUP] {} passed (compile rejected empty graph) in {} ms", name, res.elapsed_ms));
+        hq_println("[PROPUP] " + name + " passed (compile rejected empty graph) in " + std::to_string(res.elapsed_ms) + " ms");
         return res;
     }
 
@@ -2647,46 +3078,44 @@ hq::propup::PropupResult hq::propup::propup_execution_coordinator_empty_graph([[
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
     if (run_r) {
-        hq_println(std::format("[PROPUP] {} passed in {} ms (empty graph accepted as no-op)",
-                                name, res.elapsed_ms));
+        hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms (empty graph accepted as no-op)");
     } else {
-        hq_println(std::format("[PROPUP] {} passed in {} ms (empty graph rejected as error)",
-                                name, res.elapsed_ms));
+        hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms (empty graph rejected as error)");
     }
     return res;
 }
 
 void hq::propup::PropupReport::print() const {
     {
-        auto s = std::format("\n=== David Propup Engine Report ===\n");
-        hq_safe_write(1, s.data(), s.size());
+        auto s = "\n=== David Propup Engine Report ===\n";
+        hq_safe_write(1, s, std::strlen(s));
     }
     for (const auto& r : results) {
         const char* status = r.skipped ? "SKIP" : (r.passed ? "PASS" : "FAIL");
-        auto s = std::format("  [{}] {} ({} ms)", status, r.name, r.elapsed_ms);
+        auto s = std::string("  [") + status + "] " + r.name + " (" + std::to_string(r.elapsed_ms) + " ms)";
         if ((!r.passed || r.skipped) && !r.diagnostic.empty())
-            s += std::format(" | {}", r.diagnostic);
+            s += " | " + r.diagnostic;
         s += '\n';
         hq_safe_write(1, s.data(), s.size());
     }
     {
-        auto s = std::format("-----------------------------------\n");
-        hq_safe_write(1, s.data(), s.size());
+        auto s = "-----------------------------------\n";
+        hq_safe_write(1, s, std::strlen(s));
     }
     {
-        auto s = std::format("  TOTAL: {}/{} passed in {} ms", passed_count, results.size(), total_ms);
+        auto s = "  TOTAL: " + std::to_string(passed_count) + "/" + std::to_string(results.size()) + " passed in " + std::to_string(total_ms) + " ms";
         if (skipped_verbose_count > 0)
-            s += std::format(" ({} skipped)", skipped_verbose_count);
+            s += " (" + std::to_string(skipped_verbose_count) + " skipped)";
         s += '\n';
         hq_safe_write(1, s.data(), s.size());
     }
     {
-        auto s = std::format("  STATUS: {}\n", all_passed() ? "ALL CLEAR" : "BLOCKERS DETECTED");
+        auto s = std::string("  STATUS: ") + (all_passed() ? "ALL CLEAR" : "BLOCKERS DETECTED") + "\n";
         hq_safe_write(1, s.data(), s.size());
     }
     {
-        auto s = std::format("===================================\n");
-        hq_safe_write(1, s.data(), s.size());
+        auto s = "===================================\n";
+        hq_safe_write(1, s, std::strlen(s));
     }
 } // end of run_all_propups / report
 
@@ -2734,7 +3163,7 @@ hq::propup::PropupResult hq::propup::propup_runtime_diagnostic_report([[maybe_un
     if (!lcmd_initialized) {
         res.diagnostic = "LCMD not initialized (filesystem restriction); TMM+Coordinator OK";
     }
-    hq_println(std::format("[PROPUP] {} passed in {} ms", name, res.elapsed_ms));
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms");
     return res;
 }
 
@@ -2761,7 +3190,7 @@ hq::propup::PropupResult hq::propup::propup_decision_engine_empty_graph([[maybe_
 
     // Verify the error is the expected one (GraphEmpty)
     if (plan_r.error() != hq::CerberusError::GraphEmpty) {
-        auto diag = std::format("unexpected error code {}", static_cast<int>(plan_r.error()));
+        auto diag = "unexpected error code " + static_cast<int>(plan_r.error());
         auto res = PropupResult::fail(name, diag);
         res.elapsed_ms = now_ms() - t0;
         return res;
@@ -2769,7 +3198,7 @@ hq::propup::PropupResult hq::propup::propup_decision_engine_empty_graph([[maybe_
 
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    hq_println(std::format("[PROPUP] {} passed in {} ms", name, res.elapsed_ms));
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms");
     return res;
 }
 
@@ -2802,7 +3231,7 @@ hq::propup::PropupResult hq::propup::propup_staging_manager_lifecycle([[maybe_un
     // Acquire and release a buffer to prove lifecycle works
     auto buf_r = mgr.acquire();
     if (!buf_r) {
-        auto diag = std::format("acquire() failed: {}", hq::to_string(buf_r.error()));
+        auto diag = "acquire() failed: " + hq::to_string(buf_r.error());
         auto res = PropupResult::fail(name, diag);
         res.elapsed_ms = now_ms() - t0;
         return res;
@@ -2813,7 +3242,7 @@ hq::propup::PropupResult hq::propup::propup_staging_manager_lifecycle([[maybe_un
     // After release, availability should be back to initial count
     std::size_t avail_after = mgr.available_count();
     if (avail_after != avail) {
-        auto diag = std::format("available_count() mismatch after release: {} vs {}", avail_after, avail);
+        auto diag = "available_count() mismatch after release: " + std::to_string(avail_after) + " vs " + std::to_string(avail);
         auto res = PropupResult::fail(name, diag);
         res.elapsed_ms = now_ms() - t0;
         return res;
@@ -2821,7 +3250,7 @@ hq::propup::PropupResult hq::propup::propup_staging_manager_lifecycle([[maybe_un
 
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    hq_println(std::format("[PROPUP] {} passed in {} ms", name, res.elapsed_ms));
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms");
     return res;
 }
 
@@ -2877,8 +3306,7 @@ hq::propup::PropupResult hq::propup::propup_inference_audit_input_validation([[m
         // Graph engine correctly rejected mismatched dimensions
         auto res = PropupResult::pass(name);
         res.elapsed_ms = now_ms() - t0;
-        hq_println(std::format("[PROPUP] {} passed in {} ms (run_graph rejected mismatched dimensions)",
-                                name, res.elapsed_ms));
+        hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms (run_graph rejected mismatched dimensions)");
         return res;
     }
 
@@ -2925,7 +3353,7 @@ hq::propup::PropupResult hq::propup::propup_tiered_memory_bulk_alloc([[maybe_unu
 
     auto stats = mgr.stats(hq::MemoryTier::Cool);
     if (stats.allocated_bytes < total_allocated) {
-        auto diag = std::format("stats under-reported: {} < {}", stats.allocated_bytes, total_allocated);
+        auto diag = "stats under-reported: " + std::to_string(stats.allocated_bytes) + " < " + std::to_string(total_allocated);
         auto res = PropupResult::fail(name, diag);
         res.elapsed_ms = now_ms() - t0;
         // Cleanup
@@ -2940,7 +3368,7 @@ hq::propup::PropupResult hq::propup::propup_tiered_memory_bulk_alloc([[maybe_unu
 
     auto stats_after = mgr.stats(hq::MemoryTier::Cool);
     if (stats_after.allocated_bytes > 0) {
-        auto diag = std::format("leak detected: {} bytes still allocated after free", stats_after.allocated_bytes);
+        auto diag = std::string("leak detected: ") + std::to_string(stats_after.allocated_bytes) + " bytes still allocated after free";
         auto res = PropupResult::fail(name, diag);
         res.elapsed_ms = now_ms() - t0;
         return res;
@@ -2948,7 +3376,7 @@ hq::propup::PropupResult hq::propup::propup_tiered_memory_bulk_alloc([[maybe_unu
 
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    hq_println(std::format("[PROPUP] {} passed in {} ms ({} blocks, {} bytes)", name, res.elapsed_ms, handles.size(), total_allocated));
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms (" + std::to_string(handles.size()) + " blocks, " + std::to_string(total_allocated) + " bytes)");
     return res;
 }
 
@@ -2981,7 +3409,7 @@ hq::propup::PropupResult hq::propup::propup_hip_graph_denoiser_construction([[ma
 
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    hq_println(std::format("[PROPUP] {} passed in {} ms (available={})", name, res.elapsed_ms, avail));
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms (available=" + std::to_string(avail) + ")");
     return res;
 }
 
@@ -3036,8 +3464,7 @@ hq::propup::PropupResult hq::propup::propup_hip_graph_denoiser_state_machine([[m
         return PropupResult::fail(name, "replay() succeeded before capture()");
     }
     if (rep.error().code != hq::GraphError::NotCaptured) {
-        auto diag = std::format("expected NotCaptured, got code {}: {}",
-            static_cast<int>(rep.error().code), rep.error().message);
+        auto diag = std::string("expected NotCaptured, got code ") + std::to_string(static_cast<int>(rep.error().code)) + ": " + rep.error().message;
         return PropupResult::fail(name, diag);
     }
 
@@ -3060,14 +3487,13 @@ hq::propup::PropupResult hq::propup::propup_hip_graph_denoiser_state_machine([[m
         return PropupResult::fail(name, "execute_full() accepted num_steps==0");
     }
     if (full.error().code != hq::GraphError::InvalidStepCount) {
-        auto diag = std::format("expected InvalidStepCount for num_steps==0, got code {}: {}",
-            static_cast<int>(full.error().code), full.error().message);
+        auto diag = std::string("expected InvalidStepCount for num_steps==0, got code ") + std::to_string(static_cast<int>(full.error().code)) + ": " + full.error().message;
         return PropupResult::fail(name, diag);
     }
 
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    hq_println(std::format("[PROPUP] {} passed in {} ms", name, res.elapsed_ms));
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms");
     return res;
 }
 
@@ -3105,8 +3531,7 @@ hq::propup::PropupResult hq::propup::propup_hip_graph_denoiser_dimension_validat
         if (cap.error().code != hq::GraphError::InvalidStepCount &&
             cap.error().code != hq::GraphError::HipError &&
             cap.error().code != hq::GraphError::ONNXError) {
-            auto diag = std::format("unexpected error code {}: {}",
-                static_cast<int>(cap.error().code), cap.error().message);
+            auto diag = std::string("unexpected error code ") + std::to_string(static_cast<int>(cap.error().code)) + ": " + cap.error().message;
             return PropupResult::fail(name, diag);
         }
     }
@@ -3127,8 +3552,7 @@ hq::propup::PropupResult hq::propup::propup_hip_graph_denoiser_dimension_validat
     // We verify the object handles the call gracefully (no crash).
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    hq_println(std::format("[PROPUP] {} passed in {} ms (mismatched dims handled gracefully)",
-        name, res.elapsed_ms));
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms (mismatched dims handled gracefully)");
     return res;
 }
 
@@ -3171,8 +3595,7 @@ hq::propup::PropupResult hq::propup::propup_hip_graph_denoiser_scheduler_attachm
 
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    hq_println(std::format("[PROPUP] {} passed in {} ms (scheduler attach/detach safe)",
-        name, res.elapsed_ms));
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms (scheduler attach/detach safe)");
     return res;
 }
 
@@ -3210,7 +3633,7 @@ hq::propup::PropupResult hq::propup::propup_graph_engine_two_node_graph([[maybe_
     CerberusGraph cg = CerberusGraph::from_kernel_graph(kg);
 
     if (cg.nodes.size() != 2) {
-        auto diag = std::format("expected 2 nodes, got {}", cg.nodes.size());
+        auto diag = "expected 2 nodes, got " + std::to_string(cg.nodes.size());
         return PropupResult::fail(name, diag);
     }
 
@@ -3224,13 +3647,13 @@ hq::propup::PropupResult hq::propup::propup_graph_engine_two_node_graph([[maybe_
 
     // Verify tensor deduplication: t0, t1, t2, t3, t4 = 5 tensors
     if (cg.tensors.size() != 5) {
-        auto diag = std::format("expected 5 tensors, got {}", cg.tensors.size());
+        auto diag = "expected 5 tensors, got " + std::to_string(cg.tensors.size());
         return PropupResult::fail(name, diag);
     }
 
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    hq_println(std::format("[PROPUP] {} passed in {} ms", name, res.elapsed_ms));
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms");
     return res;
 }
 
@@ -3265,20 +3688,19 @@ hq::propup::PropupResult hq::propup::propup_graph_engine_from_kernel_graph([[may
     CerberusGraph cg = CerberusGraph::from_kernel_graph(kg);
 
     if (cg.nodes.size() != 2) {
-        auto diag = std::format("expected 2 nodes, got {}", cg.nodes.size());
+        auto diag = "expected 2 nodes, got " + std::to_string(cg.nodes.size());
         return PropupResult::fail(name, diag);
     }
 
     // Verify graph_inputs propagated dtype/shape into first tensors
     if (cg.tensors.size() < 2) {
-        auto diag = std::format("expected at least 2 tensors, got {}", cg.tensors.size());
+        auto diag = "expected at least 2 tensors, got " + std::to_string(cg.tensors.size());
         return PropupResult::fail(name, diag);
     }
 
     // First tensor should carry F32 from kg.graph_inputs[0]
     if (cg.tensors[0].dtype != hq::npu::TensorDesc::DataType::F32) {
-        auto diag = std::format("tensor[0] dtype expected F32, got {}",
-            static_cast<int>(cg.tensors[0].dtype));
+        auto diag = "tensor[0] dtype expected F32, got " + std::to_string(static_cast<int>(cg.tensors[0].dtype));
         return PropupResult::fail(name, diag);
     }
     if (cg.tensors[0].shape.size() != 4 || cg.tensors[0].shape[0] != 1) {
@@ -3302,7 +3724,7 @@ hq::propup::PropupResult hq::propup::propup_graph_engine_from_kernel_graph([[may
 
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    hq_println(std::format("[PROPUP] {} passed in {} ms", name, res.elapsed_ms));
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms");
     return res;
 }
 
@@ -3357,7 +3779,7 @@ hq::propup::PropupResult hq::propup::propup_graph_engine_cycle_detection([[maybe
 
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    hq_println(std::format("[PROPUP] {} passed in {} ms (cycle detected)", name, res.elapsed_ms));
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms (cycle detected)");
     return res;
 }
 
@@ -3389,7 +3811,7 @@ hq::propup::PropupResult hq::propup::propup_graph_engine_orphaned_nodes([[maybe_
     CerberusGraph cg = CerberusGraph::from_kernel_graph(kg);
 
     if (cg.nodes.size() != 2) {
-        auto diag = std::format("expected 2 nodes, got {}", cg.nodes.size());
+        auto diag = "expected 2 nodes, got " + std::to_string(cg.nodes.size());
         return PropupResult::fail(name, diag);
     }
 
@@ -3414,19 +3836,19 @@ hq::propup::PropupResult hq::propup::propup_graph_engine_orphaned_nodes([[maybe_
     }
     auto consumers = cg.consumers(cg.nodes[*orphan_idx_opt].id);
     if (!consumers.empty()) {
-        auto diag = std::format("orphan node has {} consumers, expected 0", consumers.size());
+        auto diag = "orphan node has " + std::to_string(consumers.size()) + " consumers, expected 0";
         return PropupResult::fail(name, diag);
     }
 
     // Verify all tensors are present (t0, t1, t2, t3, t4)
     if (cg.tensors.size() != 5) {
-        auto diag = std::format("expected 5 tensors (including orphan I/O), got {}", cg.tensors.size());
+        auto diag = "expected 5 tensors (including orphan I/O), got " + std::to_string(cg.tensors.size());
         return PropupResult::fail(name, diag);
     }
 
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    hq_println(std::format("[PROPUP] {} passed in {} ms", name, res.elapsed_ms));
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms");
     return res;
 }
 
@@ -3476,8 +3898,7 @@ hq::propup::PropupResult hq::propup::propup_graph_engine_dtype_mismatch([[maybe_
     // We verify it is F32 (default), and that the graph_inputs dtype propagation
     // did not incorrectly overwrite it (since "mid" is not in graph_inputs).
     if (cg.tensors[*mid_idx_opt].dtype != hq::npu::TensorDesc::DataType::F32) {
-        auto diag = std::format("'mid' tensor dtype expected F32 (default), got {}",
-            static_cast<int>(cg.tensors[*mid_idx_opt].dtype));
+        auto diag = "'mid' tensor dtype expected F32 (default), got " + std::to_string(static_cast<int>(cg.tensors[*mid_idx_opt].dtype));
         return PropupResult::fail(name, diag);
     }
 
@@ -3510,7 +3931,7 @@ hq::propup::PropupResult hq::propup::propup_graph_engine_dtype_mismatch([[maybe_
     // Here we confirm the graph engine preserves the metadata honestly.
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    hq_println(std::format("[PROPUP] {} passed in {} ms (dtype metadata preserved)", name, res.elapsed_ms));
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms (dtype metadata preserved)");
     return res;
 }
 
@@ -3544,7 +3965,7 @@ hq::propup::PropupResult hq::propup::propup_decision_engine_pick_backend_cpu_fal
 
     auto plan_r = engine.analyse(graph, "cpu");
     if (!plan_r) {
-        auto diag = std::format("analyse failed: {}", hq::to_string(plan_r.error()));
+        auto diag = "analyse failed: " + hq::to_string(plan_r.error());
         return PropupResult::fail(name, diag);
     }
     auto& plan = *plan_r;
@@ -3552,13 +3973,13 @@ hq::propup::PropupResult hq::propup::propup_decision_engine_pick_backend_cpu_fal
         return PropupResult::fail(name, "plan is empty");
     }
     if (plan[0].backend != hq::cerberus::ExecutionStep::Backend::Native) {
-        auto diag = std::format("expected Native backend for Add, got {}", static_cast<int>(plan[0].backend));
+        auto diag = "expected Native backend for Add, got " + std::to_string(static_cast<int>(plan[0].backend));
         return PropupResult::fail(name, diag);
     }
 
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    hq_println(std::format("[PROPUP] {} passed in {} ms", name, res.elapsed_ms));
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms");
     return res;
 }
 
@@ -3572,7 +3993,7 @@ hq::propup::PropupResult hq::propup::propup_decision_engine_pick_backend_npu_mat
     if (!npu_available) {
         auto res = PropupResult::skip(name, "No real Intel NPU backend available on this host");
         res.elapsed_ms = now_ms() - t0;
-        hq_println(std::format("[PROPUP] {} skipped: {}", name, res.diagnostic));
+        hq_println("[PROPUP] " + name + " skipped: " + res.diagnostic);
         return res;
     }
 
@@ -3597,7 +4018,7 @@ hq::propup::PropupResult hq::propup::propup_decision_engine_pick_backend_npu_mat
 
     auto plan_r = engine.analyse(graph, "cpu");
     if (!plan_r) {
-        auto diag = std::format("analyse failed: {}", hq::to_string(plan_r.error()));
+        auto diag = "analyse failed: " + hq::to_string(plan_r.error());
         return PropupResult::fail(name, diag);
     }
     auto& plan = *plan_r;
@@ -3605,13 +4026,13 @@ hq::propup::PropupResult hq::propup::propup_decision_engine_pick_backend_npu_mat
         return PropupResult::fail(name, "plan is empty");
     }
     if (plan[0].backend != hq::cerberus::ExecutionStep::Backend::OpenVINO) {
-        auto diag = std::format("expected OpenVINO backend for MatMul with real NPU, got {}", static_cast<int>(plan[0].backend));
+        auto diag = "expected OpenVINO backend for MatMul with real NPU, got " + std::to_string(static_cast<int>(plan[0].backend));
         return PropupResult::fail(name, diag);
     }
 
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    hq_println(std::format("[PROPUP] {} passed in {} ms", name, res.elapsed_ms));
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms");
     return res;
 }
 
@@ -3643,7 +4064,7 @@ hq::propup::PropupResult hq::propup::propup_decision_engine_quant_profile_iq4([[
 
     auto plan_r = engine.analyse(graph, "cpu");
     if (!plan_r) {
-        auto diag = std::format("analyse failed: {}", hq::to_string(plan_r.error()));
+        auto diag = "analyse failed: " + hq::to_string(plan_r.error());
         return PropupResult::fail(name, diag);
     }
     auto& plan = *plan_r;
@@ -3651,13 +4072,13 @@ hq::propup::PropupResult hq::propup::propup_decision_engine_quant_profile_iq4([[
         return PropupResult::fail(name, "plan is empty");
     }
     if (plan[0].backend != hq::cerberus::ExecutionStep::Backend::Native) {
-        auto diag = std::format("expected Native backend for IQ4_NL PerBlock quant, got {}", static_cast<int>(plan[0].backend));
+        auto diag = "expected Native backend for IQ4_NL PerBlock quant, got " + std::to_string(static_cast<int>(plan[0].backend));
         return PropupResult::fail(name, diag);
     }
 
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    hq_println(std::format("[PROPUP] {} passed in {} ms", name, res.elapsed_ms));
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms");
     return res;
 }
 
@@ -3686,7 +4107,7 @@ hq::propup::PropupResult hq::propup::propup_decision_engine_unknown_op_fallback(
 
     auto plan_r = engine.analyse(graph, "cpu");
     if (!plan_r) {
-        auto diag = std::format("analyse failed: {}", hq::to_string(plan_r.error()));
+        auto diag = "analyse failed: " + hq::to_string(plan_r.error());
         return PropupResult::fail(name, diag);
     }
     auto& plan = *plan_r;
@@ -3694,13 +4115,13 @@ hq::propup::PropupResult hq::propup::propup_decision_engine_unknown_op_fallback(
         return PropupResult::fail(name, "plan is empty");
     }
     if (plan[0].backend != hq::cerberus::ExecutionStep::Backend::Native) {
-        auto diag = std::format("expected Native fallback for Unknown op, got {}", static_cast<int>(plan[0].backend));
+        auto diag = "expected Native fallback for Unknown op, got " + std::to_string(static_cast<int>(plan[0].backend));
         return PropupResult::fail(name, diag);
     }
 
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    hq_println(std::format("[PROPUP] {} passed in {} ms", name, res.elapsed_ms));
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms");
     return res;
 }
 
@@ -3717,7 +4138,7 @@ hq::propup::PropupResult hq::propup::propup_async_pipeline_construct_destroy([[m
     // On Windows dev host without real models, we skip honestly.
     auto res = PropupResult::skip(name, "AsyncPipeline requires real ONNX model paths — not available on this host");
     res.elapsed_ms = now_ms() - t0;
-    hq_println(std::format("[PROPUP] {} skipped: {}", name, res.diagnostic));
+    hq_println("[PROPUP] " + name + " skipped: " + res.diagnostic);
     return res;
 }
 
@@ -3728,7 +4149,7 @@ hq::propup::PropupResult hq::propup::propup_async_pipeline_stage_chaining([[mayb
 
     auto res = PropupResult::skip(name, "AsyncPipeline requires real ONNX model paths — not available on this host");
     res.elapsed_ms = now_ms() - t0;
-    hq_println(std::format("[PROPUP] {} skipped: {}", name, res.diagnostic));
+    hq_println("[PROPUP] " + name + " skipped: " + res.diagnostic);
     return res;
 }
 
@@ -3749,7 +4170,7 @@ hq::propup::PropupResult hq::propup::propup_async_pipeline_stop_token_cancel([[m
 
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    hq_println(std::format("[PROPUP] {} passed in {} ms", name, res.elapsed_ms));
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms");
     return res;
 }
 
@@ -3760,7 +4181,7 @@ hq::propup::PropupResult hq::propup::propup_async_pipeline_empty_input([[maybe_u
 
     auto res = PropupResult::skip(name, "AsyncPipeline requires real ONNX model paths — not available on this host");
     res.elapsed_ms = now_ms() - t0;
-    hq_println(std::format("[PROPUP] {} skipped: {}", name, res.diagnostic));
+    hq_println("[PROPUP] " + name + " skipped: " + res.diagnostic);
     return res;
 }
 
@@ -3771,7 +4192,7 @@ hq::propup::PropupResult hq::propup::propup_async_pipeline_latency_consistent([[
 
     auto res = PropupResult::skip(name, "AsyncPipeline requires real ONNX model paths — not available on this host");
     res.elapsed_ms = now_ms() - t0;
-    hq_println(std::format("[PROPUP] {} skipped: {}", name, res.diagnostic));
+    hq_println("[PROPUP] " + name + " skipped: " + res.diagnostic);
     return res;
 }
 
@@ -3784,8 +4205,35 @@ hq::propup::PropupResult hq::propup::propup_boundary_contract_pre_condition([[ma
     const std::string name = "propup_boundary_contract_pre_condition";
     auto t0 = now_ms();
 
-    auto res = PropupResult::skip(name, "runtime boundary contract system not yet implemented — pre_condition() does not exist");
+    using hq::contract::pre_condition;
+    using hq::contract::ContractViolation;
+
+    // a. pre_condition(true, "msg") — does not throw
+    try {
+        pre_condition(true, "valid pre");
+    } catch (...) {
+        return PropupResult::fail(name, "pre_condition(true) threw unexpectedly");
+    }
+
+    // b. pre_condition(false, "msg") — throws ContractViolation
+    bool threw = false;
+    try {
+        pre_condition(false, "invalid pre");
+    } catch (const ContractViolation& cv) {
+        threw = true;
+        if (std::string_view(cv.what()).find("invalid pre") == std::string_view::npos) {
+            return PropupResult::fail(name, "pre_condition(false) exception missing message");
+        }
+    } catch (...) {
+        return PropupResult::fail(name, "pre_condition(false) threw wrong exception type");
+    }
+    if (!threw) {
+        return PropupResult::fail(name, "pre_condition(false) did not throw");
+    }
+
+    auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms");
     return res;
 }
 
@@ -3794,8 +4242,35 @@ hq::propup::PropupResult hq::propup::propup_boundary_contract_post_condition([[m
     const std::string name = "propup_boundary_contract_post_condition";
     auto t0 = now_ms();
 
-    auto res = PropupResult::skip(name, "runtime boundary contract system not yet implemented — post_condition() does not exist");
+    using hq::contract::post_condition;
+    using hq::contract::ContractViolation;
+
+    // a. post_condition(true, "msg") — does not throw
+    try {
+        post_condition(true, "valid post");
+    } catch (...) {
+        return PropupResult::fail(name, "post_condition(true) threw unexpectedly");
+    }
+
+    // b. post_condition(false, "msg") — throws ContractViolation
+    bool threw = false;
+    try {
+        post_condition(false, "invalid post");
+    } catch (const ContractViolation& cv) {
+        threw = true;
+        if (std::string_view(cv.what()).find("invalid post") == std::string_view::npos) {
+            return PropupResult::fail(name, "post_condition(false) exception missing message");
+        }
+    } catch (...) {
+        return PropupResult::fail(name, "post_condition(false) threw wrong exception type");
+    }
+    if (!threw) {
+        return PropupResult::fail(name, "post_condition(false) did not throw");
+    }
+
+    auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms");
     return res;
 }
 
@@ -3804,8 +4279,35 @@ hq::propup::PropupResult hq::propup::propup_boundary_contract_invariant([[maybe_
     const std::string name = "propup_boundary_contract_invariant";
     auto t0 = now_ms();
 
-    auto res = PropupResult::skip(name, "runtime boundary contract system not yet implemented — invariant() does not exist");
+    using hq::contract::invariant;
+    using hq::contract::ContractViolation;
+
+    // a. invariant(true, "msg") — does not throw
+    try {
+        invariant(true, "valid inv");
+    } catch (...) {
+        return PropupResult::fail(name, "invariant(true) threw unexpectedly");
+    }
+
+    // b. invariant(false, "msg") — throws ContractViolation
+    bool threw = false;
+    try {
+        invariant(false, "invalid inv");
+    } catch (const ContractViolation& cv) {
+        threw = true;
+        if (std::string_view(cv.what()).find("invalid inv") == std::string_view::npos) {
+            return PropupResult::fail(name, "invariant(false) exception missing message");
+        }
+    } catch (...) {
+        return PropupResult::fail(name, "invariant(false) threw wrong exception type");
+    }
+    if (!threw) {
+        return PropupResult::fail(name, "invariant(false) did not throw");
+    }
+
+    auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms");
     return res;
 }
 
@@ -3814,8 +4316,40 @@ hq::propup::PropupResult hq::propup::propup_boundary_contract_nested_scope([[may
     const std::string name = "propup_boundary_contract_nested_scope";
     auto t0 = now_ms();
 
-    auto res = PropupResult::skip(name, "runtime boundary contract system not yet implemented — nested contract scopes do not exist");
+    using hq::contract::pre_condition;
+    using hq::contract::post_condition;
+    using hq::contract::invariant;
+    using hq::contract::ContractViolation;
+
+    int outer_state = 0;
+    int inner_state = 0;
+
+    try {
+        // Outer scope contracts
+        pre_condition(outer_state == 0, "outer pre");
+        outer_state = 1;
+        invariant(outer_state == 1, "outer inv");
+
+        {
+            // Inner scope contracts — independent of outer
+            pre_condition(inner_state == 0, "inner pre");
+            inner_state = 2;
+            invariant(inner_state == 2, "inner inv");
+            post_condition(inner_state == 2, "inner post");
+        }
+
+        // Back in outer scope — outer invariant still holds
+        invariant(outer_state == 1, "outer inv after inner");
+        post_condition(outer_state == 1, "outer post");
+    } catch (const ContractViolation& cv) {
+        return PropupResult::fail(name, std::string("nested scope leaked: ") + cv.what());
+    } catch (...) {
+        return PropupResult::fail(name, "nested scope threw unexpected exception type");
+    }
+
+    auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms");
     return res;
 }
 
@@ -3824,8 +4358,58 @@ hq::propup::PropupResult hq::propup::propup_boundary_contract_violation_triggers
     const std::string name = "propup_boundary_contract_violation_triggers";
     auto t0 = now_ms();
 
-    auto res = PropupResult::skip(name, "runtime boundary contract system not yet implemented — ContractViolation type does not exist");
+    using hq::contract::pre_condition;
+    using hq::contract::post_condition;
+    using hq::contract::invariant;
+    using hq::contract::ContractViolation;
+
+    // Verify that the exception message is preserved through all three contract kinds
+    const std::string custom_msg = "custom_boundary_msg_42";
+
+    bool pre_ok = false;
+    try {
+        pre_condition(false, custom_msg);
+    } catch (const ContractViolation& cv) {
+        pre_ok = std::string(cv.what()).find(custom_msg) != std::string::npos;
+    }
+    if (!pre_ok) {
+        return PropupResult::fail(name, "pre_condition did not preserve custom message");
+    }
+
+    bool post_ok = false;
+    try {
+        post_condition(false, custom_msg);
+    } catch (const ContractViolation& cv) {
+        post_ok = std::string(cv.what()).find(custom_msg) != std::string::npos;
+    }
+    if (!post_ok) {
+        return PropupResult::fail(name, "post_condition did not preserve custom message");
+    }
+
+    bool inv_ok = false;
+    try {
+        invariant(false, custom_msg);
+    } catch (const ContractViolation& cv) {
+        inv_ok = std::string(cv.what()).find(custom_msg) != std::string::npos;
+    }
+    if (!inv_ok) {
+        return PropupResult::fail(name, "invariant did not preserve custom message");
+    }
+
+    // Verify std::runtime_error inheritance
+    try {
+        pre_condition(false, "inheritance_check");
+    } catch (const std::runtime_error& re) {
+        if (std::string_view(re.what()).find("inheritance_check") == std::string_view::npos) {
+            return PropupResult::fail(name, "ContractViolation does not inherit std::runtime_error correctly");
+        }
+    } catch (...) {
+        return PropupResult::fail(name, "ContractViolation not caught as std::runtime_error");
+    }
+
+    auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms");
     return res;
 }
 

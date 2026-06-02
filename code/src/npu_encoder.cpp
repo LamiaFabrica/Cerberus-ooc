@@ -22,6 +22,7 @@
 #include <type_traits>
 #include <vector>
 
+#define ORT_API_VERSION 17
 #include <onnxruntime_cxx_api.h>
 
 // ===========================================================================
