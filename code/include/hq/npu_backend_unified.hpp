@@ -30,6 +30,7 @@ namespace hq::npu {
 // ===========================================================================
 
 struct TensorDesc {
+    std::string name; ///< Tensor name (matches KernelNode input/output names)
     std::vector<std::int64_t> shape;
     enum class DataType : std::uint8_t { F32 = 0, F16, I64, I32, I8, U8, IQ4_NL_Block, Q4_K_Block };
     DataType dtype{DataType::F32};
