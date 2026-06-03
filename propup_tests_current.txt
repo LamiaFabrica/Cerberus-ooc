@@ -1,0 +1,45 @@
+[PROPUP] propup_tiered_memory passed in 0.40478515625 ms
+[PROPUP] propup_coordinator_memory_loop passed in 0.0498046875 ms
+[PROPUP] propup_coordinator_tier_decisions passed in 0.01953125 ms
+[PROPUP] propup_compile_graph_analysis passed in 0.002685546875 ms
+[PROPUP] propup_kernel_matmul passed in 0.00244140625 ms
+[PROPUP] propup_kernel_elementwise passed in 0.000244140625 ms
+[PROPUP] propup_kernel_fma passed in 0.001220703125 ms
+[PROPUP] propup_kernel_matmul_blocked passed in 0.00146484375 ms
+[PROPUP] propup_performance_matmul_vs_naive passed in 11.228515625 ms
+[PROPUP] propup_end_to_end_native passed in 0.078857421875 ms
+[PROPUP] propup_decision_engine_fusion passed in 0.05029296875 ms
+[PROPUP] propup_kernel_relu_negative_input passed in 0.000244140625 ms
+[PROPUP] propup_kernel_sigmoid_extremes passed in 0.000244140625 ms
+[PROPUP] propup_kernel_quantized_matmul_shape passed in 0.002685546875 ms
+[PROPUP] propup_ranges_adopted_in_kernels passed in 0.0029296875 ms
+[PROPUP] propup_gguf_parser_header_valid passed in 0.019287109375 ms
+[PROPUP] propup_gguf_parser_metadata_read passed in 0.0107421875 ms
+[PROPUP] propup_glow_engine_init_deinit passed in 0.008056640625 ms
+[PROPUP] propup_adversarial_null_backend passed in 0.022216796875 ms
+[PROPUP] propup_adversarial_corrupt_graph passed in 0.001953125 ms (execute rejected corrupt graph)
+[PROPUP] propup_adversarial_mismatched_tensor_shapes passed in 0.0205078125 ms (no crash on mismatch)
+[PROPUP] propup_adversarial_null_input_buffer passed in 0 ms (kernel returned error: null pointer)
+[PROPUP] propup_execution_coordinator_empty_graph passed in 0.030029296875 ms (empty graph accepted as no-op)
+[PROPUP] propup_runtime_diagnostic_report passed in 0.0517578125 ms
+[PROPUP] propup_decision_engine_empty_graph passed in 0.013916015625 ms
+[PROPUP] propup_decision_engine_pick_backend_cpu_fallback passed in 0.020263671875 ms
+[PROPUP] propup_decision_engine_pick_backend_npu_matmul skipped: No real Intel NPU backend available on this host
+[PROPUP] propup_decision_engine_quant_profile_iq4 passed in 0.0166015625 ms
+[PROPUP] propup_decision_engine_unknown_op_fallback passed in 0.01513671875 ms
+[PROPUP] propup_tiered_memory_bulk_alloc passed in 0.05615234375 ms (16 blocks, 1048576 bytes)
+[PROPUP] propup_c_api_init_shutdown_cycle passed in 70.986328125 ms
+[PROPUP] propup_graph_engine_two_node_graph passed in 0.013427734375 ms
+[PROPUP] propup_graph_engine_from_kernel_graph passed in 0.004638671875 ms
+[PROPUP] propup_graph_engine_cycle_detection passed in 0.00732421875 ms (cycle detected)
+[PROPUP] propup_graph_engine_orphaned_nodes passed in 0.002685546875 ms
+[PROPUP] propup_async_pipeline_construct_destroy skipped: AsyncPipeline requires real ONNX model paths — not available on this host
+[PROPUP] propup_async_pipeline_stage_chaining skipped: AsyncPipeline requires real ONNX model paths — not available on this host
+[PROPUP] propup_async_pipeline_stop_token_cancel passed in 0.000244140625 ms
+[PROPUP] propup_async_pipeline_empty_input skipped: AsyncPipeline requires real ONNX model paths — not available on this host
+[PROPUP] propup_async_pipeline_latency_consistent skipped: AsyncPipeline requires real ONNX model paths — not available on this host
+[PROPUP] propup_boundary_contract_pre_condition passed in 0.06201171875 ms
+[PROPUP] propup_boundary_contract_post_condition passed in 0.00537109375 ms
+[PROPUP] propup_boundary_contract_invariant passed in 0.00390625 ms
+[PROPUP] propup_boundary_contract_nested_scope passed in 0.000244140625 ms
+[PROPUP] propup_boundary_contract_violation_triggers passed in 0.0185546875 ms

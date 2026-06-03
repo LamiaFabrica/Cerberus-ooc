@@ -571,7 +571,11 @@ endif()
 add_executable(david_propup_engine src/david_propup_engine_main.cpp)
 target_link_libraries(david_propup_engine PRIVATE um790_pipeline cerberus_npu um790_compile_options um790_includes um790_link_options Threads::Threads)
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND WIN32)
-    target_link_options(david_propup_engine PRIVATE -static-libgcc -static-libstdc++)
+    # NOTE: -static-libstdc++ is INTENTIONALLY OMITTED here.
+    # Under MinGW UCRT, static libstdc++ causes deterministic segfault (exit 139)
+    # during CRT TLS teardown when stdout is redirected to a pipe/file.
+    # Dynamic libstdc++ (libstdc++-6.dll present in project root) avoids this.
+    target_link_options(david_propup_engine PRIVATE -static-libgcc)
 endif()
 
 # Registration CLI — creates encrypted Local Maintenance DB

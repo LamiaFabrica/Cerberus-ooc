@@ -33,11 +33,11 @@ public:
         k.compiled = true;
 
         // Input: x [4] f32
-        k.inputs.push_back(hq::npu::TensorDesc{{4}, hq::npu::TensorDesc::DataType::F32});
+        k.inputs.push_back(hq::npu::TensorDesc{"", {4}, hq::npu::TensorDesc::DataType::F32});
         k.input_names.push_back("x");
 
         // Output: y [4] f32
-        k.outputs.push_back(hq::npu::TensorDesc{{4}, hq::npu::TensorDesc::DataType::F32});
+        k.outputs.push_back(hq::npu::TensorDesc{"", {4}, hq::npu::TensorDesc::DataType::F32});
         k.output_names.push_back("y");
 
         // Analyze the Cerberus-owned graph for reuse

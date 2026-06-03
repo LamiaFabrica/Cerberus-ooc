@@ -557,7 +557,7 @@ IntelOpenVinoBackend::compile([[maybe_unused]] const KernelGraph& graph,
 
             ov_element_type_e et = ov_element_type_e::F32;
             ov_table.ov_port_get_element_type(port, &et);
-            k.inputs.push_back(TensorDesc{std::move(dims), map_element_type(et)});
+            k.inputs.push_back(TensorDesc{"", std::move(dims), map_element_type(et)});
             ov_table.ov_shape_free(&shape);
             ov_table.ov_output_const_port_free(port);
         }
@@ -587,7 +587,7 @@ IntelOpenVinoBackend::compile([[maybe_unused]] const KernelGraph& graph,
 
             ov_element_type_e et = ov_element_type_e::F32;
             ov_table.ov_port_get_element_type(port, &et);
-            k.outputs.push_back(TensorDesc{std::move(dims), map_element_type(et)});
+            k.outputs.push_back(TensorDesc{"", std::move(dims), map_element_type(et)});
             ov_table.ov_shape_free(&shape);
             ov_table.ov_output_const_port_free(port);
         }

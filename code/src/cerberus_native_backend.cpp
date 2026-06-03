@@ -97,10 +97,10 @@ CerberusNativeBackend::compile(const npu::KernelGraph& graph,
     // Fallback: if graph_inputs were empty, create placeholder TensorDescs
     // from the derived name list so coordinator count check passes.
     while (k.inputs.size() < k.input_names.size()) {
-        k.inputs.push_back(npu::TensorDesc{{4}, npu::TensorDesc::DataType::F32});
+        k.inputs.push_back(npu::TensorDesc{"", {4}, npu::TensorDesc::DataType::F32});
     }
     while (k.outputs.size() < k.output_names.size()) {
-        k.outputs.push_back(npu::TensorDesc{{4}, npu::TensorDesc::DataType::F32});
+        k.outputs.push_back(npu::TensorDesc{"", {4}, npu::TensorDesc::DataType::F32});
     }
 
     // Single-input/single-output descriptors (native backend path for PerBlock/quant routing)

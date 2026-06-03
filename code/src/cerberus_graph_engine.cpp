@@ -166,14 +166,17 @@ CerberusGraph CerberusGraph::from_kernel_graph(const npu::KernelGraph& kg) {
         g.tensors.push_back(std::move(gt));
     }
 
-    // Ground-up quant propagation: carry shape + dtype from KernelGraph graph_inputs (TensorDesc).
-    // This is the bridge that lets real IQ4_NL_Block / Q4_K_Block weights (when supplied in a KG)
-    // survive into CerberusGraph for DecisionEngine routing and honest TMM sizing.
-    for (std::size_t i = 0; i < kg.graph_inputs.size() && i < g.tensors.size(); ++i) {
-        if (!kg.graph_inputs[i].shape.empty())
-            g.tensors[i].shape = kg.graph_inputs[i].shape;
-        // Propagate the actual dtype (F32 / IQ4_NL_Block etc.) instead of leaving the F32 default
-        g.tensors[i].dtype = kg.graph_inputs[i].dtype;
+    // Propagate dtype from graph_inputs to matching tensor names
+    for (std::size_t i = 0; i < kg.graph_inputs.size(); ++i) {
+        // Find the tensor with the same name as the graph input
+        for (auto& t : g.tensors) {
+            if (t.name == kg.graph_inputs[i].name) {
+                if (!kg.graph_inputs[i].shape.empty())
+                    t.shape = kg.graph_inputs[i].shape;
+                t.dtype = kg.graph_inputs[i].dtype;
+                break;
+            }
+        }
     }
 
     (void)g.topo_sort();
