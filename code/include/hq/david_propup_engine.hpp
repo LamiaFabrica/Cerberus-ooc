@@ -369,20 +369,33 @@ PropupResult propup_round22_tmm_coordinator_interaction(std::ostream* log = null
 PropupResult propup_round22_all_stages_documented(std::ostream* log = nullptr);
 
 /// @brief Prop up: Athenea 60s endurance cold→hot.
+PropupResult propup_round24_athenea_60s_endurance_cold_hot(std::ostream* log = nullptr);
 
 /// @brief Prop up: NPU memory loop readiness score.
+PropupResult propup_round24_npu_memory_loop_readiness_score(std::ostream* log = nullptr);
 
 /// @brief Prop up: Athenea cold vs hot burst.
+PropupResult propup_round24_athenea_cold_vs_hot_burst(std::ostream* log = nullptr);
 
 /// @brief Prop up: NPU memory loop full Athenea pressure.
+PropupResult propup_round24_npu_memory_loop_full_athenea_pressure(std::ostream* log = nullptr);
 
 /// @brief Prop up: Athenea probe readiness LCMD.
+PropupResult propup_round24_athenea_probe_readiness_lcmd(std::ostream* log = nullptr);
 
 /// @brief Prop up: NPU memory loop cold→hot delta LCMD.
+PropupResult propup_round24_npu_memory_loop_cold_hot_delta_lcmd(std::ostream* log = nullptr);
 
 /// @brief Prop up: Athenea 30s endurance cold→hot.
+PropupResult propup_round24_athenea_30s_endurance_cold_hot(std::ostream* log = nullptr);
 
 /// @brief Prop up: NPU memory loop sustained telemetry.
+PropupResult propup_round24_npu_memory_loop_sustained_telemetry(std::ostream* log = nullptr);
+
+/// @brief Prop up: Athenea probe endurance step graph coordinator (restored from Grok Build excision).
+/// T3.24 sustained endurance test — verifies 4-node MatMul step graph lowering through coordinator
+/// with reduced allocation sizes to avoid heap exhaustion on dev hardware.
+PropupResult propup_athenea_probe_endurance_step_graph_coordinator(std::ostream* log = nullptr);
 
 // ===========================================================================
 // Intel NPU Telemetry validation suite (graceful degradation on non-NPU hosts)
@@ -429,6 +442,9 @@ PropupResult propup_quant_kernels_no_prohibited_language_in_iq4_path(std::ostrea
 
 /// @brief Prop up: No duplicate IQ4 definition in quantized kernels.
 PropupResult propup_quant_kernels_no_duplicate_iq4_definition(std::ostream* log = nullptr);
+
+/// @brief Prop up: Athenea probe real load_tensor_slice bytes → Hot + endurance.
+PropupResult propup_athenea_probe_real_load_tensor_slice_bytes_hot_endurance(std::ostream* log = nullptr);
 
 // ===========================================================================
 // Native kernel edge cases + Execution slices
