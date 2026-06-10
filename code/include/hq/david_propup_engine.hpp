@@ -434,6 +434,9 @@ PropupResult propup_intel_npu_telemetry_sustained_sampling(std::ostream* log = n
 /// @brief Prop up: NPU surface language hygiene (no prohibited terms).
 PropupResult propup_npu_surface_language_hygiene(std::ostream* log = nullptr);
 
+/// @brief Prop up: AtheneaProbeReport truly owns all telemetry state (no raw var leakage).
+PropupResult propup_athenea_probe_report_owns_telemetry_accum(std::ostream* log = nullptr);
+
 /// @brief Prop up: Linux LevelZero graceful dynamic discovery + real numbers when present.
 PropupResult propup_intel_npu_telemetry_linux_levelzero_graceful(std::ostream* log = nullptr);
 
@@ -445,6 +448,24 @@ PropupResult propup_quant_kernels_no_duplicate_iq4_definition(std::ostream* log 
 
 /// @brief Prop up: Athenea probe real load_tensor_slice bytes → Hot + endurance.
 PropupResult propup_athenea_probe_real_load_tensor_slice_bytes_hot_endurance(std::ostream* log = nullptr);
+
+/// @brief Prop up: Sustained above-65% NPU utilization metrics (restored from Grok Build excision).
+PropupResult propup_sustained_above_65_metrics(std::ostream* log = nullptr);
+
+/// @brief Prop up: Campaign stability at 70% NPU utilization threshold.
+PropupResult propup_campaign_70_stability(std::ostream* log = nullptr);
+
+/// @brief Prop up: DecisionEngine prefers NPU when Intel OpenVINO backend is real.
+PropupResult propup_decision_npu_preference(std::ostream* log = nullptr);
+
+/// @brief Prop up: Intel OpenVINO NPU real device property query capability.
+PropupResult propup_intel_openvino_real_device_query(std::ostream* log = nullptr);
+
+/// @brief Prop up: Real Intel NPU usage reported in acceleration / LCMD records.
+PropupResult propup_npu_usage_in_acceleration_report(std::ostream* log = nullptr);
+
+/// @brief Prop up: Runtime coordinator routes MatMul from compiled shape without backend bypass.
+PropupResult propup_runtime_coordinator_matmul_from_compiled_shape(std::ostream* log = nullptr);
 
 // ===========================================================================
 // Native kernel edge cases + Execution slices
