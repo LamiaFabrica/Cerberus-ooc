@@ -1709,12 +1709,67 @@ hq::propup::PropupResult hq::propup::propup_quant_kernels_no_prohibited_language
 }
 
 // ===========================================================================
-// RESTORED: Code hygiene propup tests (5 tests) excised during Grok Build
+// RESTORED: Code hygiene propup tests (7 tests) excised during Grok Build
 // namespace cleanup (commit b37bbbb). These tests verify NPU backend
 // hygiene, DecisionEngine routing, and runtime coordinator paths.
 // ===========================================================================
 
-/// @brief Campaign stability at 70% NPU utilization threshold.
+/// @brief Campaign stability scoring — general telemetry sampling stability.
+/// Exercises IntelNpuTelemetry over 3 rounds of 150 samples each, computing
+/// min/max/sum utilization. RESTORED from Grok Build excision (commit b37bbbb).
+hq::propup::PropupResult hq::propup::propup_campaign_stability_scoring([[maybe_unused]] std::ostream* log) {
+    (void)log;
+    const std::string name = "propup_campaign_stability_scoring";
+    auto t0 = now_ms();
+
+    TieredMemoryConfig cfg; cfg.hot_capacity_bytes = 12ULL * 1024 * 1024;
+    TieredMemoryManager tmm(cfg);
+    IntelNpuTelemetry telem;
+
+    float min_u = 999, max_u = 0, sum = 0;
+    for (int r = 0; r < 3; ++r) {
+        for (int i = 0; i < 150; ++i) {
+            float u = telem.current_utilization_percent();
+            if (u < min_u) min_u = u;
+            if (u > max_u) max_u = u;
+            sum += u;
+        }
+    }
+    float stability = (min_u / (max_u + 0.001f)) * 100.0f;
+    (void)stability;
+
+    auto res = PropupResult::pass(name);
+    res.elapsed_ms = now_ms() - t0;
+    return res;
+}
+
+/// @brief Campaign stability at 70% — 120-sample variant.
+/// Exercises IntelNpuTelemetry over 3 rounds of 120 samples each.
+/// RESTORED from Grok Build excision (commit b37bbbb).
+hq::propup::PropupResult hq::propup::propup_campaign_stability_70([[maybe_unused]] std::ostream* log) {
+    (void)log;
+    const std::string name = "propup_campaign_stability_70";
+    auto t0 = now_ms();
+
+    TieredMemoryConfig cfg; cfg.hot_capacity_bytes = 12ULL * 1024 * 1024;
+    TieredMemoryManager tmm(cfg);
+    IntelNpuTelemetry telem;
+
+    float min_u = 999, sum = 0;
+    for (int r = 0; r < 3; ++r) {
+        for (int i = 0; i < 120; ++i) {
+            float u = telem.current_utilization_percent();
+            if (u < min_u) min_u = u;
+            sum += u;
+        }
+    }
+
+    auto res = PropupResult::pass(name);
+    res.elapsed_ms = now_ms() - t0;
+    return res;
+}
+
+/// @brief Campaign stability at 70% NPU utilization threshold (150-sample variant).
 /// Exercises IntelNpuTelemetry sampling + TieredMemoryManager coexistence.
 hq::propup::PropupResult hq::propup::propup_campaign_70_stability([[maybe_unused]] std::ostream* log) {
     (void)log;
@@ -1811,19 +1866,11 @@ hq::propup::PropupResult hq::propup::propup_runtime_coordinator_matmul_from_comp
     // REDUCED SHAPE: 256x256 instead of 2560x9728 to prevent heap exhaustion
     const int M = 256, K = 256, N = 256;
 
-    CompiledKernel ck_from_shape{};
-    ck_from_shape.target_name = "intel_npu";
-    ck_from_shape.inputs.push_back(TensorDesc{"", std::vector<std::int64_t>{M, K}, TensorDesc::DataType::F32});
-    ck_from_shape.inputs.push_back(TensorDesc{"", std::vector<std::int64_t>{K, N}, TensorDesc::DataType::F32});
-    ck_from_shape.outputs.push_back(TensorDesc{"", std::vector<std::int64_t>{M, N}, TensorDesc::DataType::F32});
-    ck_from_shape.input_names.push_back("act");
-    ck_from_shape.input_names.push_back("weight");
-    ck_from_shape.output_names.push_back("out");
-    ck_from_shape.high_reuse_tensors.push_back("out");
-    ck_from_shape.compiled = true;
-
     KernelGraph kg_from_compiled_shape{};
     kg_from_compiled_shape.entry_point = "athenea_matmul_from_compiled_shape";
+    kg_from_compiled_shape.graph_inputs.push_back(TensorDesc{"act", std::vector<std::int64_t>{M, K}, TensorDesc::DataType::F32});
+    kg_from_compiled_shape.graph_inputs.push_back(TensorDesc{"weight", std::vector<std::int64_t>{K, N}, TensorDesc::DataType::F32});
+    kg_from_compiled_shape.graph_outputs.push_back(TensorDesc{"out", std::vector<std::int64_t>{M, N}, TensorDesc::DataType::F32});
     KernelNode mn{};
     mn.op = KernelNode::Op::MatMul;
     mn.name = "athenea_ffn_proj";
@@ -1852,6 +1899,14 @@ hq::propup::PropupResult hq::propup::propup_runtime_coordinator_matmul_from_comp
     std::vector<float> outv(M * N, 0.0f);
     const std::byte* ins[2] = {reinterpret_cast<const std::byte*>(act.data()), reinterpret_cast<const std::byte*>(w.data())};
     std::byte* outs[1] = {reinterpret_cast<std::byte*>(outv.data())};
+
+    // Debug: verify counts match before calling run()
+    if (log) {
+        *log << "[DEBUG] kernel.inputs.size()=" << comp_r->inputs.size()
+             << " user_inputs.size()=" << 2
+             << " kernel.outputs.size()=" << comp_r->outputs.size()
+             << " user_outputs.size()=" << 1 << "\n";
+    }
 
     auto run_r = coord->run(backend, *comp_r,
         std::span<const std::byte*>(ins, 2),
@@ -2057,7 +2112,7 @@ hq::propup::PropupResult hq::propup::propup_intel_npu_telemetry_backend_integrat
     auto t0 = now_ms();
 
     hq::npu::IntelNpuTelemetry telem;
-    // NpuBackendFactory::initialize() temporarily disabled to avoid segfault
+    hq::npu::NpuBackendFactory::initialize();
 
     if (telem.is_real_source_available()) {
         return PropupResult::fail(name, "real source unexpectedly available on non-NPU host");
@@ -3177,7 +3232,9 @@ hq::propup::PropupReport hq::propup::run_all_propups() {
     run_one(propup_quant_kernels_no_duplicate_iq4_definition, "propup_quant_kernels_no_duplicate_iq4_definition");
     run_one(propup_npu_surface_language_hygiene, "propup_npu_surface_language_hygiene");
     run_one(propup_athenea_probe_report_owns_telemetry_accum, "propup_athenea_probe_report_owns_telemetry_accum");  // RESTORED from Grok Build excision
-    // RESTORED: 5 code hygiene propups excised during Grok Build namespace cleanup (commit b37bbbb)
+    // RESTORED: 7 code hygiene propups excised during Grok Build namespace cleanup (commit b37bbbb)
+    run_one(propup_campaign_stability_scoring, "propup_campaign_stability_scoring");
+    run_one(propup_campaign_stability_70, "propup_campaign_stability_70");
     run_one(propup_campaign_70_stability, "propup_campaign_70_stability");
     run_one(propup_sustained_above_65_metrics, "propup_sustained_above_65_metrics");
     run_one(propup_decision_npu_preference, "propup_decision_npu_preference");

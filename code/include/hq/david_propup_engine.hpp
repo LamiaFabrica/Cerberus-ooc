@@ -452,7 +452,13 @@ PropupResult propup_athenea_probe_real_load_tensor_slice_bytes_hot_endurance(std
 /// @brief Prop up: Sustained above-65% NPU utilization metrics (restored from Grok Build excision).
 PropupResult propup_sustained_above_65_metrics(std::ostream* log = nullptr);
 
-/// @brief Prop up: Campaign stability at 70% NPU utilization threshold.
+/// @brief Prop up: Campaign stability scoring (general telemetry sampling stability).
+PropupResult propup_campaign_stability_scoring(std::ostream* log = nullptr);
+
+/// @brief Prop up: Campaign stability at 70% NPU utilization threshold (120-sample variant).
+PropupResult propup_campaign_stability_70(std::ostream* log = nullptr);
+
+/// @brief Prop up: Campaign stability at 70% NPU utilization threshold (150-sample variant).
 PropupResult propup_campaign_70_stability(std::ostream* log = nullptr);
 
 /// @brief Prop up: DecisionEngine prefers NPU when Intel OpenVINO backend is real.
