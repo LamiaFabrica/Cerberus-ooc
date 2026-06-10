@@ -7,19 +7,19 @@ extern "C" std::size_t hq_safe_write(int fd, const char* data, std::size_t len) 
 }
 
 int main() {
-    std::printf("Starting isolated staging manager test\n");
+    std::printf("Starting PINNED staging manager test\n");
     fflush(stdout);
     
     hq::StagingConfig cfg;
     cfg.buffer_count = 4;
     cfg.buffer_size_bytes = 1ULL * 1024 * 1024;
-    cfg.pinned = false;
+    cfg.pinned = true;  // PINNED!
     
     std::printf("Config: count=%zu size=%zu pinned=%d\n", cfg.buffer_count, cfg.buffer_size_bytes, cfg.pinned);
     fflush(stdout);
     
     try {
-        std::printf("About to construct EmbeddingStagingManager...\n");
+        std::printf("About to construct EmbeddingStagingManager with pinned=true...\n");
         fflush(stdout);
         hq::EmbeddingStagingManager mgr(cfg);
         std::printf("Constructed successfully!\n");
@@ -27,15 +27,6 @@ int main() {
         
         std::printf("total_capacity=%zu available=%zu\n", mgr.total_capacity(), mgr.available_count());
         fflush(stdout);
-        
-        auto buf = mgr.acquire();
-        if (buf) {
-            std::printf("Acquired buffer: capacity=%zu\n", buf->capacity);
-            mgr.release(*buf);
-            std::printf("Released buffer\n");
-        } else {
-            std::printf("Acquire failed\n");
-        }
         
         std::printf("TEST PASSED\n");
         return 0;

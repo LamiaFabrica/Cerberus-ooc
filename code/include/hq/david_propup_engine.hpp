@@ -176,6 +176,21 @@ PropupResult propup_lcmd_initialize_encrypt(std::ostream* log = nullptr);
 /// @brief Prop up: LCMD stores a preference and retrieves it back correctly.
 PropupResult propup_lcmd_store_retrieve(std::ostream* log = nullptr);
 
+/// @brief Prop up: LCMD stores an InferenceRecord and retrieves it back field-for-field.
+PropupResult propup_lcmd_inference_record_roundtrip(std::ostream* log = nullptr);
+
+/// @brief Prop up: LCMD query_inference_records and inference_stats work correctly with multiple records.
+PropupResult propup_lcmd_inference_query_and_stats(std::ostream* log = nullptr);
+
+/// @brief Prop up: LCMD exports inference records to JSON and file is valid JSON array.
+PropupResult propup_lcmd_inference_export_json(std::ostream* log = nullptr);
+
+/// @brief Prop up: LCMD stores a failed inference record and retrieves it with status="failed".
+PropupResult propup_lcmd_inference_failure_recording(std::ostream* log = nullptr);
+
+/// @brief Prop up: LCMD full audit trail — comprehensive coverage of store, query, stats, export, and field integrity.
+PropupResult propup_lcmd_full_audit_trail(std::ostream* log = nullptr);
+
 /// @brief Prop up: JWT session rejects clearly malformed tokens without crash.
 PropupResult propup_jwt_malformed_rejected(std::ostream* log = nullptr);
 
@@ -193,6 +208,9 @@ PropupResult propup_jwt_expired_detected(std::ostream* log = nullptr);
 // ===========================================================================
 // COMMAND / ANBP / METRO / SLIPSTREAM EDGE CASES
 // ===========================================================================
+
+/// @brief Prop up: ANBP gateway INFERENCE_STATS opcode returns valid stats JSON via LCMD.
+PropupResult propup_anbp_inference_stats_and_query(std::ostream* log = nullptr);
 
 // ===========================================================================
 // HIP Graph Denoiser propups
@@ -229,6 +247,9 @@ PropupResult propup_hip_graph_denoiser_scheduler_attachment(std::ostream* log = 
 
 /// @brief Prop up: LCMD offline sync queue count matches push count.
 PropupResult propup_lcmd_offline_sync_count(std::ostream* log = nullptr);
+
+/// @brief Prop up: fresh LCMD auto-initializes RBPC state with default trust policy.
+PropupResult propup_server_lcmd_fresh_auto_rbpc(std::ostream* log = nullptr);
 
 // ===========================================================================
 // Round 23 propups (8 tests — runtime diagnostics, TMM allocation, LCMD accessors)
@@ -453,8 +474,14 @@ PropupResult propup_staging_manager_lifecycle(std::ostream* log = nullptr);
 /// @brief Prop up: inference request with invalid dimensions rejected before execution.
 PropupResult propup_inference_audit_input_validation(std::ostream* log = nullptr);
 
+/// @brief Prop up: RBPC gate controls inference audit export/clear — open, close, burn states.
+PropupResult propup_inference_audit_rbpc_gate(std::ostream* log = nullptr);
+
 /// @brief Prop up: allocate many small blocks from TieredMemoryManager, verify total tracks.
 PropupResult propup_tiered_memory_bulk_alloc(std::ostream* log = nullptr);
+
+/// @brief Prop up: reset_for_testing() drains all allocations, resets PMR counters, and leaves TMM usable.
+PropupResult propup_tiered_memory_reset(std::ostream* log = nullptr);
 
 // ===========================================================================
 // C ABI surface (cerberus_api.cpp) — zero-coverage high-risk

@@ -166,14 +166,31 @@ CerberusGraph CerberusGraph::from_kernel_graph(const npu::KernelGraph& kg) {
         g.tensors.push_back(std::move(gt));
     }
 
-    // Propagate dtype from graph_inputs to matching tensor names
+    // Propagate dtype/shape from graph_inputs to tensors with matching names.
+    // If a graph_input has an empty name, it will not match any tensor — this is
+    // intentional; callers must provide meaningful names in graph_inputs for
+    // propagation to occur.  (See propup_graph_engine_dtype_mismatch for the
+    // test that guards this behaviour.)
     for (std::size_t i = 0; i < kg.graph_inputs.size(); ++i) {
-        // Find the tensor with the same name as the graph input
         for (auto& t : g.tensors) {
             if (t.name == kg.graph_inputs[i].name) {
                 if (!kg.graph_inputs[i].shape.empty())
                     t.shape = kg.graph_inputs[i].shape;
                 t.dtype = kg.graph_inputs[i].dtype;
+                break;
+            }
+        }
+    }
+
+    // Propagate dtype/shape from graph_outputs to tensors with matching names.
+    // This ensures output tensors that may not appear as node inputs (e.g. final
+    // graph outputs only produced by a node) carry the correct dtype metadata.
+    for (std::size_t i = 0; i < kg.graph_outputs.size(); ++i) {
+        for (auto& t : g.tensors) {
+            if (t.name == kg.graph_outputs[i].name) {
+                if (!kg.graph_outputs[i].shape.empty())
+                    t.shape = kg.graph_outputs[i].shape;
+                t.dtype = kg.graph_outputs[i].dtype;
                 break;
             }
         }

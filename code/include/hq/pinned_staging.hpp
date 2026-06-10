@@ -246,4 +246,4 @@ using CLIPStagingPool = PinnedStagingPool<float>;
 // instantiate PinnedStagingPool<T>.  Included here (rather than the header
 // alone) because the full implementation requires HIP headers.
 // ---------------------------------------------------------------------------
-#include "pinned_staging.cpp"   // template implementation (in src/)
+#include "../src/pinned_staging.cpp"   // template implementation (in src/)

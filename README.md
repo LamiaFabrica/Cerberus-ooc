@@ -164,9 +164,13 @@ Cerberus/
 ├── lfssl_bridge/          # LFSSL DLL build (PQC + AES + Argon2id)
 ├── ort/                   # ONNX Runtime libraries
 ├── Development docs/      # Internal docs, logs, research (git-ignored)
+│   └── Readme_AI.md       # **LIVING DOCUMENT — AI Session Context**
+│                            *Always read this first when an AI agent joins.*
 ├── LICENSE                # MIT License
 └── README.md              # You are here
 ```
+
+**IMPORTANT FOR AI AGENTS:** Before doing any work, read `Development docs/Readme_AI.md`. It contains the current state, known bugs, toolchain gotchas, and what was left unfinished from the last session. Do not make claims about the build state without consulting it.
 
 All internal documentation, build logs, scratch files, and research reports live in
 `Development docs/` which is **git-ignored** and not part of the public repository.

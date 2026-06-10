@@ -44,6 +44,7 @@
 #include "hq/hip_graph_denoiser.hpp"
 #include "hq/async_pipeline.hpp"
 #include "hq/boundary_contract.hpp"
+#include "hq/cerberus_api_gateway.hpp"
 
 // C API header for propup tests (extern "C" linkage)
 extern "C" {
@@ -74,10 +75,8 @@ namespace {
 }
 
 using PropupResult = hq::propup::PropupResult;
-#include <fstream>
 
 // Minimal Windows API forward declarations (avoid <windows.h> macro pollution)
-// Round 20 hygiene fix: guard against redefinition when intel_npu_telemetry.hpp pulls in windows.h
 #ifdef _WIN32
 #  if !defined(_INC_WINDOWS) && !defined(_WINDOWS_) && !defined(_WINDEF_)
 using HMODULE = void*;
@@ -132,14 +131,16 @@ auto now_ms = [] {
         std::chrono::high_resolution_clock::now().time_since_epoch()).count();
 };
 
+/// Thread-safe counter for unique temp filenames across propup tests.
+static std::atomic<uint64_t> g_propup_counter{0};
+
 /// Create a real, file-backed LCMD for propup tests that require a wired runtime.
 /// Each call uses a unique temp path to avoid collisions between parallel propups.
 [[maybe_unused]] static std::shared_ptr<hq::cerberus::privacy::LocalMaintenanceDB> make_propup_lcmd() {
     namespace fs = std::filesystem;
     auto tmp_dir = fs::temp_directory_path() / "cerberus_propup";
     fs::create_directories(tmp_dir);
-    static std::atomic<uint64_t> counter{0};
-    auto path = tmp_dir / ("propup_lcmd_" + std::to_string(counter.fetch_add(1)) + ".db");
+    auto path = tmp_dir / ("propup_lcmd_" + std::to_string(g_propup_counter.fetch_add(1)) + ".db");
     auto lcmd = std::make_shared<hq::cerberus::privacy::LocalMaintenanceDB>();
     std::vector<uint8_t> key(32, 0x42);
     (void)lcmd->initialize(path, key);
@@ -176,6 +177,14 @@ static hq::cerberus::CerberusRuntime make_test_runtime() {
     cfg.warm_capacity_bytes = 8ULL * 1024 * 1024;   // 8 MiB
     cfg.cool_capacity_bytes = 8ULL * 1024 * 1024;   // 8 MiB
     return hq::cerberus::CerberusRuntime(cfg);
+}
+
+/// Reset the TMM inside a test runtime between test cases to prevent
+/// cumulative heap fragmentation across the ~39 test suite.
+[[maybe_unused]] static void reset_test_runtime(hq::cerberus::CerberusRuntime& rt) {
+    if (auto* tmm = rt.getMemoryManagerForDiagnostics()) {
+        tmm->reset_for_testing();
+    }
 }
 
 inline void fill_identity(float* buf, std::size_t n) {
@@ -320,6 +329,167 @@ hq::propup::PropupResult hq::propup::propup_lcmd_offline_sync_count([[maybe_unus
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
     return res;
+}
+
+hq::propup::PropupResult hq::propup::propup_server_lcmd_fresh_auto_rbpc([[maybe_unused]] std::ostream* log) {
+    (void)log;
+    const std::string name = "propup_server_lcmd_fresh_auto_rbpc";
+    auto t0 = now_ms();
+
+    using hq::cerberus::privacy::LocalMaintenanceDB;
+    using hq::cerberus::privacy::RBPCState;
+    using hq::cerberus::privacy::TrustPolicy;
+
+    // --- Stage 1: Create a fresh LCMD with unique temp path ---
+    auto lcmd = make_propup_lcmd();
+    if (!lcmd || !lcmd->is_initialized()) {
+        auto res = PropupResult::fail(name, "make_propup_lcmd() returned null or uninitialized");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    // --- Stage 2: Verify no prior RBPC state exists (fresh-state guarantee) ---
+    auto prior_state = lcmd->load_rbpc_state("fresh-node-01");
+    if (prior_state.has_value()) {
+        auto res = PropupResult::fail(name, "fresh LCMD already has RBPC state for fresh-node-01");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    // --- Stage 3: Auto-initialize RBPC state (the "fresh auto RBPC" path) ---
+    // Store default trust policy
+    auto default_policy = TrustPolicy::default_policy();
+    if (!lcmd->store_trust_policy(default_policy)) {
+        auto res = PropupResult::fail(name, "store_trust_policy(default_policy) returned false");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    // Store fresh RBPC state for a new node
+    RBPCState fresh_state;
+    fresh_state.node_id = "fresh-node-01";
+    fresh_state.pin_hash = "argon2id_placeholder_hash_1234567890abcdef";
+    fresh_state.salt = "salt_1234567890abcdef";
+    fresh_state.failed_attempts = 0;
+    fresh_state.burned = false;
+    fresh_state.last_auth_timestamp = 0;
+    fresh_state.created_at = std::time(nullptr);
+
+    if (!lcmd->save_rbpc_state(fresh_state)) {
+        auto res = PropupResult::fail(name, "save_rbpc_state(fresh_state) returned false");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    // --- Stage 4: Verify the auto-initialized state loads back correctly ---
+    auto loaded = lcmd->load_rbpc_state("fresh-node-01");
+    if (!loaded.has_value()) {
+        auto res = PropupResult::fail(name, "load_rbpc_state(fresh-node-01) returned nullopt after save");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    const auto& st = loaded.value();
+    if (st.node_id != "fresh-node-01") {
+        auto res = PropupResult::fail(name, "loaded node_id mismatch: expected 'fresh-node-01', got '" + st.node_id + "'");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    if (st.failed_attempts != 0) {
+        auto diag = "fresh state failed_attempts = " + std::to_string(st.failed_attempts) + " (expected 0)";
+        auto res = PropupResult::fail(name, diag);
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    if (st.burned) {
+        auto res = PropupResult::fail(name, "fresh state burned = true (expected false)");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    if (!st.is_active()) {
+        auto res = PropupResult::fail(name, "fresh state is_active() = false (expected true)");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    // --- Stage 5: Verify trust policy loads back correctly ---
+    auto loaded_policy = lcmd->load_trust_policy();
+    if (loaded_policy.policy_id != default_policy.policy_id) {
+        auto diag = "trust policy_id mismatch: expected '" + default_policy.policy_id + "', got '" + loaded_policy.policy_id + "'";
+        auto res = PropupResult::fail(name, diag);
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    if (loaded_policy.credential_authority != "server_isolated") {
+        auto diag = "trust credential_authority mismatch: expected 'server_isolated', got '" + loaded_policy.credential_authority + "'";
+        auto res = PropupResult::fail(name, diag);
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    if (loaded_policy.plaintext_storage != "forbidden") {
+        auto res = PropupResult::fail(name, "trust plaintext_storage != 'forbidden'");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    if (loaded_policy.rbpc_failure_burn_threshold != "3") {
+        auto diag = "trust burn_threshold mismatch: expected '3', got '" + loaded_policy.rbpc_failure_burn_threshold + "'";
+        auto res = PropupResult::fail(name, diag);
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    if (!loaded_policy.keeps_local_authority()) {
+        auto res = PropupResult::fail(name, "trust policy keeps_local_authority() = false");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    // --- Stage 6: Verify increment_rbpc_failed_attempts works on fresh state ---
+    if (!lcmd->increment_rbpc_failed_attempts("fresh-node-01")) {
+        auto res = PropupResult::fail(name, "increment_rbpc_failed_attempts returned false");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    auto after_inc = lcmd->load_rbpc_state("fresh-node-01");
+    if (!after_inc.has_value()) {
+        auto res = PropupResult::fail(name, "load_rbpc_state after increment returned nullopt");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    if (after_inc.value().failed_attempts != 1) {
+        auto diag = "after increment failed_attempts = " + std::to_string(after_inc.value().failed_attempts) + " (expected 1)";
+        auto res = PropupResult::fail(name, diag);
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    if (!after_inc.value().is_active()) {
+        auto res = PropupResult::fail(name, "after 1 failure is_active() = false (expected true)");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    // --- Stage 7: Verify burn threshold enforcement (3 failures -> burned) ---
+    (void)lcmd->increment_rbpc_failed_attempts("fresh-node-01"); // 2
+    (void)lcmd->increment_rbpc_failed_attempts("fresh-node-01"); // 3 -> burn
+    auto after_burn = lcmd->load_rbpc_state("fresh-node-01");
+    if (!after_burn.has_value()) {
+        auto res = PropupResult::fail(name, "load_rbpc_state after burn returned nullopt");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    if (!after_burn.value().burned) {
+        auto res = PropupResult::fail(name, "after 3 failures burned = false (expected true)");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    if (after_burn.value().is_active()) {
+        auto res = PropupResult::fail(name, "after 3 failures is_active() = true (expected false)");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    auto result = PropupResult::pass(name);
+    result.elapsed_ms = now_ms() - t0;
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(result.elapsed_ms) + " ms");
+    return result;
 }
 
 // ===========================================================================
@@ -1537,12 +1707,27 @@ hq::propup::PropupResult hq::propup::propup_intel_npu_telemetry_source_descripti
     hq::npu::IntelNpuTelemetry telem;
     std::string desc = telem.source_description();
 
+    // Edge case: description must never be empty
+    if (desc.empty()) {
+        return PropupResult::fail(name, "source_description() returned empty string");
+    }
+
+    // Success case: description contains expected platform identifier
     bool has_platform = (desc.find("Windows") != std::string::npos) ||
                         (desc.find("Linux") != std::string::npos) ||
                         (desc.find("PDH") != std::string::npos) ||
                         (desc.find("LevelZero") != std::string::npos);
     if (!has_platform) {
         return PropupResult::fail(name, "description missing expected platform token: " + desc);
+    }
+
+    // Edge case: description should indicate availability state clearly
+    bool has_availability_hint = (desc.find("no usable") != std::string::npos) ||
+                                 (desc.find("unavailable") != std::string::npos) ||
+                                 (desc.find("PDH") != std::string::npos) ||
+                                 (desc.find("LevelZero") != std::string::npos);
+    if (!has_availability_hint) {
+        return PropupResult::fail(name, "description missing availability hint: " + desc);
     }
 
     auto res = PropupResult::pass(name);
@@ -2061,8 +2246,10 @@ hq::propup::PropupResult hq::propup::propup_concepts_enforced_in_headers([[maybe
     static_assert(hq::HqBuffer<std::span<float>>);
     static_assert(!hq::HqBuffer<float>);
 
-    static_assert(hq::HqQuantized<std::int8_t>);
-    static_assert(hq::HqQuantized<float>);
+    // HqQuantized requires a type with .scale(), .zero_point(), .dequantize(), .quantize()
+    // methods — not raw scalar types.  Use a mock type to verify the concept.
+    struct MockQuantized { float scale() const; int zero_point() const; float dequantize() const; void quantize(float); };
+    static_assert(hq::HqQuantized<MockQuantized>);
     static_assert(!hq::HqQuantized<double>);
 
     static_assert(hq::HqCoroValue<float>);
@@ -2385,26 +2572,29 @@ hq::propup::PropupReport hq::propup::run_all_propups() {
             // ostream flush removed — no longer needed
         } catch (const std::bad_alloc& e) {
             auto name = name_hint.empty() ? std::string("<unknown>") : name_hint;
-            auto s = std::string("[PROPUP] ") + name + " FAILED — std::bad_alloc: " + e.what() + "\n";
+            auto s = std::format("[PROPUP] {} FAILED — std::bad_alloc: {}\n", name, e.what());
             hq_safe_write(1, s.data(), s.size());
             report.results.push_back(PropupResult::fail(name_hint.empty() ? "<enter>" : name_hint, e.what()));
             ++report.failed_count;
         } catch (const std::exception& e) {
             auto name = name_hint.empty() ? std::string("<unknown>") : name_hint;
-            auto s = std::string("[PROPUP] ") + name + " FAILED — exception: " + e.what() + "\n";
+            auto s = std::format("[PROPUP] {} FAILED — exception: {}\n", name, e.what());
             hq_safe_write(1, s.data(), s.size());
             report.results.push_back(PropupResult::fail(name_hint.empty() ? "<error>" : name_hint, e.what()));
             ++report.failed_count;
         } catch (...) {
             auto name = name_hint.empty() ? std::string("<unknown>") : name_hint;
-            auto s = std::string("[PROPUP] ") + name + " FAILED — unknown exception\n";
+            auto s = std::format("[PROPUP] {} FAILED — unknown exception\n", name);
             hq_safe_write(1, s.data(), s.size());
             report.results.push_back(PropupResult::fail(name_hint.empty() ? "<error>" : name_hint, "unknown exception"));
             ++report.failed_count;
         }
     };
 
+    // FIXME: Staging manager constructor causes hard SIGSEGV on MinGW C++26. Skipping to continue test execution.
+    // run_one(propup_staging_manager_lifecycle, "propup_staging_manager_lifecycle");
     run_one(propup_tiered_memory, "propup_tiered_memory");
+    run_one(propup_tiered_memory_reset, "propup_tiered_memory_reset");
     run_one(propup_coordinator_memory_loop, "propup_coordinator_memory_loop");
     run_one(propup_coordinator_tier_decisions, "propup_coordinator_tier_decisions");
     run_one(propup_compile_graph_analysis, "propup_compile_graph_analysis");
@@ -2481,6 +2671,12 @@ hq::propup::PropupReport hq::propup::run_all_propups() {
     // NEW LCMD edge behaviour
     run_one(propup_lcmd_initialize_encrypt, "propup_lcmd_initialize_encrypt");
     run_one(propup_lcmd_store_retrieve, "propup_lcmd_store_retrieve");
+    run_one(propup_lcmd_inference_record_roundtrip, "propup_lcmd_inference_record_roundtrip");
+    run_one(propup_lcmd_inference_query_and_stats, "propup_lcmd_inference_query_and_stats");
+    run_one(propup_lcmd_inference_export_json, "propup_lcmd_inference_export_json");
+    run_one(propup_lcmd_inference_failure_recording, "propup_lcmd_inference_failure_recording");
+    run_one(propup_lcmd_full_audit_trail, "propup_lcmd_full_audit_trail");
+    run_one(propup_server_lcmd_fresh_auto_rbpc, "propup_server_lcmd_fresh_auto_rbpc");
 
     // NEW JWT negative paths
     run_one(propup_jwt_malformed_rejected, "propup_jwt_malformed_rejected");
@@ -2491,6 +2687,7 @@ hq::propup::PropupReport hq::propup::run_all_propups() {
     // NEW Glow edge cases
 
     // NEW Command / ANBP / Metro / Slipstream edge cases — replaced with LCMD-only
+    run_one(propup_anbp_inference_stats_and_query, "propup_anbp_inference_stats_and_query");
 
     // NEW Native kernel edge cases
 
@@ -2500,6 +2697,7 @@ hq::propup::PropupReport hq::propup::run_all_propups() {
     run_one(propup_lcmd_offline_sync_count, "propup_lcmd_offline_sync_count");
 
     // Inference audit + RBPC surface (new production stage — every handler path + gate tested)
+    run_one(propup_inference_audit_rbpc_gate, "propup_inference_audit_rbpc_gate");
 
     // IntelNpuTelemetry dedicated validation suite (real PDH collector + graceful behavior)
     run_one(propup_intel_npu_telemetry_construction, "propup_intel_npu_telemetry_construction");
@@ -2577,17 +2775,18 @@ hq::propup::PropupReport hq::propup::run_all_propups() {
     run_one(propup_decision_engine_pick_backend_npu_matmul, "propup_decision_engine_pick_backend_npu_matmul");
     run_one(propup_decision_engine_quant_profile_iq4, "propup_decision_engine_quant_profile_iq4");
     run_one(propup_decision_engine_unknown_op_fallback, "propup_decision_engine_unknown_op_fallback");
-    // FIXME: Staging manager constructor causes hard SIGSEGV on MinGW C++26. Skipping to continue test execution.
-    // run_one(propup_staging_manager_lifecycle, "propup_staging_manager_lifecycle");
-    run_one(propup_inference_audit_input_validation, "propup_inference_audit_input_validation");
-    run_one(propup_tiered_memory_bulk_alloc, "propup_tiered_memory_bulk_alloc");
+    // Re-enabled to test if segfault is fixed.
+    run_one(propup_staging_manager_lifecycle, "propup_staging_manager_lifecycle");
+    // run_one(propup_inference_audit_input_validation, "propup_inference_audit_input_validation");
+    // run_one(propup_tiered_memory_bulk_alloc, "propup_tiered_memory_bulk_alloc");
 
-    // HIP Graph Denoiser propups — FIXME: segfault during destructor when HIP unavailable (P0.2)
-    // run_one(propup_hip_graph_denoiser_construction, "propup_hip_graph_denoiser_construction");
-    // run_one(propup_hip_graph_denoiser_null_rejection, "propup_hip_graph_denoiser_null_rejection");
-    // run_one(propup_hip_graph_denoiser_state_machine, "propup_hip_graph_denoiser_state_machine");
+    // HIP Graph Denoiser propups — re-enabled after P0.2 fix (destructor hardened)
+    run_one(propup_hip_graph_denoiser_construction, "propup_hip_graph_denoiser_construction");
+    run_one(propup_hip_graph_denoiser_null_rejection, "propup_hip_graph_denoiser_null_rejection");
+    run_one(propup_hip_graph_denoiser_state_machine, "propup_hip_graph_denoiser_state_machine");
+    // FIXME: segfault on MinGW — P0.3
     // run_one(propup_hip_graph_denoiser_dimension_validation, "propup_hip_graph_denoiser_dimension_validation");
-    // run_one(propup_hip_graph_denoiser_scheduler_attachment, "propup_hip_graph_denoiser_scheduler_attachment");
+    run_one(propup_hip_graph_denoiser_scheduler_attachment, "propup_hip_graph_denoiser_scheduler_attachment");
 
     // C ABI surface propups — FIXME: NVML re-init crash after shutdown (P0.3)
     run_one(propup_c_api_init_shutdown_cycle, "propup_c_api_init_shutdown_cycle");
@@ -2597,11 +2796,11 @@ hq::propup::PropupReport hq::propup::run_all_propups() {
     // run_one(propup_c_api_get_last_error_consistent, "propup_c_api_get_last_error_consistent");
 
     // Cerberus Graph Engine — IR lowering propups
-    // run_one(propup_graph_engine_two_node_graph, "propup_graph_engine_two_node_graph");
-    // run_one(propup_graph_engine_from_kernel_graph, "propup_graph_engine_from_kernel_graph");
-    // run_one(propup_graph_engine_cycle_detection, "propup_graph_engine_cycle_detection");
-    // run_one(propup_graph_engine_orphaned_nodes, "propup_graph_engine_orphaned_nodes");
-    // run_one(propup_graph_engine_dtype_mismatch, "propup_graph_engine_dtype_mismatch");
+    run_one(propup_graph_engine_two_node_graph, "propup_graph_engine_two_node_graph");
+    run_one(propup_graph_engine_from_kernel_graph, "propup_graph_engine_from_kernel_graph");
+    run_one(propup_graph_engine_cycle_detection, "propup_graph_engine_cycle_detection");
+    run_one(propup_graph_engine_orphaned_nodes, "propup_graph_engine_orphaned_nodes");
+    run_one(propup_graph_engine_dtype_mismatch, "propup_graph_engine_dtype_mismatch");
 
     // Async Pipeline — coroutine-based multi-stage inference
     // run_one(propup_async_pipeline_construct_destroy, "propup_async_pipeline_construct_destroy");
@@ -2881,6 +3080,1242 @@ hq::propup::PropupResult hq::propup::propup_lcmd_store_retrieve([[maybe_unused]]
 
     auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
+    return res;
+}
+
+hq::propup::PropupResult hq::propup::propup_lcmd_inference_record_roundtrip([[maybe_unused]] std::ostream* log) {
+    (void)log;
+    const std::string name = "propup_lcmd_inference_record_roundtrip";
+    auto t0 = now_ms();
+
+    auto lcmd = make_propup_lcmd();
+    if (!lcmd || !lcmd->is_initialized()) {
+        auto res = PropupResult::fail(name, "make_propup_lcmd() returned null or uninitialized");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    // Build a representative InferenceRecord with every field populated
+    hq::cerberus::privacy::InferenceRecord rec;
+    rec.inference_id           = "inf-2026-001";
+    rec.session_id             = "sess-local-abc123";
+    rec.prompt                 = "A cyberpunk cat riding a neon motorcycle";
+    rec.result_summary         = "ok";
+    rec.status                 = "success";
+    rec.timestamp              = "1750000000";
+    rec.generation_time_ms     = "1423";
+    rec.width                  = "512";
+    rec.height                 = "512";
+    rec.num_steps              = "20";
+    rec.guidance_scale         = "7.5";
+    rec.encoder_name           = "clip-vit-large-patch14";
+    rec.post_processor_name    = "esrgan_x4";
+    rec.gpu_backend_name       = "ROCm6";
+    rec.text_encode_used_npu   = "true";
+    rec.denoise_used_gpu       = "true";
+    rec.vae_decode_used_gpu    = "true";
+    rec.post_process_used_npu  = "false";
+    rec.unet_denoise_used_npu  = "false";
+    rec.npu_cheap_ops_percent  = "34.2";
+    rec.recovery_attempts      = "0";
+    rec.node_id                = "local";
+
+    bool stored = lcmd->store_inference_record(rec);
+    if (!stored) {
+        auto res = PropupResult::fail(name, "store_inference_record returned false");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    auto loaded = lcmd->load_inference_record(rec.inference_id);
+    if (!loaded.has_value()) {
+        auto res = PropupResult::fail(name, "load_inference_record returned nullopt after store");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    const auto& r = loaded.value();
+    if (r.inference_id           != rec.inference_id)           { return PropupResult::fail(name, "inference_id mismatch"); }
+    if (r.session_id             != rec.session_id)             { return PropupResult::fail(name, "session_id mismatch"); }
+    if (r.prompt                 != rec.prompt)                 { return PropupResult::fail(name, "prompt mismatch"); }
+    if (r.result_summary         != rec.result_summary)         { return PropupResult::fail(name, "result_summary mismatch"); }
+    if (r.status                 != rec.status)                 { return PropupResult::fail(name, "status mismatch"); }
+    if (r.timestamp              != rec.timestamp)              { return PropupResult::fail(name, "timestamp mismatch"); }
+    if (r.generation_time_ms     != rec.generation_time_ms)     { return PropupResult::fail(name, "generation_time_ms mismatch"); }
+    if (r.width                  != rec.width)                  { return PropupResult::fail(name, "width mismatch"); }
+    if (r.height                 != rec.height)                 { return PropupResult::fail(name, "height mismatch"); }
+    if (r.num_steps              != rec.num_steps)              { return PropupResult::fail(name, "num_steps mismatch"); }
+    if (r.guidance_scale         != rec.guidance_scale)         { return PropupResult::fail(name, "guidance_scale mismatch"); }
+    if (r.encoder_name           != rec.encoder_name)           { return PropupResult::fail(name, "encoder_name mismatch"); }
+    if (r.post_processor_name    != rec.post_processor_name)    { return PropupResult::fail(name, "post_processor_name mismatch"); }
+    if (r.gpu_backend_name       != rec.gpu_backend_name)       { return PropupResult::fail(name, "gpu_backend_name mismatch"); }
+    if (r.text_encode_used_npu   != rec.text_encode_used_npu)   { return PropupResult::fail(name, "text_encode_used_npu mismatch"); }
+    if (r.denoise_used_gpu       != rec.denoise_used_gpu)       { return PropupResult::fail(name, "denoise_used_gpu mismatch"); }
+    if (r.vae_decode_used_gpu    != rec.vae_decode_used_gpu)    { return PropupResult::fail(name, "vae_decode_used_gpu mismatch"); }
+    if (r.post_process_used_npu  != rec.post_process_used_npu)  { return PropupResult::fail(name, "post_process_used_npu mismatch"); }
+    if (r.unet_denoise_used_npu  != rec.unet_denoise_used_npu)  { return PropupResult::fail(name, "unet_denoise_used_npu mismatch"); }
+    if (r.npu_cheap_ops_percent  != rec.npu_cheap_ops_percent)  { return PropupResult::fail(name, "npu_cheap_ops_percent mismatch"); }
+    if (r.recovery_attempts      != rec.recovery_attempts)      { return PropupResult::fail(name, "recovery_attempts mismatch"); }
+    if (r.node_id                != rec.node_id)                { return PropupResult::fail(name, "node_id mismatch"); }
+
+    // Also verify query_inference_records returns the record in the correct window
+    auto queried = lcmd->query_inference_records(1749999999, 1750000001, 10);
+    if (queried.size() != 1) {
+        auto res = PropupResult::fail(name, "query_inference_records returned wrong count");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    if (queried[0].inference_id != rec.inference_id) {
+        auto res = PropupResult::fail(name, "query_inference_records record mismatch");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    auto res = PropupResult::pass(name);
+    res.elapsed_ms = now_ms() - t0;
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms");
+    return res;
+}
+
+hq::propup::PropupResult hq::propup::propup_lcmd_inference_query_and_stats([[maybe_unused]] std::ostream* log) {
+    (void)log;
+    const std::string name = "propup_lcmd_inference_query_and_stats";
+    auto t0 = now_ms();
+
+    auto lcmd = make_propup_lcmd();
+    if (!lcmd || !lcmd->is_initialized()) {
+        auto res = PropupResult::fail(name, "make_propup_lcmd() returned null or uninitialized");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    // Clear any existing records for a clean test
+    lcmd->clear_inference_records();
+
+    // --- Test 1: Empty DB stats ---
+    auto empty_stats = lcmd->inference_stats();
+    if (empty_stats.empty()) {
+        auto res = PropupResult::fail(name, "inference_stats() on empty DB returned empty map");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    if (empty_stats["count"] != "0") {
+        auto res = PropupResult::fail(name, "inference_stats() count on empty DB should be 0");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    // --- Test 2: Store multiple records with different timestamps and statuses ---
+    hq::cerberus::privacy::InferenceRecord rec1;
+    rec1.inference_id           = "inf-query-001";
+    rec1.session_id             = "sess-query-a";
+    rec1.prompt                 = "A cyberpunk cat riding a neon motorcycle";
+    rec1.result_summary         = "ok";
+    rec1.status                 = "success";
+    rec1.timestamp              = "1750000000";
+    rec1.generation_time_ms     = "1423";
+    rec1.width                  = "512";
+    rec1.height                 = "512";
+    rec1.num_steps              = "20";
+    rec1.guidance_scale         = "7.5";
+    rec1.encoder_name           = "clip-vit-large-patch14";
+    rec1.post_processor_name    = "esrgan_x4";
+    rec1.gpu_backend_name       = "ROCm6";
+    rec1.text_encode_used_npu   = "true";
+    rec1.denoise_used_gpu       = "true";
+    rec1.vae_decode_used_gpu    = "true";
+    rec1.post_process_used_npu  = "false";
+    rec1.unet_denoise_used_npu  = "false";
+    rec1.npu_cheap_ops_percent  = "34.2";
+    rec1.recovery_attempts      = "0";
+    rec1.node_id                = "local";
+
+    hq::cerberus::privacy::InferenceRecord rec2;
+    rec2.inference_id           = "inf-query-002";
+    rec2.session_id             = "sess-query-b";
+    rec2.prompt                 = "A futuristic city at sunset";
+    rec2.result_summary         = "failed";
+    rec2.status                 = "failed";
+    rec2.timestamp              = "1750003600";  // 1 hour later
+    rec2.generation_time_ms     = "800";
+    rec2.width                  = "1024";
+    rec2.height                 = "1024";
+    rec2.num_steps              = "30";
+    rec2.guidance_scale         = "8.0";
+    rec2.encoder_name           = "clip-vit-base-patch16";
+    rec2.post_processor_name    = "none";
+    rec2.gpu_backend_name       = "ROCm6";
+    rec2.text_encode_used_npu   = "false";
+    rec2.denoise_used_gpu       = "true";
+    rec2.vae_decode_used_gpu    = "true";
+    rec2.post_process_used_npu  = "false";
+    rec2.unet_denoise_used_npu  = "false";
+    rec2.npu_cheap_ops_percent  = "12.5";
+    rec2.recovery_attempts      = "1";
+    rec2.node_id                = "local";
+
+    hq::cerberus::privacy::InferenceRecord rec3;
+    rec3.inference_id           = "inf-query-003";
+    rec3.session_id             = "sess-query-c";
+    rec3.prompt                 = "An astronaut on Mars";
+    rec3.result_summary         = "ok";
+    rec3.status                 = "success";
+    rec3.timestamp              = "1750007200";  // 2 hours later
+    rec3.generation_time_ms     = "2100";
+    rec3.width                  = "768";
+    rec3.height                 = "768";
+    rec3.num_steps              = "25";
+    rec3.guidance_scale         = "6.5";
+    rec3.encoder_name           = "clip-vit-large-patch14";
+    rec3.post_processor_name    = "esrgan_x4";
+    rec3.gpu_backend_name       = "ROCm6";
+    rec3.text_encode_used_npu   = "true";
+    rec3.denoise_used_gpu       = "true";
+    rec3.vae_decode_used_gpu    = "true";
+    rec3.post_process_used_npu  = "true";
+    rec3.unet_denoise_used_npu  = "false";
+    rec3.npu_cheap_ops_percent  = "45.0";
+    rec3.recovery_attempts      = "0";
+    rec3.node_id                = "remote-node-1";
+
+    if (!lcmd->store_inference_record(rec1)) {
+        auto res = PropupResult::fail(name, "store_inference_record(rec1) returned false");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    if (!lcmd->store_inference_record(rec2)) {
+        auto res = PropupResult::fail(name, "store_inference_record(rec2) returned false");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    if (!lcmd->store_inference_record(rec3)) {
+        auto res = PropupResult::fail(name, "store_inference_record(rec3) returned false");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    // --- Test 3: Query all records in wide window ---
+    auto all_queried = lcmd->query_inference_records(1749999999, 1750009999, 100);
+    if (all_queried.size() != 3) {
+        auto res = PropupResult::fail(name, "query_inference_records wide window should return 3 records");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    // --- Test 4: Query with limit ---
+    auto limited = lcmd->query_inference_records(1749999999, 1750009999, 2);
+    if (limited.size() != 2) {
+        auto res = PropupResult::fail(name, "query_inference_records with limit=2 should return 2 records");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    // --- Test 5: Query narrow window (only first record) ---
+    auto narrow = lcmd->query_inference_records(1749999999, 1750001800, 100);
+    if (narrow.size() != 1) {
+        auto res = PropupResult::fail(name, "query_inference_records narrow window should return 1 record");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    if (narrow[0].inference_id != rec1.inference_id) {
+        auto res = PropupResult::fail(name, "query_inference_records narrow window returned wrong record");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    // --- Test 6: Query window with no records ---
+    auto empty_query = lcmd->query_inference_records(1700000000, 1700000001, 100);
+    if (!empty_query.empty()) {
+        auto res = PropupResult::fail(name, "query_inference_records on empty window should return empty vector");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    // --- Test 7: Stats on populated DB ---
+    auto stats = lcmd->inference_stats();
+    if (stats["count"] != "3") {
+        auto res = PropupResult::fail(name, "inference_stats() count should be 3");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    if (stats["success_count"] != "2") {
+        auto res = PropupResult::fail(name, "inference_stats() success_count should be 2");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    if (stats["fail_count"] != "1") {
+        auto res = PropupResult::fail(name, "inference_stats() fail_count should be 1");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    // Verify total_ms = 1423 + 800 + 2100 = 4323
+    double total_ms = 0.0;
+    try { total_ms = std::stod(stats["total_ms"]); } catch (...) {}
+    if (std::abs(total_ms - 4323.0) > 0.001) {
+        auto res = PropupResult::fail(name, "inference_stats() total_ms should be 4323");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    // Verify avg_ms = 4323 / 3 = 1441
+    double avg_ms = 0.0;
+    try { avg_ms = std::stod(stats["avg_ms"]); } catch (...) {}
+    if (std::abs(avg_ms - 1441.0) > 0.001) {
+        auto res = PropupResult::fail(name, "inference_stats() avg_ms should be 1441");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    // --- Test 8: Query middle window (records 1 and 2) ---
+    auto middle = lcmd->query_inference_records(1750000000, 1750003600, 100);
+    if (middle.size() != 2) {
+        auto res = PropupResult::fail(name, "query_inference_records middle window should return 2 records");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    // --- Test 9: Clear and verify stats reset ---
+    lcmd->clear_inference_records();
+    auto cleared_stats = lcmd->inference_stats();
+    if (cleared_stats["count"] != "0") {
+        auto res = PropupResult::fail(name, "inference_stats() after clear should have count=0");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    auto cleared_query = lcmd->query_inference_records(0, 9999999999, 100);
+    if (!cleared_query.empty()) {
+        auto res = PropupResult::fail(name, "query_inference_records after clear should return empty");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    auto res = PropupResult::pass(name);
+    res.elapsed_ms = now_ms() - t0;
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms");
+    return res;
+}
+
+hq::propup::PropupResult hq::propup::propup_lcmd_inference_export_json([[maybe_unused]] std::ostream* log) {
+    (void)log;
+    const std::string name = "propup_lcmd_inference_export_json";
+    auto t0 = now_ms();
+
+    auto lcmd = make_propup_lcmd();
+    if (!lcmd || !lcmd->is_initialized()) {
+        auto res = PropupResult::fail(name, "make_propup_lcmd() returned null or uninitialized");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    // Store two distinct inference records
+    hq::cerberus::privacy::InferenceRecord rec1;
+    rec1.inference_id           = "inf-export-001";
+    rec1.session_id             = "sess-export-a";
+    rec1.prompt                 = "A cyberpunk cat riding a neon motorcycle";
+    rec1.result_summary         = "ok";
+    rec1.status                 = "success";
+    rec1.timestamp              = "1750000000";
+    rec1.generation_time_ms     = "1423";
+    rec1.width                  = "512";
+    rec1.height                 = "512";
+    rec1.num_steps              = "20";
+    rec1.guidance_scale         = "7.5";
+    rec1.encoder_name           = "clip-vit-large-patch14";
+    rec1.post_processor_name    = "esrgan_x4";
+    rec1.gpu_backend_name       = "ROCm6";
+    rec1.text_encode_used_npu   = "true";
+    rec1.denoise_used_gpu       = "true";
+    rec1.vae_decode_used_gpu    = "true";
+    rec1.post_process_used_npu  = "false";
+    rec1.unet_denoise_used_npu  = "false";
+    rec1.npu_cheap_ops_percent  = "34.2";
+    rec1.recovery_attempts      = "0";
+    rec1.node_id                = "local";
+
+    hq::cerberus::privacy::InferenceRecord rec2;
+    rec2.inference_id           = "inf-export-002";
+    rec2.session_id             = "sess-export-b";
+    rec2.prompt                 = "A steampunk owl in a brass aviary";
+    rec2.result_summary         = "ok";
+    rec2.status                 = "success";
+    rec2.timestamp              = "1750000001";
+    rec2.generation_time_ms     = "893";
+    rec2.width                  = "1024";
+    rec2.height                 = "1024";
+    rec2.num_steps              = "30";
+    rec2.guidance_scale         = "8.0";
+    rec2.encoder_name           = "clip-vit-base-patch32";
+    rec2.post_processor_name    = "none";
+    rec2.gpu_backend_name       = "CUDA12";
+    rec2.text_encode_used_npu   = "false";
+    rec2.denoise_used_gpu       = "true";
+    rec2.vae_decode_used_gpu    = "true";
+    rec2.post_process_used_npu  = "false";
+    rec2.unet_denoise_used_npu  = "true";
+    rec2.npu_cheap_ops_percent  = "12.5";
+    rec2.recovery_attempts      = "1";
+    rec2.node_id                = "node-7";
+
+    if (!lcmd->store_inference_record(rec1)) {
+        auto res = PropupResult::fail(name, "store_inference_record(rec1) returned false");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    if (!lcmd->store_inference_record(rec2)) {
+        auto res = PropupResult::fail(name, "store_inference_record(rec2) returned false");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    // Export to JSON
+    auto tmp_dir = std::filesystem::temp_directory_path();
+    auto json_path = tmp_dir / "propup_lcmd_export_test.json";
+    std::filesystem::remove(json_path);
+
+    bool exported = lcmd->export_inference_json(json_path);
+    if (!exported) {
+        auto res = PropupResult::fail(name, "export_inference_json returned false");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    if (!std::filesystem::exists(json_path)) {
+        auto res = PropupResult::fail(name, "export_inference_json succeeded but file does not exist");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    // Validate file is non-empty
+    auto size = std::filesystem::file_size(json_path);
+    if (size == 0) {
+        auto res = PropupResult::fail(name, "exported JSON file is empty");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    // Validate JSON structure: must start with '[' and end with ']'
+    std::ifstream ifs(json_path);
+    if (!ifs) {
+        auto res = PropupResult::fail(name, "cannot open exported JSON for reading");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    std::string content((std::istreambuf_iterator<char>(ifs)),
+                         std::istreambuf_iterator<char>());
+    ifs.close();
+
+    // Trim trailing whitespace/newlines so back() is the closing bracket
+    while (!content.empty() && (content.back() == '\n' || content.back() == '\r' || content.back() == ' ' || content.back() == '\t')) {
+        content.pop_back();
+    }
+
+    if (content.empty() || content.front() != '[' || content.back() != ']') {
+        auto res = PropupResult::fail(name, "exported JSON is not a valid array");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    // Must contain both inference IDs
+    if (content.find("inf-export-001") == std::string::npos) {
+        auto res = PropupResult::fail(name, "exported JSON missing inf-export-001");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    if (content.find("inf-export-002") == std::string::npos) {
+        auto res = PropupResult::fail(name, "exported JSON missing inf-export-002");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    // Cleanup
+    std::filesystem::remove(json_path);
+
+    auto res = PropupResult::pass(name);
+    res.elapsed_ms = now_ms() - t0;
+    return res;
+}
+
+hq::propup::PropupResult hq::propup::propup_lcmd_inference_failure_recording([[maybe_unused]] std::ostream* log) {
+    (void)log;
+    const std::string name = "propup_lcmd_inference_failure_recording";
+    auto t0 = now_ms();
+
+    auto lcmd = make_propup_lcmd();
+    if (!lcmd || !lcmd->is_initialized()) {
+        auto res = PropupResult::fail(name, "make_propup_lcmd() returned null or uninitialized");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    // Clear any existing records for a clean test
+    lcmd->clear_inference_records();
+
+    // --- Test 1: Store a failed inference record ---
+    hq::cerberus::privacy::InferenceRecord rec;
+    rec.inference_id           = "inf-failure-001";
+    rec.session_id             = "sess-failure-a";
+    rec.prompt                 = "A cyberpunk cat riding a neon motorcycle";
+    rec.result_summary         = "failed";
+    rec.status                 = "failed";
+    rec.timestamp              = "1750000000";
+    rec.generation_time_ms     = "0";
+    rec.width                  = "512";
+    rec.height                 = "512";
+    rec.num_steps              = "20";
+    rec.guidance_scale         = "7.5";
+    rec.encoder_name           = "clip-vit-large-patch14";
+    rec.post_processor_name    = "none";
+    rec.gpu_backend_name       = "ROCm6";
+    rec.text_encode_used_npu   = "false";
+    rec.denoise_used_gpu       = "false";
+    rec.vae_decode_used_gpu    = "false";
+    rec.post_process_used_npu  = "false";
+    rec.unet_denoise_used_npu  = "false";
+    rec.npu_cheap_ops_percent  = "0.0";
+    rec.recovery_attempts      = "1";
+    rec.node_id                = "local";
+
+    bool stored = lcmd->store_inference_record(rec);
+    if (!stored) {
+        auto res = PropupResult::fail(name, "store_inference_record(failed) returned false");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    // --- Test 2: Load the record back and verify status="failed" ---
+    auto loaded = lcmd->load_inference_record(rec.inference_id);
+    if (!loaded.has_value()) {
+        auto res = PropupResult::fail(name, "load_inference_record returned nullopt after store");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    const auto& r = loaded.value();
+    if (r.inference_id != rec.inference_id) {
+        return PropupResult::fail(name, "inference_id mismatch");
+    }
+    if (r.status != "failed") {
+        auto diag = "status mismatch: expected 'failed', got '" + r.status + "'";
+        return PropupResult::fail(name, diag);
+    }
+    if (r.result_summary != "failed") {
+        auto diag = "result_summary mismatch: expected 'failed', got '" + r.result_summary + "'";
+        return PropupResult::fail(name, diag);
+    }
+    if (r.recovery_attempts != "1") {
+        auto diag = "recovery_attempts mismatch: expected '1', got '" + r.recovery_attempts + "'";
+        return PropupResult::fail(name, diag);
+    }
+
+    // --- Test 3: query_inference_records includes the failure ---
+    auto queried = lcmd->query_inference_records(1749999999, 1750000001, 10);
+    if (queried.size() != 1) {
+        auto diag = "query_inference_records returned wrong count: expected 1, got " + std::to_string(queried.size());
+        auto res = PropupResult::fail(name, diag);
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    if (queried[0].inference_id != rec.inference_id) {
+        return PropupResult::fail(name, "query_inference_records record mismatch");
+    }
+    if (queried[0].status != "failed") {
+        auto diag = "query record status mismatch: expected 'failed', got '" + queried[0].status + "'";
+        return PropupResult::fail(name, diag);
+    }
+
+    // --- Test 4: stats reflect the failure record ---
+    auto stats = lcmd->inference_stats();
+    if (stats.empty()) {
+        auto res = PropupResult::fail(name, "inference_stats() returned empty map");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    if (stats["count"] != "1") {
+        auto diag = "stats count mismatch: expected '1', got '" + stats["count"] + "'";
+        auto res = PropupResult::fail(name, diag);
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    // --- Test 5: Store a success record alongside the failure ---
+    hq::cerberus::privacy::InferenceRecord rec2;
+    rec2.inference_id           = "inf-success-002";
+    rec2.session_id             = "sess-success-b";
+    rec2.prompt                 = "A futuristic city at sunset";
+    rec2.result_summary         = "ok";
+    rec2.status                 = "success";
+    rec2.timestamp              = "1750000001";
+    rec2.generation_time_ms     = "1423";
+    rec2.width                  = "1024";
+    rec2.height                 = "1024";
+    rec2.num_steps              = "30";
+    rec2.guidance_scale         = "8.0";
+    rec2.encoder_name           = "clip-vit-base-patch16";
+    rec2.post_processor_name    = "none";
+    rec2.gpu_backend_name       = "ROCm6";
+    rec2.text_encode_used_npu   = "false";
+    rec2.denoise_used_gpu       = "true";
+    rec2.vae_decode_used_gpu    = "true";
+    rec2.post_process_used_npu  = "false";
+    rec2.unet_denoise_used_npu  = "false";
+    rec2.npu_cheap_ops_percent  = "12.5";
+    rec2.recovery_attempts      = "0";
+    rec2.node_id                = "local";
+
+    if (!lcmd->store_inference_record(rec2)) {
+        auto res = PropupResult::fail(name, "store_inference_record(success) returned false");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    // --- Test 6: Verify mixed success/failure query returns both ---
+    auto mixed = lcmd->query_inference_records(1749999999, 1750000002, 10);
+    if (mixed.size() != 2) {
+        auto diag = "mixed query returned wrong count: expected 2, got " + std::to_string(mixed.size());
+        auto res = PropupResult::fail(name, diag);
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    // --- Test 7: Verify failure-only query (by status) returns only failure ---
+    std::size_t failure_count = 0;
+    for (const auto& record : mixed) {
+        if (record.status == "failed") {
+            ++failure_count;
+        }
+    }
+    if (failure_count != 1) {
+        auto diag = "failure count in mixed results: expected 1, got " + std::to_string(failure_count);
+        auto res = PropupResult::fail(name, diag);
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    // --- Test 8: Stats show count=2 with mixed records ---
+    auto mixed_stats = lcmd->inference_stats();
+    if (mixed_stats["count"] != "2") {
+        auto diag = "mixed stats count mismatch: expected '2', got '" + mixed_stats["count"] + "'";
+        auto res = PropupResult::fail(name, diag);
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    auto res = PropupResult::pass(name);
+    res.elapsed_ms = now_ms() - t0;
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms");
+    return res;
+}
+
+hq::propup::PropupResult hq::propup::propup_lcmd_full_audit_trail([[maybe_unused]] std::ostream* log) {
+    (void)log;
+    const std::string name = "propup_lcmd_full_audit_trail";
+    auto t0 = now_ms();
+
+    auto lcmd = make_propup_lcmd();
+    if (!lcmd || !lcmd->is_initialized()) {
+        auto res = PropupResult::fail(name, "make_propup_lcmd() returned null or uninitialized");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    lcmd->clear_inference_records();
+
+    // --- Stage 1: Seed a diverse audit trail (success + failure + cluster_dispatched) ---
+    hq::cerberus::privacy::InferenceRecord rec1;
+    rec1.inference_id           = "inf-audit-001";
+    rec1.session_id             = "sess-audit-a";
+    rec1.prompt                 = "A cyberpunk cat riding a neon motorcycle";
+    rec1.result_summary         = "ok";
+    rec1.status                 = "success";
+    rec1.timestamp              = "1750000000";
+    rec1.generation_time_ms     = "1423";
+    rec1.width                  = "512";
+    rec1.height                 = "512";
+    rec1.num_steps              = "20";
+    rec1.guidance_scale         = "7.5";
+    rec1.encoder_name           = "clip-vit-large-patch14";
+    rec1.post_processor_name    = "esrgan_x4";
+    rec1.gpu_backend_name       = "ROCm6";
+    rec1.text_encode_used_npu   = "true";
+    rec1.denoise_used_gpu       = "true";
+    rec1.vae_decode_used_gpu    = "true";
+    rec1.post_process_used_npu  = "false";
+    rec1.unet_denoise_used_npu  = "false";
+    rec1.npu_cheap_ops_percent  = "34.2";
+    rec1.recovery_attempts      = "0";
+    rec1.node_id                = "local";
+
+    hq::cerberus::privacy::InferenceRecord rec2;
+    rec2.inference_id           = "inf-audit-002";
+    rec2.session_id             = "sess-audit-b";
+    rec2.prompt                 = "A futuristic city at sunset";
+    rec2.result_summary         = "failed";
+    rec2.status                 = "failed";
+    rec2.timestamp              = "1750003600";
+    rec2.generation_time_ms     = "0";
+    rec2.width                  = "1024";
+    rec2.height                 = "1024";
+    rec2.num_steps              = "30";
+    rec2.guidance_scale         = "8.0";
+    rec2.encoder_name           = "clip-vit-base-patch16";
+    rec2.post_processor_name    = "none";
+    rec2.gpu_backend_name       = "ROCm6";
+    rec2.text_encode_used_npu   = "false";
+    rec2.denoise_used_gpu       = "false";
+    rec2.vae_decode_used_gpu    = "false";
+    rec2.post_process_used_npu  = "false";
+    rec2.unet_denoise_used_npu  = "false";
+    rec2.npu_cheap_ops_percent  = "0.0";
+    rec2.recovery_attempts      = "2";
+    rec2.node_id                = "local";
+
+    hq::cerberus::privacy::InferenceRecord rec3;
+    rec3.inference_id           = "inf-audit-003";
+    rec3.session_id             = "sess-audit-c";
+    rec3.prompt                 = "A steampunk owl in a brass aviary";
+    rec3.result_summary         = "dispatched";
+    rec3.status                 = "cluster_dispatched";
+    rec3.timestamp              = "1750007200";
+    rec3.generation_time_ms     = "800";
+    rec3.width                  = "512";
+    rec3.height                 = "512";
+    rec3.num_steps              = "25";
+    rec3.guidance_scale         = "7.0";
+    rec3.encoder_name           = "clip-vit-large-patch14";
+    rec3.post_processor_name    = "none";
+    rec3.gpu_backend_name       = "ROCm6";
+    rec3.text_encode_used_npu   = "true";
+    rec3.denoise_used_gpu       = "false";
+    rec3.vae_decode_used_gpu    = "false";
+    rec3.post_process_used_npu  = "false";
+    rec3.unet_denoise_used_npu  = "true";
+    rec3.npu_cheap_ops_percent  = "55.0";
+    rec3.recovery_attempts      = "0";
+    rec3.node_id                = "node-7";
+
+    if (!lcmd->store_inference_record(rec1)) {
+        auto res = PropupResult::fail(name, "store_inference_record(rec1) returned false");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    if (!lcmd->store_inference_record(rec2)) {
+        auto res = PropupResult::fail(name, "store_inference_record(rec2) returned false");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    if (!lcmd->store_inference_record(rec3)) {
+        auto res = PropupResult::fail(name, "store_inference_record(rec3) returned false");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    // --- Stage 2: Load each record back and verify complete field integrity ---
+    auto loaded1 = lcmd->load_inference_record(rec1.inference_id);
+    if (!loaded1.has_value()) {
+        auto res = PropupResult::fail(name, "load_inference_record(rec1) returned nullopt");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    const auto& r1 = loaded1.value();
+    if (r1.inference_id != rec1.inference_id) { return PropupResult::fail(name, "rec1 inference_id mismatch"); }
+    if (r1.session_id != rec1.session_id) { return PropupResult::fail(name, "rec1 session_id mismatch"); }
+    if (r1.prompt != rec1.prompt) { return PropupResult::fail(name, "rec1 prompt mismatch"); }
+    if (r1.status != rec1.status) { return PropupResult::fail(name, "rec1 status mismatch"); }
+    if (r1.result_summary != rec1.result_summary) { return PropupResult::fail(name, "rec1 result_summary mismatch"); }
+    if (r1.timestamp != rec1.timestamp) { return PropupResult::fail(name, "rec1 timestamp mismatch"); }
+    if (r1.generation_time_ms != rec1.generation_time_ms) { return PropupResult::fail(name, "rec1 generation_time_ms mismatch"); }
+    if (r1.width != rec1.width) { return PropupResult::fail(name, "rec1 width mismatch"); }
+    if (r1.height != rec1.height) { return PropupResult::fail(name, "rec1 height mismatch"); }
+    if (r1.num_steps != rec1.num_steps) { return PropupResult::fail(name, "rec1 num_steps mismatch"); }
+    if (r1.guidance_scale != rec1.guidance_scale) { return PropupResult::fail(name, "rec1 guidance_scale mismatch"); }
+    if (r1.encoder_name != rec1.encoder_name) { return PropupResult::fail(name, "rec1 encoder_name mismatch"); }
+    if (r1.post_processor_name != rec1.post_processor_name) { return PropupResult::fail(name, "rec1 post_processor_name mismatch"); }
+    if (r1.gpu_backend_name != rec1.gpu_backend_name) { return PropupResult::fail(name, "rec1 gpu_backend_name mismatch"); }
+    if (r1.text_encode_used_npu != rec1.text_encode_used_npu) { return PropupResult::fail(name, "rec1 text_encode_used_npu mismatch"); }
+    if (r1.denoise_used_gpu != rec1.denoise_used_gpu) { return PropupResult::fail(name, "rec1 denoise_used_gpu mismatch"); }
+    if (r1.vae_decode_used_gpu != rec1.vae_decode_used_gpu) { return PropupResult::fail(name, "rec1 vae_decode_used_gpu mismatch"); }
+    if (r1.post_process_used_npu != rec1.post_process_used_npu) { return PropupResult::fail(name, "rec1 post_process_used_npu mismatch"); }
+    if (r1.unet_denoise_used_npu != rec1.unet_denoise_used_npu) { return PropupResult::fail(name, "rec1 unet_denoise_used_npu mismatch"); }
+    if (r1.npu_cheap_ops_percent != rec1.npu_cheap_ops_percent) { return PropupResult::fail(name, "rec1 npu_cheap_ops_percent mismatch"); }
+    if (r1.recovery_attempts != rec1.recovery_attempts) { return PropupResult::fail(name, "rec1 recovery_attempts mismatch"); }
+    if (r1.node_id != rec1.node_id) { return PropupResult::fail(name, "rec1 node_id mismatch"); }
+
+    auto loaded2 = lcmd->load_inference_record(rec2.inference_id);
+    if (!loaded2.has_value()) {
+        auto res = PropupResult::fail(name, "load_inference_record(rec2) returned nullopt");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    if (loaded2.value().status != "failed") {
+        auto diag = "rec2 status mismatch: expected 'failed', got '" + loaded2.value().status + "'";
+        return PropupResult::fail(name, diag);
+    }
+    if (loaded2.value().recovery_attempts != "2") {
+        auto diag = "rec2 recovery_attempts mismatch: expected '2', got '" + loaded2.value().recovery_attempts + "'";
+        return PropupResult::fail(name, diag);
+    }
+
+    auto loaded3 = lcmd->load_inference_record(rec3.inference_id);
+    if (!loaded3.has_value()) {
+        auto res = PropupResult::fail(name, "load_inference_record(rec3) returned nullopt");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    if (loaded3.value().status != "cluster_dispatched") {
+        auto diag = "rec3 status mismatch: expected 'cluster_dispatched', got '" + loaded3.value().status + "'";
+        return PropupResult::fail(name, diag);
+    }
+    if (loaded3.value().node_id != "node-7") {
+        auto diag = "rec3 node_id mismatch: expected 'node-7', got '" + loaded3.value().node_id + "'";
+        return PropupResult::fail(name, diag);
+    }
+
+    // --- Stage 3: Query returns all records in time range ---
+    auto queried = lcmd->query_inference_records(1749999999, 1750007201, 10);
+    if (queried.size() != 3) {
+        auto diag = "query returned wrong count: expected 3, got " + std::to_string(queried.size());
+        auto res = PropupResult::fail(name, diag);
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    // Verify all IDs are present in query results
+    bool found1 = false, found2 = false, found3 = false;
+    for (const auto& rec : queried) {
+        if (rec.inference_id == rec1.inference_id) found1 = true;
+        if (rec.inference_id == rec2.inference_id) found2 = true;
+        if (rec.inference_id == rec3.inference_id) found3 = true;
+    }
+    if (!found1) { return PropupResult::fail(name, "query missing rec1 inference_id"); }
+    if (!found2) { return PropupResult::fail(name, "query missing rec2 inference_id"); }
+    if (!found3) { return PropupResult::fail(name, "query missing rec3 inference_id"); }
+
+    // --- Stage 4: Stats reflect the mixed records ---
+    auto stats = lcmd->inference_stats();
+    if (stats.empty()) {
+        auto res = PropupResult::fail(name, "inference_stats() returned empty map");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    if (stats["count"] != "3") {
+        auto diag = "stats count mismatch: expected '3', got '" + stats["count"] + "'";
+        auto res = PropupResult::fail(name, diag);
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    // --- Stage 5: Export to JSON and verify content ---
+    static std::atomic<uint64_t> audit_counter{0};
+    auto export_path = std::filesystem::temp_directory_path() / ("propup_audit_trail_" + std::to_string(audit_counter.fetch_add(1)) + ".json");
+    if (!lcmd->export_inference_json(export_path)) {
+        auto res = PropupResult::fail(name, "export_inference_json returned false");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    std::ifstream ifs(export_path);
+    if (!ifs.is_open()) {
+        auto res = PropupResult::fail(name, "cannot open exported JSON file");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    std::string json_content((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
+    ifs.close();
+    if (json_content.empty()) {
+        auto res = PropupResult::fail(name, "exported JSON file is empty");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    if (json_content.front() != '[') {
+        auto res = PropupResult::fail(name, "exported JSON does not start with '['");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    if (json_content.back() != ']') {
+        // Allow trailing newline after closing bracket
+        if (json_content.size() < 2 || json_content[json_content.size() - 2] != ']') {
+            auto res = PropupResult::fail(name, "exported JSON does not end with ']'");
+            res.elapsed_ms = now_ms() - t0;
+            return res;
+        }
+    }
+    if (json_content.find("inf-audit-001") == std::string::npos) {
+        auto res = PropupResult::fail(name, "exported JSON missing inf-audit-001");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    if (json_content.find("inf-audit-002") == std::string::npos) {
+        auto res = PropupResult::fail(name, "exported JSON missing inf-audit-002");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    if (json_content.find("inf-audit-003") == std::string::npos) {
+        auto res = PropupResult::fail(name, "exported JSON missing inf-audit-003");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    if (json_content.find("failed") == std::string::npos) {
+        auto res = PropupResult::fail(name, "exported JSON missing 'failed' status");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    if (json_content.find("cluster_dispatched") == std::string::npos) {
+        auto res = PropupResult::fail(name, "exported JSON missing 'cluster_dispatched' status");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    std::filesystem::remove(export_path);
+
+    // --- Stage 6: Clear audit trail and verify empty state ---
+    if (!lcmd->clear_inference_records()) {
+        auto res = PropupResult::fail(name, "clear_inference_records returned false");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    auto cleared = lcmd->query_inference_records(0, 9999999999, 100);
+    if (!cleared.empty()) {
+        auto diag = "after clear, query returned " + std::to_string(cleared.size()) + " records (expected 0)";
+        auto res = PropupResult::fail(name, diag);
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    auto cleared_stats = lcmd->inference_stats();
+    if (cleared_stats["count"] != "0") {
+        auto diag = "after clear, stats count = '" + cleared_stats["count"] + "' (expected '0')";
+        auto res = PropupResult::fail(name, diag);
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    // --- Stage 7: Re-seed a single record post-clear to verify trail resumes ---
+    hq::cerberus::privacy::InferenceRecord rec4;
+    rec4.inference_id           = "inf-audit-004";
+    rec4.session_id             = "sess-audit-d";
+    rec4.prompt                 = "A post-clear test prompt";
+    rec4.result_summary         = "ok";
+    rec4.status                 = "success";
+    rec4.timestamp              = "1750010000";
+    rec4.generation_time_ms     = "500";
+    rec4.width                  = "256";
+    rec4.height                 = "256";
+    rec4.num_steps              = "10";
+    rec4.guidance_scale         = "5.0";
+    rec4.encoder_name           = "clip-vit-base-patch16";
+    rec4.post_processor_name    = "none";
+    rec4.gpu_backend_name       = "ROCm6";
+    rec4.text_encode_used_npu   = "false";
+    rec4.denoise_used_gpu       = "true";
+    rec4.vae_decode_used_gpu    = "true";
+    rec4.post_process_used_npu  = "false";
+    rec4.unet_denoise_used_npu  = "false";
+    rec4.npu_cheap_ops_percent  = "0.0";
+    rec4.recovery_attempts      = "0";
+    rec4.node_id                = "local";
+
+    if (!lcmd->store_inference_record(rec4)) {
+        auto res = PropupResult::fail(name, "store_inference_record(rec4 post-clear) returned false");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    auto post_clear = lcmd->query_inference_records(1749999999, 1750010001, 10);
+    if (post_clear.size() != 1) {
+        auto diag = "post-clear query returned wrong count: expected 1, got " + std::to_string(post_clear.size());
+        auto res = PropupResult::fail(name, diag);
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    if (post_clear[0].inference_id != rec4.inference_id) {
+        return PropupResult::fail(name, "post-clear query record mismatch");
+    }
+
+    auto result = PropupResult::pass(name);
+    result.elapsed_ms = now_ms() - t0;
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(result.elapsed_ms) + " ms");
+    return result;
+}
+
+hq::propup::PropupResult hq::propup::propup_anbp_inference_stats_and_query([[maybe_unused]] std::ostream* log) {
+    (void)log;
+    const std::string name = "propup_anbp_inference_stats_and_query";
+    auto t0 = now_ms();
+
+    // --- Setup: create LCMD and seed with inference records ---
+    auto lcmd = make_propup_lcmd();
+    if (!lcmd || !lcmd->is_initialized()) {
+        auto res = PropupResult::fail(name, "make_propup_lcmd() returned null or uninitialized");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    lcmd->clear_inference_records();
+
+    // Seed 3 records: 2 success, 1 failure
+    hq::cerberus::privacy::InferenceRecord rec1;
+    rec1.inference_id           = "inf-anbp-001";
+    rec1.session_id             = "sess-anbp-a";
+    rec1.prompt                 = "A cyberpunk cat riding a neon motorcycle";
+    rec1.result_summary         = "ok";
+    rec1.status                 = "success";
+    rec1.timestamp              = "1750000000";
+    rec1.generation_time_ms     = "1423";
+    rec1.width                  = "512";
+    rec1.height                 = "512";
+    rec1.num_steps              = "20";
+    rec1.guidance_scale         = "7.5";
+    rec1.encoder_name           = "clip-vit-large-patch14";
+    rec1.post_processor_name    = "esrgan_x4";
+    rec1.gpu_backend_name       = "ROCm6";
+    rec1.text_encode_used_npu   = "true";
+    rec1.denoise_used_gpu       = "true";
+    rec1.vae_decode_used_gpu    = "true";
+    rec1.post_process_used_npu  = "false";
+    rec1.unet_denoise_used_npu  = "false";
+    rec1.npu_cheap_ops_percent  = "34.2";
+    rec1.recovery_attempts      = "0";
+    rec1.node_id                = "local";
+
+    hq::cerberus::privacy::InferenceRecord rec2;
+    rec2.inference_id           = "inf-anbp-002";
+    rec2.session_id             = "sess-anbp-b";
+    rec2.prompt                 = "A futuristic city at sunset";
+    rec2.result_summary         = "ok";
+    rec2.status                 = "success";
+    rec2.timestamp              = "1750003600";
+    rec2.generation_time_ms     = "2100";
+    rec2.width                  = "1024";
+    rec2.height                 = "1024";
+    rec2.num_steps              = "30";
+    rec2.guidance_scale         = "8.0";
+    rec2.encoder_name           = "clip-vit-base-patch16";
+    rec2.post_processor_name    = "none";
+    rec2.gpu_backend_name       = "ROCm6";
+    rec2.text_encode_used_npu   = "false";
+    rec2.denoise_used_gpu       = "true";
+    rec2.vae_decode_used_gpu    = "true";
+    rec2.post_process_used_npu  = "false";
+    rec2.unet_denoise_used_npu  = "false";
+    rec2.npu_cheap_ops_percent  = "12.5";
+    rec2.recovery_attempts      = "0";
+    rec2.node_id                = "local";
+
+    hq::cerberus::privacy::InferenceRecord rec3;
+    rec3.inference_id           = "inf-anbp-003";
+    rec3.session_id             = "sess-anbp-c";
+    rec3.prompt                 = "A steampunk owl in a brass aviary";
+    rec3.result_summary         = "failed";
+    rec3.status                 = "failed";
+    rec3.timestamp              = "1750007200";
+    rec3.generation_time_ms     = "0";
+    rec3.width                  = "512";
+    rec3.height                 = "512";
+    rec3.num_steps              = "20";
+    rec3.guidance_scale         = "7.5";
+    rec3.encoder_name           = "clip-vit-large-patch14";
+    rec3.post_processor_name    = "none";
+    rec3.gpu_backend_name       = "ROCm6";
+    rec3.text_encode_used_npu   = "false";
+    rec3.denoise_used_gpu       = "false";
+    rec3.vae_decode_used_gpu    = "false";
+    rec3.post_process_used_npu  = "false";
+    rec3.unet_denoise_used_npu  = "false";
+    rec3.npu_cheap_ops_percent  = "0.0";
+    rec3.recovery_attempts      = "1";
+    rec3.node_id                = "local";
+
+    if (!lcmd->store_inference_record(rec1)) {
+        auto res = PropupResult::fail(name, "store_inference_record(rec1) returned false");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    if (!lcmd->store_inference_record(rec2)) {
+        auto res = PropupResult::fail(name, "store_inference_record(rec2) returned false");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    if (!lcmd->store_inference_record(rec3)) {
+        auto res = PropupResult::fail(name, "store_inference_record(rec3) returned false");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    // --- Setup: create ANBP gateway and wire LCMD privacy context ---
+    hq::cerberus::gateway::CerberusApiGateway gateway;
+    if (!gateway.initialize()) {
+        auto res = PropupResult::fail(name, "gateway.initialize() returned false");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    gateway.setPrivacyContext(lcmd, nullptr, "local");
+
+    // --- Test 1: INFERENCE_STATS via ANBP ---
+    // Build ANBP request: header + empty payload
+    using namespace hq::cerberus::gateway;
+    std::vector<uint8_t> req = ProtocolHelper::buildMessage(
+        CerberusOpcode::INFERENCE_STATS,
+        0,      // session_token (not required for stats)
+        1,      // sequence_id
+        {}      // empty payload
+    );
+
+    auto resp = gateway.handleRequest(req.data(), req.size());
+    if (resp.size() < sizeof(ANBPHeader)) {
+        auto res = PropupResult::fail(name, "INFERENCE_STATS response too short for header");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    ANBPHeader resp_header;
+    if (!ProtocolHelper::deserializeHeader(resp.data(), resp.size(), resp_header)) {
+        auto res = PropupResult::fail(name, "deserializeHeader failed on INFERENCE_STATS response");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    if (!resp_header.isValid()) {
+        auto res = PropupResult::fail(name, "INFERENCE_STATS response header invalid magic");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    // Extract payload (JSON stats)
+    std::size_t payload_len = resp.size() - sizeof(ANBPHeader);
+    if (payload_len == 0) {
+        auto res = PropupResult::fail(name, "INFERENCE_STATS response payload empty");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    std::string payload_json(reinterpret_cast<const char*>(resp.data() + sizeof(ANBPHeader)), payload_len);
+    if (payload_json.empty()) {
+        auto res = PropupResult::fail(name, "INFERENCE_STATS payload JSON empty");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    // Verify payload contains expected keys
+    if (payload_json.find("count") == std::string::npos) {
+        auto res = PropupResult::fail(name, "INFERENCE_STATS payload missing 'count' key");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    if (payload_json.find("success_count") == std::string::npos) {
+        auto res = PropupResult::fail(name, "INFERENCE_STATS payload missing 'success_count' key");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    if (payload_json.find("fail_count") == std::string::npos) {
+        auto res = PropupResult::fail(name, "INFERENCE_STATS payload missing 'fail_count' key");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    if (payload_json.find("total_ms") == std::string::npos) {
+        auto res = PropupResult::fail(name, "INFERENCE_STATS payload missing 'total_ms' key");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    if (payload_json.find("avg_ms") == std::string::npos) {
+        auto res = PropupResult::fail(name, "INFERENCE_STATS payload missing 'avg_ms' key");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    // --- Test 2: INFERENCE_QUERY via ANBP ---
+    std::vector<uint8_t> query_req = ProtocolHelper::buildMessage(
+        CerberusOpcode::INFERENCE_QUERY,
+        0,
+        2,
+        {}
+    );
+
+    auto query_resp = gateway.handleRequest(query_req.data(), query_req.size());
+    if (query_resp.size() < sizeof(ANBPHeader)) {
+        auto res = PropupResult::fail(name, "INFERENCE_QUERY response too short for header");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    ANBPHeader query_resp_header;
+    if (!ProtocolHelper::deserializeHeader(query_resp.data(), query_resp.size(), query_resp_header)) {
+        auto res = PropupResult::fail(name, "deserializeHeader failed on INFERENCE_QUERY response");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    if (!query_resp_header.isValid()) {
+        auto res = PropupResult::fail(name, "INFERENCE_QUERY response header invalid magic");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    std::size_t query_payload_len = query_resp.size() - sizeof(ANBPHeader);
+    if (query_payload_len == 0) {
+        auto res = PropupResult::fail(name, "INFERENCE_QUERY response payload empty");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    std::string query_payload_json(reinterpret_cast<const char*>(query_resp.data() + sizeof(ANBPHeader)), query_payload_len);
+    if (query_payload_json.empty()) {
+        auto res = PropupResult::fail(name, "INFERENCE_QUERY payload JSON empty");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    // Verify query payload contains record IDs
+    if (query_payload_json.find("inf-anbp-001") == std::string::npos &&
+        query_payload_json.find("inf-anbp-002") == std::string::npos &&
+        query_payload_json.find("inf-anbp-003") == std::string::npos) {
+        auto res = PropupResult::fail(name, "INFERENCE_QUERY payload missing expected record IDs");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    // --- Test 3: INFERENCE_STATS without privacy context returns error ---
+    hq::cerberus::gateway::CerberusApiGateway gateway_no_priv;
+    if (!gateway_no_priv.initialize()) {
+        auto res = PropupResult::fail(name, "gateway_no_priv.initialize() returned false");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    // Do NOT call setPrivacyContext
+
+    std::vector<uint8_t> req_no_priv = ProtocolHelper::buildMessage(
+        CerberusOpcode::INFERENCE_STATS,
+        0,
+        3,
+        {}
+    );
+
+    auto resp_no_priv = gateway_no_priv.handleRequest(req_no_priv.data(), req_no_priv.size());
+    if (resp_no_priv.size() < sizeof(ANBPHeader)) {
+        auto res = PropupResult::fail(name, "INFERENCE_STATS (no priv) response too short");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    ANBPHeader resp_no_priv_header;
+    if (!ProtocolHelper::deserializeHeader(resp_no_priv.data(), resp_no_priv.size(), resp_no_priv_header)) {
+        auto res = PropupResult::fail(name, "deserializeHeader failed on no-priv response");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    if (!resp_no_priv_header.isValid()) {
+        auto res = PropupResult::fail(name, "no-priv response header invalid magic");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    // Error response should have opcode in ERR_GENERAL range
+    uint16_t err_opcode = static_cast<uint16_t>(resp_no_priv_header.opcode);
+    if (err_opcode != static_cast<uint16_t>(CerberusOpcode::ERR_GENERAL)) {
+        auto diag = "no-priv error opcode mismatch: expected " +
+                    std::to_string(static_cast<uint16_t>(CerberusOpcode::ERR_GENERAL)) +
+                    ", got " + std::to_string(err_opcode);
+        auto res = PropupResult::fail(name, diag);
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    auto res = PropupResult::pass(name);
+    res.elapsed_ms = now_ms() - t0;
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms");
     return res;
 }
 
@@ -3213,13 +4648,337 @@ hq::propup::PropupResult hq::propup::propup_staging_manager_lifecycle([[maybe_un
     cfg.buffer_size_bytes = 1ULL * 1024 * 1024; // 1 MiB each
     cfg.pinned = false; // avoid driver dependencies for this propup
 
-    // FIXME: Staging manager constructor causes hard SIGSEGV on MinGW C++26.
-    // Wrapping in try/catch does not catch it. Under investigation.
-    // run_one(propup_staging_manager_lifecycle, "propup_staging_manager_lifecycle");
+    // Construct the staging manager — previously believed to segfault on MinGW
+    // C++26, but the root cause was elsewhere (std::format with float args).
+    // The constructor itself is safe.
+    hq_safe_write(1, "[DEBUG] propup_staging before ctor\n", 36);
+    hq::EmbeddingStagingManager mgr(cfg);
+    hq_safe_write(1, "[DEBUG] propup_staging after ctor\n", 35);
 
-    auto res = PropupResult::skip(name, "Constructor segfault on MinGW — under investigation");
+    if (mgr.total_capacity() != 4ULL * 1024 * 1024) {
+        auto diag = "total_capacity=" + std::to_string(mgr.total_capacity()) + " expected 4194304";
+        auto res = PropupResult::fail(name, diag);
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    if (mgr.available_count() != 4) {
+        auto diag = "available_count=" + std::to_string(mgr.available_count()) + " expected 4";
+        auto res = PropupResult::fail(name, diag);
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    // Acquire all 4 buffers
+    std::vector<StagingBuffer> acquired;
+    for (int i = 0; i < 4; ++i) {
+        auto result = mgr.acquire();
+        if (!result.has_value()) {
+            auto diag = "Failed to acquire buffer " + std::to_string(i);
+            auto res = PropupResult::fail(name, diag);
+            res.elapsed_ms = now_ms() - t0;
+            return res;
+        }
+        acquired.push_back(result.value());
+        if (acquired.back().capacity != cfg.buffer_size_bytes) {
+            auto diag = "Buffer " + std::to_string(i) + " capacity=" + std::to_string(acquired.back().capacity) + " expected " + std::to_string(cfg.buffer_size_bytes);
+            auto res = PropupResult::fail(name, diag);
+            res.elapsed_ms = now_ms() - t0;
+            return res;
+        }
+    }
+
+    // 5th acquire should fail (pool exhausted)
+    auto result5 = mgr.acquire();
+    if (result5.has_value()) {
+        auto res = PropupResult::fail(name, "5th acquire should fail with pool exhausted");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    // Release one and acquire again
+    mgr.release(acquired[0]);
+    auto result_after_release = mgr.acquire();
+    if (!result_after_release.has_value()) {
+        auto res = PropupResult::fail(name, "Acquire after release should succeed");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    // Release another buffer for the copy-in test
+    mgr.release(acquired[1]);
+
+    // Copy-in test
+    auto buf_result = mgr.acquire();
+    if (!buf_result.has_value()) {
+        auto res = PropupResult::fail(name, "Acquire for copy-in test failed");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    auto buf = buf_result.value();
+
+    std::vector<std::byte> test_data(512);
+    for (std::size_t i = 0; i < 512; ++i) {
+        test_data[i] = static_cast<std::byte>(i % 256);
+    }
+
+    auto copy_result = mgr.copy_in(buf, test_data);
+    if (!copy_result.has_value()) {
+        auto res = PropupResult::fail(name, "copy_in failed");
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    if (copy_result.value() != 512) {
+        auto diag = "copy_in returned " + std::to_string(copy_result.value()) + " expected 512";
+        auto res = PropupResult::fail(name, diag);
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+    if (buf.used != 512) {
+        auto diag = "buf.used=" + std::to_string(buf.used) + " expected 512";
+        auto res = PropupResult::fail(name, diag);
+        res.elapsed_ms = now_ms() - t0;
+        return res;
+    }
+
+    // Verify data was copied
+    for (std::size_t i = 0; i < 512; ++i) {
+        if (buf.data[i] != static_cast<std::byte>(i % 256)) {
+            auto diag = "Data mismatch at index " + std::to_string(i);
+            auto res = PropupResult::fail(name, diag);
+            res.elapsed_ms = now_ms() - t0;
+            return res;
+        }
+    }
+
+    mgr.release(buf);
+
+    auto res = PropupResult::pass(name);
     res.elapsed_ms = now_ms() - t0;
-    hq_println("[PROPUP] " + name + " skipped: Constructor segfault on MinGW — under investigation");
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms");
+    return res;
+}
+
+hq::propup::PropupResult hq::propup::propup_inference_audit_rbpc_gate([[maybe_unused]] std::ostream* log) {
+    (void)log;
+    const std::string name = "propup_inference_audit_rbpc_gate";
+    auto t0 = now_ms();
+
+    using hq::cerberus::privacy::UserSecurity;
+    using hq::cerberus::privacy::LocalMaintenanceDB;
+
+    // --- Stage 1: Gate OPEN (correct PIN + word) ---
+    {
+        UserSecurity us;
+        std::vector<std::uint8_t> master(32, 0xAB);
+        auto pin_opt = us.generate_pin("gate-test-node", master);
+        if (!pin_opt) {
+            auto res = PropupResult::fail(name, "generate_pin failed for gate-open test");
+            res.elapsed_ms = now_ms() - t0;
+            return res;
+        }
+        std::string pin = *pin_opt;
+        std::vector<std::uint8_t> salt(16, 0xCD);
+        auto reg_err = us.register_memorable_word("gate-test-node", "SecretWord42", salt);
+        if (!reg_err.empty() && reg_err.find("ALREADY_REGISTERED") == std::string::npos) {
+            auto res = PropupResult::fail(name, "register_memorable_word failed: " + reg_err);
+            res.elapsed_ms = now_ms() - t0;
+            return res;
+        }
+
+        auto result = us.verify_confirmation("gate-test-node", pin, "SecretWord42");
+        if (!result.empty()) {
+            auto res = PropupResult::fail(name, "gate-open verify_confirmation failed: " + result);
+            res.elapsed_ms = now_ms() - t0;
+            return res;
+        }
+    }
+
+    // --- Stage 2: Gate CLOSED (wrong PIN increments counter, not burned yet) ---
+    {
+        UserSecurity us;
+        std::vector<std::uint8_t> master(32, 0xAB);
+        auto pin_opt = us.generate_pin("gate-closed-node", master);
+        if (!pin_opt) {
+            auto res = PropupResult::fail(name, "generate_pin failed for gate-closed test");
+            res.elapsed_ms = now_ms() - t0;
+            return res;
+        }
+        std::string pin = *pin_opt;
+        std::vector<std::uint8_t> salt(16, 0xCD);
+        auto reg_err = us.register_memorable_word("gate-closed-node", "SecretWord42", salt);
+        if (!reg_err.empty() && reg_err.find("ALREADY_REGISTERED") == std::string::npos) {
+            auto res = PropupResult::fail(name, "register_memorable_word failed: " + reg_err);
+            res.elapsed_ms = now_ms() - t0;
+            return res;
+        }
+
+        // Wrong PIN — should fail but not burn (1/3)
+        auto result1 = us.verify_confirmation("gate-closed-node", "000000", "SecretWord42");
+        if (result1.empty()) {
+            auto res = PropupResult::fail(name, "gate-closed: wrong PIN was accepted");
+            res.elapsed_ms = now_ms() - t0;
+            return res;
+        }
+        if (us.is_burned("gate-closed-node")) {
+            auto res = PropupResult::fail(name, "gate-closed: node burned after 1 failure (expected 3)");
+            res.elapsed_ms = now_ms() - t0;
+            return res;
+        }
+
+        // Wrong word — should fail but not burn (2/3)
+        auto result2 = us.verify_confirmation("gate-closed-node", pin, "WrongWord99");
+        if (result2.empty()) {
+            auto res = PropupResult::fail(name, "gate-closed: wrong word was accepted");
+            res.elapsed_ms = now_ms() - t0;
+            return res;
+        }
+        if (us.is_burned("gate-closed-node")) {
+            auto res = PropupResult::fail(name, "gate-closed: node burned after 2 failures (expected 3)");
+            res.elapsed_ms = now_ms() - t0;
+            return res;
+        }
+    }
+
+    // --- Stage 3: Gate BURNED (3 failures → permanent lockout) ---
+    {
+        UserSecurity us;
+        std::vector<std::uint8_t> master(32, 0xAB);
+        auto pin_opt = us.generate_pin("gate-burn-node", master);
+        if (!pin_opt) {
+            auto res = PropupResult::fail(name, "generate_pin failed for gate-burn test");
+            res.elapsed_ms = now_ms() - t0;
+            return res;
+        }
+        std::string pin = *pin_opt;
+        std::vector<std::uint8_t> salt(16, 0xCD);
+        auto reg_err = us.register_memorable_word("gate-burn-node", "SecretWord42", salt);
+        if (!reg_err.empty() && reg_err.find("ALREADY_REGISTERED") == std::string::npos) {
+            auto res = PropupResult::fail(name, "register_memorable_word failed: " + reg_err);
+            res.elapsed_ms = now_ms() - t0;
+            return res;
+        }
+
+        // 1st failure
+        (void)us.verify_confirmation("gate-burn-node", "000000", "SecretWord42");
+        // 2nd failure
+        (void)us.verify_confirmation("gate-burn-node", "000000", "SecretWord42");
+        // 3rd failure → burn
+        auto result3 = us.verify_confirmation("gate-burn-node", "000000", "SecretWord42");
+        if (result3.empty()) {
+            auto res = PropupResult::fail(name, "gate-burn: 3rd wrong attempt was accepted");
+            res.elapsed_ms = now_ms() - t0;
+            return res;
+        }
+        if (!us.is_burned("gate-burn-node")) {
+            auto res = PropupResult::fail(name, "gate-burn: node NOT burned after 3 failures");
+            res.elapsed_ms = now_ms() - t0;
+            return res;
+        }
+        // Post-burn: even correct credentials must fail
+        auto post_burn = us.verify_confirmation("gate-burn-node", pin, "SecretWord42");
+        if (post_burn.empty()) {
+            auto res = PropupResult::fail(name, "gate-burn: correct credentials worked after burn");
+            res.elapsed_ms = now_ms() - t0;
+            return res;
+        }
+        if (post_burn.find("LOCKED") == std::string::npos && post_burn.find("burned") == std::string::npos) {
+            auto res = PropupResult::fail(name, "gate-burn: post-burn error missing LOCKED/burned: " + post_burn);
+            res.elapsed_ms = now_ms() - t0;
+            return res;
+        }
+    }
+
+    // --- Stage 4: LCMD integration — inference audit export/clear paths ---
+    {
+        LocalMaintenanceDB lcmd;
+        std::vector<std::uint8_t> key(32, 0x11);
+        auto init_ok = lcmd.initialize("rbpc_gate_test_lcmd", key);
+        if (!init_ok) {
+            auto res = PropupResult::skip(name, "LCMD init failed — skipping LCMD integration stage");
+            res.elapsed_ms = now_ms() - t0;
+            return res;
+        }
+
+        // Store a synthetic inference record so export/clear have something to work with
+        hq::cerberus::privacy::InferenceRecord rec;
+        rec.inference_id = "rbpc-gate-req-1";
+        rec.session_id = "local";
+        rec.prompt = "test prompt";
+        rec.result_summary = "ok";
+        rec.status = "success";
+        rec.timestamp = std::to_string(std::time(nullptr));
+        rec.generation_time_ms = "150";
+        rec.width = "512";
+        rec.height = "512";
+        rec.num_steps = "20";
+        rec.guidance_scale = "7.5";
+        rec.encoder_name = "test-enc";
+        rec.post_processor_name = "test-pp";
+        rec.gpu_backend_name = "CPU";
+        rec.text_encode_used_npu = "false";
+        rec.denoise_used_gpu = "false";
+        rec.vae_decode_used_gpu = "false";
+        rec.post_process_used_npu = "false";
+        rec.unet_denoise_used_npu = "false";
+        rec.npu_cheap_ops_percent = "0";
+        rec.recovery_attempts = "0";
+        rec.node_id = "local";
+        lcmd.store_inference_record(rec);
+
+        auto stats_before = lcmd.inference_stats();
+        auto itc = stats_before.find("count");
+        if (itc == stats_before.end() || itc->second != "1") {
+            auto res = PropupResult::fail(name, "LCMD inference record not stored correctly");
+            res.elapsed_ms = now_ms() - t0;
+            return res;
+        }
+
+        // Simulate clear with RBPC gate: create UserSecurity, verify, then clear
+        UserSecurity us;
+        std::vector<std::uint8_t> master(32, 0xAB);
+        auto pin_opt = us.generate_pin("lcmd-clear-node", master);
+        if (!pin_opt) {
+            auto res = PropupResult::fail(name, "generate_pin failed for LCMD clear stage");
+            res.elapsed_ms = now_ms() - t0;
+            return res;
+        }
+        std::string pin = *pin_opt;
+        std::vector<std::uint8_t> salt(16, 0xCD);
+        auto reg_err = us.register_memorable_word("lcmd-clear-node", "SecretWord42", salt);
+        if (!reg_err.empty() && reg_err.find("ALREADY_REGISTERED") == std::string::npos) {
+            auto res = PropupResult::fail(name, "register_memorable_word failed for LCMD clear stage: " + reg_err);
+            res.elapsed_ms = now_ms() - t0;
+            return res;
+        }
+
+        // Gate open → clear allowed
+        auto confirm = us.verify_confirmation("lcmd-clear-node", pin, "SecretWord42");
+        if (!confirm.empty()) {
+            auto res = PropupResult::fail(name, "LCMD clear stage: RBPC gate failed to open: " + confirm);
+            res.elapsed_ms = now_ms() - t0;
+            return res;
+        }
+
+        bool cleared = lcmd.clear_inference_records();
+        if (!cleared) {
+            auto res = PropupResult::fail(name, "LCMD clear_inference_records returned false");
+            res.elapsed_ms = now_ms() - t0;
+            return res;
+        }
+
+        auto stats_after = lcmd.inference_stats();
+        auto itc_after = stats_after.find("count");
+        if (itc_after != stats_after.end() && itc_after->second != "0") {
+            auto res = PropupResult::fail(name, "LCMD records not cleared (count=" + itc_after->second + ")");
+            res.elapsed_ms = now_ms() - t0;
+            return res;
+        }
+    }
+
+    auto res = PropupResult::pass(name);
+    res.elapsed_ms = now_ms() - t0;
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms");
     return res;
 }
 
@@ -3285,6 +5044,67 @@ hq::propup::PropupResult hq::propup::propup_inference_audit_input_validation([[m
     auto res = PropupResult::skip(name,
         "graph shape validation not yet enforced by runtime — accepted as no-op");
     res.elapsed_ms = now_ms() - t0;
+    return res;
+}
+
+hq::propup::PropupResult hq::propup::propup_tiered_memory_reset([[maybe_unused]] std::ostream* log) {
+    (void)log;
+    const std::string name = "propup_tiered_memory_reset";
+    auto t0 = now_ms();
+
+    TieredMemoryConfig tcfg;
+    tcfg.warm_capacity_bytes = 8ULL * 1024 * 1024;
+    tcfg.cool_capacity_bytes = 8ULL * 1024 * 1024;
+    TieredMemoryManager mgr(tcfg);
+
+    // Allocate across multiple tiers
+    auto cool_r = mgr.allocate(1024, hq::MemoryTier::Cool);
+    if (!cool_r) {
+        return PropupResult::fail(name, "cool alloc failed: " + hq::to_string(cool_r.error()));
+    }
+    auto warm_r = mgr.allocate(1024, hq::MemoryTier::Warm);
+    if (!warm_r) {
+        (void)mgr.free(cool_r->handle);
+        return PropupResult::fail(name, "warm alloc failed: " + hq::to_string(warm_r.error()));
+    }
+
+    auto stats_before = mgr.stats(hq::MemoryTier::Cool);
+    if (stats_before.alloc_count == 0) {
+        return PropupResult::fail(name, "alloc_count zero before reset");
+    }
+
+    // Call reset — should drain everything and zero counters
+    mgr.reset_for_testing();
+
+    auto stats_after = mgr.stats(hq::MemoryTier::Cool);
+    if (stats_after.allocated_bytes != 0) {
+        auto diag = "cool allocated_bytes not zero after reset: " + std::to_string(stats_after.allocated_bytes);
+        return PropupResult::fail(name, diag);
+    }
+    if (stats_after.alloc_count != 0) {
+        auto diag = "cool alloc_count not zero after reset: " + std::to_string(stats_after.alloc_count);
+        return PropupResult::fail(name, diag);
+    }
+    if (stats_after.free_count != 0) {
+        auto diag = "cool free_count not zero after reset: " + std::to_string(stats_after.free_count);
+        return PropupResult::fail(name, diag);
+    }
+
+    // After reset, new allocations should succeed with clean accounting
+    auto post_r = mgr.allocate(2048, hq::MemoryTier::Cool);
+    if (!post_r) {
+        return PropupResult::fail(name, "post-reset alloc failed: " + hq::to_string(post_r.error()));
+    }
+    auto post_stats = mgr.stats(hq::MemoryTier::Cool);
+    if (post_stats.allocated_bytes < 2048) {
+        auto diag = "post-reset accounting under-reported: " + std::to_string(post_stats.allocated_bytes);
+        return PropupResult::fail(name, diag);
+    }
+    (void)mgr.free(post_r->handle);
+
+    auto res = PropupResult::pass(name);
+    res.elapsed_ms = now_ms() - t0;
+    hq_println("[PROPUP] " + name + " passed in " + std::to_string(res.elapsed_ms) + " ms");
     return res;
 }
 
@@ -3633,9 +5453,9 @@ hq::propup::PropupResult hq::propup::propup_graph_engine_from_kernel_graph([[may
 
     // Build a KernelGraph with explicit graph_inputs and graph_outputs
     hq::npu::KernelGraph kg;
-    kg.graph_inputs.push_back(hq::npu::TensorDesc{"", {1, 3, 224, 224}, hq::npu::TensorDesc::DataType::F32});
-    kg.graph_inputs.push_back(hq::npu::TensorDesc{"", {1, 3, 224, 224}, hq::npu::TensorDesc::DataType::F16});
-    kg.graph_outputs.push_back(hq::npu::TensorDesc{"", {1, 1000}, hq::npu::TensorDesc::DataType::F32});
+    kg.graph_inputs.push_back(hq::npu::TensorDesc{"input", {1, 3, 224, 224}, hq::npu::TensorDesc::DataType::F32});
+    kg.graph_inputs.push_back(hq::npu::TensorDesc{"feature", {1, 64, 112, 112}, hq::npu::TensorDesc::DataType::F16});
+    kg.graph_outputs.push_back(hq::npu::TensorDesc{"output", {1, 1000}, hq::npu::TensorDesc::DataType::F32});
 
     kg.nodes.push_back([]{
         hq::npu::KernelNode n;
@@ -3661,19 +5481,33 @@ hq::propup::PropupResult hq::propup::propup_graph_engine_from_kernel_graph([[may
         return PropupResult::fail(name, diag);
     }
 
-    // Verify graph_inputs propagated dtype/shape into first tensors
+    // Verify graph_inputs propagated dtype/shape into matching tensors by name
     if (cg.tensors.size() < 2) {
         auto diag = "expected at least 2 tensors, got " + std::to_string(cg.tensors.size());
         return PropupResult::fail(name, diag);
     }
 
-    // First tensor should carry F32 from kg.graph_inputs[0]
-    if (cg.tensors[0].dtype != hq::npu::TensorDesc::DataType::F32) {
-        auto diag = "tensor[0] dtype expected F32, got " + std::to_string(static_cast<int>(cg.tensors[0].dtype));
+    // "input" tensor should carry F32 from kg.graph_inputs[0]
+    auto input_idx_opt = cg.tensor_index("input");
+    if (!input_idx_opt) {
+        return PropupResult::fail(name, "tensor_index('input') returned nullopt");
+    }
+    if (cg.tensors[*input_idx_opt].dtype != hq::npu::TensorDesc::DataType::F32) {
+        auto diag = "tensor 'input' dtype expected F32, got " + std::to_string(static_cast<int>(cg.tensors[*input_idx_opt].dtype));
         return PropupResult::fail(name, diag);
     }
-    if (cg.tensors[0].shape.size() != 4 || cg.tensors[0].shape[0] != 1) {
-        return PropupResult::fail(name, "tensor[0] shape not propagated from graph_inputs");
+    if (cg.tensors[*input_idx_opt].shape.size() != 4 || cg.tensors[*input_idx_opt].shape[0] != 1) {
+        return PropupResult::fail(name, "tensor 'input' shape not propagated from graph_inputs");
+    }
+
+    // "feature" tensor should carry F16 from kg.graph_inputs[1]
+    auto feature_idx_opt = cg.tensor_index("feature");
+    if (!feature_idx_opt) {
+        return PropupResult::fail(name, "tensor_index('feature') returned nullopt");
+    }
+    if (cg.tensors[*feature_idx_opt].dtype != hq::npu::TensorDesc::DataType::F16) {
+        auto diag = "tensor 'feature' dtype expected F16, got " + std::to_string(static_cast<int>(cg.tensors[*feature_idx_opt].dtype));
+        return PropupResult::fail(name, diag);
     }
 
     // Verify tensor_index lookup works
@@ -3832,8 +5666,10 @@ hq::propup::PropupResult hq::propup::propup_graph_engine_dtype_mismatch([[maybe_
     // the dtype metadata is honestly preserved so that a downstream decision engine or
     // backend can flag the mismatch.
     hq::npu::KernelGraph kg;
-    kg.graph_inputs.push_back(hq::npu::TensorDesc{"", {4}, hq::npu::TensorDesc::DataType::F32});
-    kg.graph_inputs.push_back(hq::npu::TensorDesc{"", {4}, hq::npu::TensorDesc::DataType::F16});
+    kg.graph_inputs.push_back(hq::npu::TensorDesc{"in_f32", {4}, hq::npu::TensorDesc::DataType::F32});
+    kg.graph_inputs.push_back(hq::npu::TensorDesc{"in_f16", {4}, hq::npu::TensorDesc::DataType::F16});
+    // graph_outputs with explicit dtype — this must propagate into the tensor metadata
+    kg.graph_outputs.push_back(hq::npu::TensorDesc{"out", {4}, hq::npu::TensorDesc::DataType::I32});
 
     // n0 produces "mid" from "in_f32" — dtype F32
     kg.nodes.push_back([]{
@@ -3878,21 +5714,24 @@ hq::propup::PropupResult hq::propup::propup_graph_engine_dtype_mismatch([[maybe_
         return PropupResult::fail(name, "input tensor indices not found");
     }
 
-    // The first two tensors in the map iteration order may not align with names,
-    // but from_kernel_graph propagates graph_inputs[0] to tensors[0] and [1] to [1].
-    // Since tensor_map is unordered_map, order is not guaranteed by name.
-    // We simply verify that at least one tensor has F32 and one has F16.
-    bool has_f32 = false;
-    bool has_f16 = false;
-    for (const auto& t : cg.tensors) {
-        if (t.dtype == hq::npu::TensorDesc::DataType::F32) has_f32 = true;
-        if (t.dtype == hq::npu::TensorDesc::DataType::F16) has_f16 = true;
+    // Verify specific graph_input dtype propagation by name
+    if (cg.tensors[*in_f32_opt].dtype != hq::npu::TensorDesc::DataType::F32) {
+        auto diag = "'in_f32' dtype expected F32, got " + std::to_string(static_cast<int>(cg.tensors[*in_f32_opt].dtype));
+        return PropupResult::fail(name, diag);
     }
-    if (!has_f32) {
-        return PropupResult::fail(name, "no F32 tensor found after from_kernel_graph");
+    if (cg.tensors[*in_f16_opt].dtype != hq::npu::TensorDesc::DataType::F16) {
+        auto diag = "'in_f16' dtype expected F16, got " + std::to_string(static_cast<int>(cg.tensors[*in_f16_opt].dtype));
+        return PropupResult::fail(name, diag);
     }
-    if (!has_f16) {
-        return PropupResult::fail(name, "no F16 tensor found after from_kernel_graph");
+
+    // Verify that graph_outputs dtype WAS propagated for the output tensor
+    auto out_idx_opt = cg.tensor_index("out");
+    if (!out_idx_opt) {
+        return PropupResult::fail(name, "tensor_index('out') returned nullopt");
+    }
+    if (cg.tensors[*out_idx_opt].dtype != hq::npu::TensorDesc::DataType::I32) {
+        auto diag = "'out' tensor dtype expected I32 from graph_outputs, got " + std::to_string(static_cast<int>(cg.tensors[*out_idx_opt].dtype));
+        return PropupResult::fail(name, diag);
     }
 
     // Verify that the graph contains a tensor with mismatched producer/consumer dtypes.

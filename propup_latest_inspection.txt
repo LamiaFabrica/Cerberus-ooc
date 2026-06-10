@@ -1,0 +1,192 @@
+[PROPUP] propup_tiered_memory passed in 0.450439453125 ms
+[PROPUP] propup_coordinator_memory_loop passed in 0.069580078125 ms
+[PROPUP] propup_coordinator_tier_decisions passed in 0.022216796875 ms
+[PROPUP] propup_compile_graph_analysis passed in 0.0029296875 ms
+[PROPUP] propup_kernel_matmul passed in 0.003173828125 ms
+[PROPUP] propup_kernel_elementwise passed in 0.00048828125 ms
+[PROPUP] propup_kernel_fma passed in 0.0009765625 ms
+[PROPUP] propup_kernel_matmul_blocked passed in 0.001953125 ms
+[PROPUP] propup_performance_matmul_vs_naive passed in 11.33935546875 ms
+[PROPUP] propup_end_to_end_native passed in 0.0712890625 ms
+[PROPUP] propup_decision_engine_fusion passed in 0.04638671875 ms
+[PROPUP] propup_kernel_relu_negative_input passed in 0.000244140625 ms
+[PROPUP] propup_kernel_sigmoid_extremes passed in 0.000244140625 ms
+[PROPUP] propup_kernel_quantized_matmul_shape passed in 0.002197265625 ms
+[PROPUP] propup_ranges_adopted_in_kernels passed in 0.0029296875 ms
+[PROPUP] propup_gguf_parser_header_valid passed in 0.017333984375 ms
+[PROPUP] propup_gguf_parser_metadata_read passed in 0.011474609375 ms
+[PROPUP] propup_glow_engine_init_deinit passed in 0.007568359375 ms
+[PROPUP] propup_adversarial_null_backend passed in 0.022216796875 ms
+[PROPUP] propup_adversarial_corrupt_graph passed in 0.002197265625 ms (execute rejected corrupt graph)
+[PROPUP] propup_adversarial_mismatched_tensor_shapes passed in 0.019775390625 ms (no crash on mismatch)
+[PROPUP] propup_adversarial_null_input_buffer passed in 0 ms (kernel returned error: null pointer)
+[11:28:42.569] [INFO ] npu_backend_unified.cpp:766 hq::npu::NpuBackendFactory::initialize()::<lambda()>() — [NpuBackendFactory] Probed 3 backends:
+[11:28:42.570] [INFO ] npu_backend_unified.cpp:791 hq::npu::NpuBackendFactory::print_status()::<lambda(hq::npu::INpuBackend*)>() —   ONNX-CPU-Fallback: available=yes, synthetic=yes, can_compile_for(intel_npu)=no, can_compile_for(cuda)=no, can_compile_for(cpu)=yes
+[11:28:42.570] [INFO ] npu_backend_unified.cpp:791 hq::npu::NpuBackendFactory::print_status()::<lambda(hq::npu::INpuBackend*)>() —   NVIDIA-CUDA: available=no, synthetic=yes, can_compile_for(intel_npu)=no, can_compile_for(cuda)=yes, can_compile_for(cpu)=no
+[11:28:42.570] [INFO ] npu_backend_unified.cpp:791 hq::npu::NpuBackendFactory::print_status()::<lambda(hq::npu::INpuBackend*)>() —   Intel-OpenVINO-NPU: available=no, synthetic=yes, can_compile_for(intel_npu)=yes, can_compile_for(cuda)=no, can_compile_for(cpu)=yes
+[PROPUP] propup_execution_coordinator_empty_graph passed in 0.02734375 ms (empty graph accepted as no-op)
+[PROPUP] propup_runtime_diagnostic_report passed in 0.05029296875 ms
+[PROPUP] propup_decision_engine_empty_graph passed in 0.013916015625 ms
+[PROPUP] propup_decision_engine_pick_backend_cpu_fallback passed in 0.020263671875 ms
+[PROPUP] propup_decision_engine_pick_backend_npu_matmul skipped: No real Intel NPU backend available on this host
+[PROPUP] propup_decision_engine_quant_profile_iq4 passed in 0.016845703125 ms
+[PROPUP] propup_decision_engine_unknown_op_fallback passed in 0.015380859375 ms
+[PROPUP] propup_tiered_memory_bulk_alloc passed in 0.0712890625 ms (16 blocks, 1048576 bytes)
+[GPUMonitor] Initialized with NVML backend (device 0)
+[GPUMonitor] Initialized with NVML backend (device 0)
+[NpuDmaPipeline] WARNING: No encoder provided. Pipeline will fail encode requests until an encoder is set.
+[NpuDmaPipeline] Initialised: 3 slots, 630784 bytes/slot
+[GPUMonitor] Initialized with NVML backend (device 0)
+[GPUMonitor] Initialized with NVML backend (device 0)
+[NpuDmaPipeline] WARNING: No encoder provided. Pipeline will fail encode requests until an encoder is set.
+[NpuDmaPipeline] Initialised: 3 slots, 630784 bytes/slot
+[PROPUP] propup_c_api_init_shutdown_cycle passed in 75.0810546875 ms
+[PROPUP] propup_graph_engine_two_node_graph passed in 0.010498046875 ms
+[PROPUP] propup_graph_engine_from_kernel_graph passed in 0.008056640625 ms
+[PROPUP] propup_graph_engine_cycle_detection passed in 0.005859375 ms (cycle detected)
+[PROPUP] propup_graph_engine_orphaned_nodes passed in 0.002685546875 ms
+[PROPUP] propup_async_pipeline_construct_destroy skipped: AsyncPipeline requires real ONNX model paths — not available on this host
+[PROPUP] propup_async_pipeline_stage_chaining skipped: AsyncPipeline requires real ONNX model paths — not available on this host
+[PROPUP] propup_async_pipeline_stop_token_cancel passed in 0.000244140625 ms
+[PROPUP] propup_async_pipeline_empty_input skipped: AsyncPipeline requires real ONNX model paths — not available on this host
+[PROPUP] propup_async_pipeline_latency_consistent skipped: AsyncPipeline requires real ONNX model paths — not available on this host
+[PROPUP] propup_boundary_contract_pre_condition passed in 0.06103515625 ms
+[PROPUP] propup_boundary_contract_post_condition passed in 0.005126953125 ms
+[PROPUP] propup_boundary_contract_invariant passed in 0.004150390625 ms
+[PROPUP] propup_boundary_contract_nested_scope passed in 0.000244140625 ms
+[PROPUP] propup_boundary_contract_violation_triggers passed in 0.017578125 ms
+
+=== David Propup Engine Report ===
+  [PASS] propup_tiered_memory (0.450439453125 ms)
+  [PASS] propup_coordinator_memory_loop (0.069580078125 ms)
+  [PASS] propup_coordinator_tier_decisions (0.022216796875 ms)
+  [PASS] propup_compile_graph_analysis (0.0029296875 ms)
+  [PASS] propup_kernel_matmul (0.003173828125 ms)
+  [PASS] propup_kernel_elementwise (0.00048828125 ms)
+  [PASS] propup_kernel_fma (0.0009765625 ms)
+  [PASS] propup_kernel_matmul_blocked (0.001953125 ms)
+  [PASS] propup_performance_matmul_vs_naive (11.33935546875 ms)
+  [PASS] propup_kernel_matmul_avx2 (1.090576171875 ms)
+  [PASS] propup_kernel_avx512_detect (0.00146484375 ms)
+  [PASS] propup_end_to_end_native (0.0712890625 ms)
+  [PASS] propup_decision_engine_fusion (0.04638671875 ms)
+  [PASS] propup_kernel_relu (0.000244140625 ms)
+  [PASS] propup_kernel_sigmoid (0.00244140625 ms)
+  [PASS] propup_kernel_relu_negative_input (0.000244140625 ms)
+  [PASS] propup_kernel_sigmoid_extremes (0.000244140625 ms)
+  [PASS] propup_kernel_quantized_matmul_shape (0.002197265625 ms)
+  [PASS] propup_ranges_adopted_in_kernels (0.0029296875 ms)
+  [PASS] propup_gguf_parser_header_valid (0.017333984375 ms)
+  [PASS] propup_gguf_parser_metadata_read (0.011474609375 ms)
+  [PASS] propup_glow_engine_init_deinit (0.007568359375 ms)
+  [FAIL] propup_glow_engine_tensor_create (0 ms) | query_hot_paths did not return expected 10->20->30->40 path
+  [PASS] propup_adversarial_null_backend (0.022216796875 ms)
+  [PASS] propup_adversarial_corrupt_graph (0.002197265625 ms)
+  [PASS] propup_adversarial_mismatched_tensor_shapes (0.019775390625 ms)
+  [PASS] propup_adversarial_null_input_buffer (0 ms)
+  [PASS] propup_lcmd_initialize_encrypt (0.072265625 ms)
+  [PASS] propup_lcmd_store_retrieve (0.048828125 ms)
+  [PASS] propup_jwt_malformed_rejected (0.021240234375 ms)
+  [PASS] propup_jwt_expired_detected (0.430908203125 ms)
+  [PASS] propup_lcmd_offline_sync_count (0.0341796875 ms)
+  [PASS] propup_intel_npu_telemetry_construction (197.73828125 ms)
+  [PASS] propup_intel_npu_telemetry_graceful_unavailable (4.9453125 ms)
+  [PASS] propup_intel_npu_telemetry_source_description (5.037841796875 ms)
+  [PASS] propup_intel_npu_telemetry_repeated_calls_safe (5.544189453125 ms)
+  [PASS] propup_intel_npu_telemetry_backend_integration (12.556884765625 ms)
+  [PASS] propup_intel_npu_telemetry_discovery_does_not_crash (48.80029296875 ms)
+  [PASS] propup_intel_npu_telemetry_real_source_flag_consistent (5.06298828125 ms)
+  [PASS] propup_intel_npu_telemetry_with_tmm_athenea_shape (4.914794921875 ms)
+  [PASS] propup_intel_npu_telemetry_during_tier_migration (5.263427734375 ms)
+  [PASS] propup_intel_npu_telemetry_sustained_sampling (5.08740234375 ms)
+  [PASS] propup_runtime_memory_loop_60s_lcmd (5.015380859375 ms)
+  [PASS] propup_quant_kernels_no_prohibited_language_in_iq4_path (0.232421875 ms)
+  [PASS] propup_quant_kernels_no_duplicate_iq4_definition (0.091064453125 ms)
+  [PASS] propup_npu_surface_language_hygiene (1.80322265625 ms)
+  [PASS] propup_intel_npu_telemetry_linux_levelzero_graceful (5.047607421875 ms)
+  [PASS] round22_fma_blend_stability (0.04736328125 ms)
+  [PASS] round22_telemetry_cache_benefit (4.90478515625 ms)
+  [PASS] round22_reduced_sampling_util (4.867431640625 ms)
+  [PASS] round22_tmm_hot_during_optimized_burst (0.10498046875 ms)
+  [PASS] round22_lcmd_via_runtime_only (0.048095703125 ms)
+  [PASS] round22_fma_in_denoise_path (0.00048828125 ms)
+  [PASS] round22_cache_in_intel_telemetry (5.63671875 ms)
+  [PASS] round22_endurance_with_reduced_sync (0.115478515625 ms)
+  [PASS] round22_quality_fma_vs_naive (0.05322265625 ms)
+  [PASS] round22_npu_util_metrics_in_report (5.232666015625 ms)
+  [PASS] round22_tmm_coordinator_interaction (0.0810546875 ms)
+  [PASS] round22_all_stages_documented (0.05126953125 ms)
+  [PASS] round23_runtime_diagnostic_tmm (0.0458984375 ms)
+  [PASS] round23_runtime_diagnostic_coordinator (0.044189453125 ms)
+  [PASS] round23_runtime_diagnostic_lcmd (0.04443359375 ms)
+  [PASS] round23_runtime_diagnostic_all_three (0.083984375 ms)
+  [PASS] round23_runtime_tmm_allocation_works (0.06591796875 ms)
+  [PASS] round23_runtime_coordinator_present (0.0439453125 ms)
+  [PASS] round23_lcmd_only_via_runtime_accessor (0.043212890625 ms)
+  [PASS] round23_diagnostic_accessors_no_fake_db (0.060302734375 ms)
+  [PASS] propup_concepts_enforced_in_headers (0 ms)
+  [PASS] propup_expected_chains_valid (0 ms)
+  [PASS] propup_execution_coordinator_empty_graph (0.02734375 ms)
+  [PASS] propup_runtime_diagnostic_report (0.05029296875 ms)
+  [PASS] propup_decision_engine_empty_graph (0.013916015625 ms)
+  [PASS] propup_decision_engine_pick_backend_cpu_fallback (0.020263671875 ms)
+  [SKIP] propup_decision_engine_pick_backend_npu_matmul (0.000244140625 ms) | No real Intel NPU backend available on this host
+  [PASS] propup_decision_engine_quant_profile_iq4 (0.016845703125 ms)
+  [PASS] propup_decision_engine_unknown_op_fallback (0.015380859375 ms)
+  [SKIP] propup_inference_audit_input_validation (0.0703125 ms) | graph shape validation not yet enforced by runtime — accepted as no-op
+  [PASS] propup_tiered_memory_bulk_alloc (0.0712890625 ms)
+  [PASS] propup_c_api_init_shutdown_cycle (75.0810546875 ms)
+  [PASS] propup_graph_engine_two_node_graph (0.010498046875 ms)
+  [PASS] propup_graph_engine_from_kernel_graph (0.008056640625 ms)
+  [PASS] propup_graph_engine_cycle_detection (0.005859375 ms)
+  [PASS] propup_graph_engine_orphaned_nodes (0.002685546875 ms)
+  [FAIL] propup_graph_engine_dtype_mismatch (0 ms) | 'mid' tensor dtype expected F32 (default), got 1
+  [SKIP] propup_async_pipeline_construct_destroy (0.001708984375 ms) | AsyncPipeline requires real ONNX model paths — not available on this host
+  [SKIP] propup_async_pipeline_stage_chaining (0 ms) | AsyncPipeline requires real ONNX model paths — not available on this host
+  [PASS] propup_async_pipeline_stop_token_cancel (0.000244140625 ms)
+  [SKIP] propup_async_pipeline_empty_input (0.000244140625 ms) | AsyncPipeline requires real ONNX model paths — not available on this host
+  [SKIP] propup_async_pipeline_latency_consistent (0.000244140625 ms) | AsyncPipeline requires real ONNX model paths — not available on this host
+  [PASS] propup_boundary_contract_pre_condition (0.06103515625 ms)
+  [PASS] propup_boundary_contract_post_condition (0.005126953125 ms)
+  [PASS] propup_boundary_contract_invariant (0.004150390625 ms)
+  [PASS] propup_boundary_contract_nested_scope (0.000244140625 ms)
+  [PASS] propup_boundary_contract_violation_triggers (0.017578125 ms)
+-----------------------------------
+  TOTAL: 86/94 passed in 417.998291015625 ms (6 skipped)
+  STATUS: BLOCKERS DETECTED
+===================================
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
+[cerberus] initialized: hailo=0 gpu=1 cpu=1
+[cerberus] shutdown complete
+[cerberus] initialized: hailo=0 gpu=1 cpu=1
+[cerberus] shutdown complete

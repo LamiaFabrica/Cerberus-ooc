@@ -53,72 +53,92 @@ public:
     std::queue<std::size_t> free_indices_;
     mutable std::mutex mtx_;
 
-    explicit Impl(StagingConfig cfg)
-        : cfg_{std::move(cfg)}
-    {
-        buffers_.reserve(cfg_.buffer_count);
-#if STAGING_HAS_HIP
-        if (cfg_.pinned) {
-            for (std::size_t i = 0; i < cfg_.buffer_count; ++i) {
-                void* ptr = nullptr;
-                hipError_t err = hipHostMalloc(&ptr, cfg_.buffer_size_bytes,
-                                               hipHostMallocPortable);
-                if (err == hipSuccess && ptr) {
-                    buffers_.emplace_back(ptr, cfg_.buffer_size_bytes);
-                    free_indices_.push(i);
-                } else {
-                    std::string msg = std::format("[staging] WARNING: hipHostMalloc failed ({}), "
-                               "falling back to regular memory\n",
-                               hipGetErrorString(err));
-                    hq_safe_write(1, msg.data(), msg.size());
-                    for (auto& b : buffers_) {
-                        hipHostFree(b.pinned_ptr);
-                        b.pinned_ptr = nullptr;
-                    }
-                    buffers_.clear();
-                    while (!free_indices_.empty()) {
-                        free_indices_.pop();
-                    }
-                    break;
-                }
-            }
-            if (!buffers_.empty()) {
-                return;
-            }
-        }
-#else
-        if (cfg_.pinned) {
-            std::string msg = std::format("[staging] WARNING: pinned=true but HIP not available "
-                       "at compile time, using regular memory\n");
-            hq_safe_write(1, msg.data(), msg.size());
-        }
-#endif
-        for (std::size_t i = 0; i < cfg_.buffer_count; ++i) {
-            buffers_.emplace_back(cfg_.buffer_size_bytes);
-            free_indices_.push(i);
-        }
-    }
+    explicit Impl(StagingConfig cfg);
+    ~Impl();
 
-    ~Impl() {
-#if STAGING_HAS_HIP
-        for (auto& buf : buffers_) {
-            if (buf.pinned_ptr) {
-                hipHostFree(buf.pinned_ptr);
-                buf.pinned_ptr = nullptr;
-            }
-        }
-#endif
-    }
-
-    std::size_t available() const {
-        std::lock_guard lock{mtx_};
-        return free_indices_.size();
-    }
+    std::size_t available() const;
 };
 
-EmbeddingStagingManager::EmbeddingStagingManager(StagingConfig cfg)
-    : impl_{std::make_unique<Impl>(std::move(cfg))}
+EmbeddingStagingManager::Impl::Impl(StagingConfig cfg)
+    : cfg_{std::move(cfg)}
 {
+    std::string msg1 = "[DEBUG] Impl ctor start, buffer_count=" + std::to_string(cfg_.buffer_count) + "\n";
+    hq_safe_write(1, msg1.data(), msg1.size());
+    buffers_.reserve(cfg_.buffer_count);
+    std::string msg2 = "[DEBUG] After reserve\n";
+    hq_safe_write(1, msg2.data(), msg2.size());
+#if STAGING_HAS_HIP
+    if (cfg_.pinned) {
+        for (std::size_t i = 0; i < cfg_.buffer_count; ++i) {
+            void* ptr = nullptr;
+            hipError_t err = hipHostMalloc(&ptr, cfg_.buffer_size_bytes,
+                                           hipHostMallocPortable);
+            if (err == hipSuccess && ptr) {
+                buffers_.emplace_back(ptr, cfg_.buffer_size_bytes);
+                free_indices_.push(i);
+            } else {
+                std::string msg = "[staging] WARNING: hipHostMalloc failed, falling back to regular memory\n";
+                hq_safe_write(1, msg.data(), msg.size());
+                for (auto& b : buffers_) {
+                    hipHostFree(b.pinned_ptr);
+                    b.pinned_ptr = nullptr;
+                }
+                buffers_.clear();
+                while (!free_indices_.empty()) {
+                    free_indices_.pop();
+                }
+                break;
+            }
+        }
+        if (!buffers_.empty()) {
+            return;
+        }
+    }
+#else
+    if (cfg_.pinned) {
+        std::string msg = "[staging] WARNING: pinned=true but HIP not available at compile time, using regular memory\n";
+        hq_safe_write(1, msg.data(), msg.size());
+    }
+#endif
+    std::string msg3 = "[DEBUG] Before loop, buffer_count=" + std::to_string(cfg_.buffer_count) + "\n";
+    hq_safe_write(1, msg3.data(), msg3.size());
+    for (std::size_t i = 0; i < cfg_.buffer_count; ++i) {
+        std::string msg4 = "[DEBUG] Loop i=" + std::to_string(i) + "\n";
+        hq_safe_write(1, msg4.data(), msg4.size());
+        buffers_.emplace_back(cfg_.buffer_size_bytes);
+        std::string msg5 = "[DEBUG] After emplace i=" + std::to_string(i) + "\n";
+        hq_safe_write(1, msg5.data(), msg5.size());
+        free_indices_.push(i);
+        std::string msg6 = "[DEBUG] After push i=" + std::to_string(i) + "\n";
+        hq_safe_write(1, msg6.data(), msg6.size());
+    }
+    std::string msg7 = "[DEBUG] Impl ctor end\n";
+    hq_safe_write(1, msg7.data(), msg7.size());
+}
+
+EmbeddingStagingManager::Impl::~Impl() {
+#if STAGING_HAS_HIP
+    for (auto& buf : buffers_) {
+        if (buf.pinned_ptr) {
+            hipHostFree(buf.pinned_ptr);
+            buf.pinned_ptr = nullptr;
+        }
+    }
+#endif
+}
+
+std::size_t EmbeddingStagingManager::Impl::available() const {
+    std::lock_guard lock{mtx_};
+    return free_indices_.size();
+}
+
+EmbeddingStagingManager::EmbeddingStagingManager(StagingConfig cfg)
+{
+    std::string msg = "[DEBUG] EmbeddingStagingManager ctor before make_unique\n";
+    hq_safe_write(1, msg.data(), msg.size());
+    impl_ = std::make_unique<Impl>(std::move(cfg));
+    std::string msg2 = "[DEBUG] EmbeddingStagingManager ctor after make_unique\n";
+    hq_safe_write(1, msg2.data(), msg2.size());
 }
 
 EmbeddingStagingManager::~EmbeddingStagingManager() = default;

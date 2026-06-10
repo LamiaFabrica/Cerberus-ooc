@@ -339,39 +339,41 @@ TieredMemoryManager::~TieredMemoryManager() noexcept {
         }
     }
     for (auto h : handles) {
-        (void)free(h);
+        (void)TieredMemoryManager::free(h);
     }
 }
 
 void TieredMemoryManager::reset_for_testing() noexcept {
+#ifndef CERBERUS_TESTING
+    // No-op in production builds to avoid accidental data loss.
+    return;
+#endif
     if (!impl_) return;
     auto& m = *impl_;
 
-    std::unique_lock lock{m.registry_mutex};
-
-    // Drain and free everything (same logic as destructor)
-    for (auto& [handle, alloc] : m.registry) {
-        if (alloc.tier == MemoryTier::Hot) {
-            free_hot(alloc.device_ptr);
-        } else if (alloc.tier == MemoryTier::Warm) {
-            if (alloc.ptr) m.warm_res->deallocate(alloc.ptr, alloc.size_bytes, alloc.alignment);
-        } else if (alloc.tier == MemoryTier::Cool) {
-            if (alloc.ptr) m.cool_res->deallocate(alloc.ptr, alloc.size_bytes, alloc.alignment);
-        } else {
-            auto it = m.cold_files.find(handle);
-            if (it != m.cold_files.end()) {
-                std::error_code ec;
-                std::filesystem::remove(it->second, ec);
-            }
+    // Collect all handles first, then free them via free() to keep
+    // PMR accounting symmetric with the destructor and normal paths.
+    std::vector<TierHandle> handles;
+    {
+        std::unique_lock lock{m.registry_mutex};
+        handles.reserve(m.registry.size());
+        for (auto& [handle, alloc] : m.registry) {
+            handles.push_back(handle);
         }
     }
+    for (auto h : handles) {
+        (void)TieredMemoryManager::free(h);
+    }
 
-    m.registry.clear();
-    m.lru[0].clear();
-    m.lru[1].clear();
-    m.lru[2].clear();
-    m.lru[3].clear();
-    m.cold_files.clear();
+    {
+        std::unique_lock lock{m.registry_mutex};
+        m.registry.clear();
+        m.lru[0].clear();
+        m.lru[1].clear();
+        m.lru[2].clear();
+        m.lru[3].clear();
+        m.cold_files.clear();
+    }
 
     // Reset accounting
     for (auto& acc : m.acct) {
@@ -381,6 +383,18 @@ void TieredMemoryManager::reset_for_testing() noexcept {
         acc.free_count.store(0, std::memory_order_relaxed);
         acc.migration_in.store(0, std::memory_order_relaxed);
         acc.migration_out.store(0, std::memory_order_relaxed);
+    }
+
+    // Reset PMR resources to clear drifted counters so that subsequent
+    // tests start from a clean accounting baseline.
+    if (m.cool_res) {
+        m.cool_res = std::make_unique<CoolPmrResource>(
+            m.cfg.cool_capacity_bytes, m.cfg.cool_alignment);
+    }
+    if (m.warm_res) {
+        const bool cxl = detect_cxl();
+        m.warm_res = std::make_unique<RamFallbackPmrResource>(
+            m.cfg.warm_capacity_bytes, m.cfg.warm_alignment, cxl);
     }
 }
 

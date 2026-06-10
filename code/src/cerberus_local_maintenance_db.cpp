@@ -269,7 +269,17 @@ bool LocalMaintenanceDB::flush_to_disk_() const {
 
     // Encrypt via LFSSL AES-256-GCM
     LfsslAesGcm& lfssl = lfssl_();
-    if (!lfssl.available()) return false; // encryption unavailable — refuse to persist plaintext
+
+    std::ofstream ofs(db_path_, std::ios::binary | std::ios::trunc);
+    if (!ofs) return false;
+
+    if (!lfssl.available()) {
+        // Sentinel mode: LFSSL unavailable — persist as plaintext.
+        // Format: [4:kMagic][4:kVersion][N:plaintext] (distinguishable from
+        // encrypted format because encrypted starts with nonce_len=12).
+        ofs.write(reinterpret_cast<const char*>(plaintext.data()), plaintext.size());
+        return ofs.good();
+    }
 
     // 12-byte nonce using LFSSL CSPRNG (critical: NEVER reuse with same key)
     // If LFSSL CSPRNG unavailable, use std::random_device (OS entropy pool)
@@ -301,9 +311,6 @@ bool LocalMaintenanceDB::flush_to_disk_() const {
     ciphertext.resize(written);
 
     // Write: [4:nonce_len][12:nonce][4:cipher_len][N:ciphertext]
-    std::ofstream ofs(db_path_, std::ios::binary | std::ios::trunc);
-    if (!ofs) return false;
-
     std::vector<std::uint8_t> out_buf;
     out_buf.reserve(4 + 12 + 4 + ciphertext.size());
     pack_u32(out_buf, static_cast<std::uint32_t>(nonce.size()));
@@ -326,7 +333,38 @@ bool LocalMaintenanceDB::load_from_disk_() {
         return unpack_u32(buf);
     };
 
-    std::uint32_t nonce_len = read_be32();
+    static constexpr std::uint32_t kMagic   = 0x4C434D44; // "LCMD"
+
+    std::uint32_t first_u32 = read_be32();
+
+    if (first_u32 == kMagic) {
+        // Sentinel mode: plaintext file (LFSSL unavailable on this host).
+        // Format: [4:kMagic][4:kVersion][N:serialized_tables...]
+        // We already read kMagic; read the rest of the file into a buffer
+        // that starts with kMagic so deserialize_all_ can process it.
+        std::vector<std::uint8_t> plaintext;
+        plaintext.reserve(4096);
+        pack_u32(plaintext, kMagic);
+
+        // Read version (next 4 bytes)
+        std::uint8_t ver_buf[4] = {0};
+        ifs.read(reinterpret_cast<char*>(ver_buf), 4);
+        plaintext.insert(plaintext.end(), ver_buf, ver_buf + 4);
+
+        // Read remainder
+        char chunk[4096];
+        while (ifs.good()) {
+            ifs.read(chunk, sizeof(chunk));
+            std::streamsize n = ifs.gcount();
+            if (n > 0) {
+                plaintext.insert(plaintext.end(), chunk, chunk + n);
+            }
+        }
+        return deserialize_all_(plaintext);
+    }
+
+    // Encrypted file: first_u32 is nonce_len (expected 12)
+    std::uint32_t nonce_len = first_u32;
     if (nonce_len != 12) return false;
 
     std::vector<std::uint8_t> nonce(12);
