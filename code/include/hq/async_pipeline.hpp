@@ -121,8 +121,7 @@ struct task_promise final : task_promise_base {
         return final_awaiter{continuation_};
     }
 
-    template<typename U>
-        requires std::convertible_to<U, T>
+    template<std::convertible_to<T> U>
     void return_value(U&& value) {
         result_ = std::forward<U>(value);
     }
