@@ -649,6 +649,13 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND WIN32)
     target_link_options(test_lcmd_e2e PRIVATE -static-libgcc -static-libstdc++)
 endif()
 
+# Standalone fresh auto RBPC test (isolated propup for server LCMD)
+add_executable(test_fresh_auto_rbpc tests/test_fresh_auto_rbpc.cpp)
+target_link_libraries(test_fresh_auto_rbpc PRIVATE um790_pipeline cerberus_npu um790_compile_options um790_includes um790_link_options Threads::Threads)
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND WIN32)
+    target_link_options(test_fresh_auto_rbpc PRIVATE -static-libgcc -static-libstdc++)
+endif()
+
 # Build cerberus_npu as STATIC to avoid MinGW duplicate-symbol segfault.
 # When SHARED, um790_pipeline (static) is linked into BOTH the DLL and
 # the executable, causing ABI mismatch crashes (0xc0000139) on Windows.
@@ -697,6 +704,7 @@ if(WIN32 AND ONNXRUNTIME_DLLS)
         david_propup_engine
         cerberus_register
         test_lcmd_e2e
+        test_fresh_auto_rbpc
         cerberus_server
     )
     foreach(_ort_tgt IN LISTS _ORT_EXE_TARGETS)
