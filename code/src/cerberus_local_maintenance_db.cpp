@@ -274,10 +274,45 @@ bool LocalMaintenanceDB::flush_to_disk_() const {
     if (!ofs) return false;
 
     if (!lfssl.available()) {
-        // Sentinel mode: LFSSL unavailable — persist as plaintext.
-        // Format: [4:kMagic][4:kVersion][N:plaintext] (distinguishable from
-        // encrypted format because encrypted starts with nonce_len=12).
-        ofs.write(reinterpret_cast<const char*>(plaintext.data()), plaintext.size());
+        // Sentinel mode: LFSSL unavailable — use fallback authenticated stream cipher.
+        // Keystream = HMAC-SHA256(key, nonce || counter) repeatedly.
+        // Tag = HMAC-SHA256(key, nonce || ciphertext) truncated to 16 bytes.
+        std::vector<std::uint8_t> nonce(12);
+        std::random_device rd;
+        std::uniform_int_distribution<int> dist(0, 255);
+        for (auto& b : nonce) b = static_cast<std::uint8_t>(dist(rd));
+
+        std::vector<std::uint8_t> ciphertext(plaintext.size() + 16); // +16 for tag
+        // Generate keystream via repeated HMAC-SHA256(key, nonce || block_counter)
+        std::size_t blocks_needed = (plaintext.size() + 31) / 32;
+        std::vector<std::uint8_t> keystream;
+        keystream.reserve(blocks_needed * 32);
+        for (std::size_t block = 0; block < blocks_needed; ++block) {
+            std::string ctr_msg(reinterpret_cast<const char*>(nonce.data()), nonce.size());
+            ctr_msg += std::to_string(block);
+            auto mac = hq::cerberus::security::CryptoBridge::hmac_sha256(db_key_, ctr_msg);
+            keystream.insert(keystream.end(), mac.begin(), mac.end());
+        }
+        // XOR plaintext with keystream
+        for (std::size_t i = 0; i < plaintext.size(); ++i) {
+            ciphertext[i] = plaintext[i] ^ keystream[i];
+        }
+        // Compute tag = HMAC-SHA256(key, nonce || ciphertext)
+        std::string tag_msg(reinterpret_cast<const char*>(nonce.data()), nonce.size());
+        tag_msg.append(reinterpret_cast<const char*>(ciphertext.data()), plaintext.size());
+        auto tag_full = hq::cerberus::security::CryptoBridge::hmac_sha256(db_key_, tag_msg);
+        for (std::size_t i = 0; i < 16; ++i) {
+            ciphertext[plaintext.size() + i] = tag_full[i];
+        }
+
+        // Write: [4:nonce_len][12:nonce][4:cipher_len][N:ciphertext]
+        std::vector<std::uint8_t> out_buf;
+        out_buf.reserve(4 + 12 + 4 + ciphertext.size());
+        pack_u32(out_buf, static_cast<std::uint32_t>(nonce.size()));
+        out_buf.insert(out_buf.end(), nonce.begin(), nonce.end());
+        pack_u32(out_buf, static_cast<std::uint32_t>(ciphertext.size()));
+        out_buf.insert(out_buf.end(), ciphertext.begin(), ciphertext.end());
+        ofs.write(reinterpret_cast<const char*>(out_buf.data()), out_buf.size());
         return ofs.good();
     }
 
@@ -377,20 +412,48 @@ bool LocalMaintenanceDB::load_from_disk_() {
     ifs.read(reinterpret_cast<char*>(ciphertext.data()), cipher_len);
     if (static_cast<std::size_t>(ifs.gcount()) != cipher_len) return false;
 
-    // Decrypt via LFSSL
+    // Decrypt via LFSSL or fallback authenticated stream cipher
     LfsslAesGcm& lfssl = lfssl_();
-    if (!lfssl.available()) return false;
+    if (lfssl.available()) {
+        std::vector<std::uint8_t> plaintext(cipher_len);
+        std::size_t written = 0;
+        int rc = lfssl.decrypt(db_key_.data(),
+                               nonce.data(), nonce.size(),
+                               ciphertext.data(), ciphertext.size(),
+                               nullptr, 0,
+                               plaintext.data(), plaintext.size(), &written);
+        if (rc != 0 || written == 0) return false;
+        plaintext.resize(written);
+        return deserialize_all_(plaintext);
+    }
 
-    std::vector<std::uint8_t> plaintext(cipher_len);
-    std::size_t written = 0;
-    int rc = lfssl.decrypt(db_key_.data(),
-                           nonce.data(), nonce.size(),
-                           ciphertext.data(), ciphertext.size(),
-                           nullptr, 0,
-                           plaintext.data(), plaintext.size(), &written);
-    if (rc != 0 || written == 0) return false;
-    plaintext.resize(written);
-
+    // Fallback decryption: HMAC-SHA256 stream cipher + tag verification
+    if (cipher_len < 16) return false;
+    std::size_t pt_len = cipher_len - 16;
+    std::vector<std::uint8_t> plaintext(pt_len);
+    // Regenerate keystream
+    std::size_t blocks_needed = (pt_len + 31) / 32;
+    std::vector<std::uint8_t> keystream;
+    keystream.reserve(blocks_needed * 32);
+    for (std::size_t block = 0; block < blocks_needed; ++block) {
+        std::string ctr_msg(reinterpret_cast<const char*>(nonce.data()), nonce.size());
+        ctr_msg += std::to_string(block);
+        auto mac = hq::cerberus::security::CryptoBridge::hmac_sha256(db_key_, ctr_msg);
+        keystream.insert(keystream.end(), mac.begin(), mac.end());
+    }
+    // Verify tag
+    std::string tag_msg(reinterpret_cast<const char*>(nonce.data()), nonce.size());
+    tag_msg.append(reinterpret_cast<const char*>(ciphertext.data()), pt_len);
+    auto expected_tag = hq::cerberus::security::CryptoBridge::hmac_sha256(db_key_, tag_msg);
+    std::uint8_t diff = 0;
+    for (std::size_t i = 0; i < 16; ++i) {
+        diff |= (ciphertext[pt_len + i] ^ expected_tag[i]);
+    }
+    if (diff != 0) return false; // wrong key or tampered
+    // XOR ciphertext with keystream
+    for (std::size_t i = 0; i < pt_len; ++i) {
+        plaintext[i] = ciphertext[i] ^ keystream[i];
+    }
     return deserialize_all_(plaintext);
 }
 

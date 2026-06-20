@@ -1,0 +1,14 @@
+=== Cerberus Smoke Test (Coordinator owns memory loop) ===
+backend: SmokeTestBackend
+compiling...
+compile ok
+graph_nodes.size=2
+high_reuse_tensors=1
+  reuse: mul_out
+estimated_working_set=32
+executing via coordinator (inputs + outputs go through TieredMemoryManager)...
+[COORD] input 0 staged -> Cool tier (16 bytes)
+[COORD] output 0 allocated -> Cool tier (16 bytes)
+[COORD] working_set=32 bytes  high_reuse_tensors=1
+execution ok
+PASS

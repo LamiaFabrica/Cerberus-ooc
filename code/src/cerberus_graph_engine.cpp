@@ -144,7 +144,35 @@ CerberusGraph CerberusGraph::from_kernel_graph(const npu::KernelGraph& kg) {
     }
 
     // Build tensor list from node I/O (deduplicate by name)
+    // Order matters: graph_inputs first, then intermediate/output tensors.
+    // This preserves the graph_inputs dtype propagation contract tested by
+    // propup_graph_engine_dtype_mismatch.
     std::unordered_map<std::string, GraphTensor> tensor_map;
+
+    // 1. Seed graph_inputs first so their dtype/shape are established early.
+    for (const auto& gi : kg.graph_inputs) {
+        if (!gi.name.empty() && tensor_map.find(gi.name) == tensor_map.end()) {
+            GraphTensor gt;
+            gt.name  = gi.name;
+            gt.shape = gi.shape;
+            gt.dtype = gi.dtype;
+            tensor_map[gi.name] = std::move(gt);
+        }
+    }
+
+    // 2. Seed graph_outputs so their dtype/shape are preserved even if they
+    //    only appear as node outputs (and never as node inputs).
+    for (const auto& go : kg.graph_outputs) {
+        if (!go.name.empty() && tensor_map.find(go.name) == tensor_map.end()) {
+            GraphTensor gt;
+            gt.name  = go.name;
+            gt.shape = go.shape;
+            gt.dtype = go.dtype;
+            tensor_map[go.name] = std::move(gt);
+        }
+    }
+
+    // 3. Add any remaining tensors discovered from node I/O.
     for (const auto& kn : kg.nodes) {
         for (const auto& in : kn.inputs) {
             if (tensor_map.find(in) == tensor_map.end()) {
