@@ -282,6 +282,19 @@ test_lcmd_e2e/fast:
 .PHONY : test_lcmd_e2e/fast
 
 #=============================================================================
+# Target rules for targets named test_fresh_auto_rbpc
+
+# Build rule for target.
+test_fresh_auto_rbpc: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\Makefile2 test_fresh_auto_rbpc
+.PHONY : test_fresh_auto_rbpc
+
+# fast build rule for target.
+test_fresh_auto_rbpc/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\test_fresh_auto_rbpc.dir\build.make CMakeFiles/test_fresh_auto_rbpc.dir/build
+.PHONY : test_fresh_auto_rbpc/fast
+
+#=============================================================================
 # Target rules for targets named cerberus_npu
 
 # Build rule for target.
@@ -1679,6 +1692,30 @@ tests/test_all.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\um790_test.dir\build.make CMakeFiles/um790_test.dir/tests/test_all.cpp.s
 .PHONY : tests/test_all.cpp.s
 
+tests/test_fresh_auto_rbpc.obj: tests/test_fresh_auto_rbpc.cpp.obj
+.PHONY : tests/test_fresh_auto_rbpc.obj
+
+# target to build an object file
+tests/test_fresh_auto_rbpc.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\test_fresh_auto_rbpc.dir\build.make CMakeFiles/test_fresh_auto_rbpc.dir/tests/test_fresh_auto_rbpc.cpp.obj
+.PHONY : tests/test_fresh_auto_rbpc.cpp.obj
+
+tests/test_fresh_auto_rbpc.i: tests/test_fresh_auto_rbpc.cpp.i
+.PHONY : tests/test_fresh_auto_rbpc.i
+
+# target to preprocess a source file
+tests/test_fresh_auto_rbpc.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\test_fresh_auto_rbpc.dir\build.make CMakeFiles/test_fresh_auto_rbpc.dir/tests/test_fresh_auto_rbpc.cpp.i
+.PHONY : tests/test_fresh_auto_rbpc.cpp.i
+
+tests/test_fresh_auto_rbpc.s: tests/test_fresh_auto_rbpc.cpp.s
+.PHONY : tests/test_fresh_auto_rbpc.s
+
+# target to generate assembly for a file
+tests/test_fresh_auto_rbpc.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\test_fresh_auto_rbpc.dir\build.make CMakeFiles/test_fresh_auto_rbpc.dir/tests/test_fresh_auto_rbpc.cpp.s
+.PHONY : tests/test_fresh_auto_rbpc.cpp.s
+
 tests/test_lcmd_e2e.obj: tests/test_lcmd_e2e.cpp.obj
 .PHONY : tests/test_lcmd_e2e.obj
 
@@ -1726,6 +1763,7 @@ help:
 	@echo ... gmock_main
 	@echo ... gtest
 	@echo ... gtest_main
+	@echo ... test_fresh_auto_rbpc
 	@echo ... test_lcmd_e2e
 	@echo ... test_smoke_ov
 	@echo ... um790_pipeline
@@ -1896,6 +1934,9 @@ help:
 	@echo ... tests/test_all.obj
 	@echo ... tests/test_all.i
 	@echo ... tests/test_all.s
+	@echo ... tests/test_fresh_auto_rbpc.obj
+	@echo ... tests/test_fresh_auto_rbpc.i
+	@echo ... tests/test_fresh_auto_rbpc.s
 	@echo ... tests/test_lcmd_e2e.obj
 	@echo ... tests/test_lcmd_e2e.i
 	@echo ... tests/test_lcmd_e2e.s

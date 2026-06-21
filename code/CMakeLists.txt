@@ -176,10 +176,18 @@ endif()
 
 # --- ONNX Runtime ---
 # Use the staged ONNX Runtime SDK (GPU package with CUDA/DML EP support).
-# The SDK was downloaded and staged by parent task t_31fcdbae to:
-#   <project-root>/third_party/onnxruntime/onnxruntime-win-x64-gpu-1.26.0
+# The SDK is downloaded by scripts/download-onnxruntime.ps1 (Windows) or
+# scripts/download-onnxruntime.sh (Linux) if not present.
 # On Linux, set -DONNXRUNTIME_ROOT=... to point at the extracted tarball.
-set(ONNXRUNTIME_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/onnxruntime/onnxruntime-win-x64-gpu-1.26.0" CACHE PATH "ONNX Runtime SDK root directory")
+#
+# NOTE: Do NOT commit .zip, .dll, or .pdb files to git. They are ignored
+# by .gitignore and downloaded on-demand by the build system.
+set(_ONNXRUNTIME_DEFAULT_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/onnxruntime/onnxruntime-win-x64-gpu-1.26.0")
+if(NOT EXISTS "${_ONNXRUNTIME_DEFAULT_ROOT}/include/onnxruntime_cxx_api.h")
+    message(WARNING "ONNX Runtime SDK not found at ${_ONNXRUNTIME_DEFAULT_ROOT}")
+    message(WARNING "  Run: scripts/download-onnxruntime.ps1 (Windows) or scripts/download-onnxruntime.sh (Linux)")
+endif()
+set(ONNXRUNTIME_ROOT "${_ONNXRUNTIME_DEFAULT_ROOT}" CACHE PATH "ONNX Runtime SDK root directory")
 
 find_library(ONNXRUNTIME_LIB NAMES onnxruntime
     HINTS

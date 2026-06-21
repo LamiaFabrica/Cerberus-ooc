@@ -14,6 +14,8 @@
 #  include <print>
 #endif
 #include <utility>
+#include <atomic>
+#include <mutex>
 
 extern "C" std::size_t hq_safe_write(int fd, const char* data, std::size_t len);
 
@@ -53,6 +55,44 @@ namespace {
 #define GPUMONITOR_HAS_ROCM_SMI 0
 #endif
 
+namespace {
+
+// ---------------------------------------------------------------------------
+// Process-wide NVML lifecycle guard — NVML crashes on re-init after shutdown.
+// We init once and never shut down within the process lifetime.
+// ---------------------------------------------------------------------------
+#if GPUMONITOR_HAS_NVML
+struct NvmlLifecycleGuard {
+    std::atomic<bool> init_attempted{false};
+    std::atomic<bool> init_ok{false};
+    std::mutex mtx;
+
+    bool ensure_init() {
+        if (init_attempted.load(std::memory_order_acquire)) {
+            return init_ok.load(std::memory_order_acquire);
+        }
+        std::lock_guard lock{mtx};
+        if (init_attempted.load(std::memory_order_relaxed)) {
+            return init_ok.load(std::memory_order_acquire);
+        }
+        nvmlReturn_t nr = nvmlInit();
+        init_attempted.store(true, std::memory_order_release);
+        init_ok.store(nr == NVML_SUCCESS, std::memory_order_release);
+        return init_ok.load(std::memory_order_acquire);
+    }
+
+    // Never call nvmlShutdown() — it makes re-init crash.
+    // Let the OS clean up at process exit.
+};
+
+static NvmlLifecycleGuard& nvml_guard() {
+    static NvmlLifecycleGuard g;
+    return g;
+}
+#endif
+
+} // anonymous namespace
+
 namespace hq {
 
 // ---------------------------------------------------------------------------
@@ -69,9 +109,8 @@ GPUMonitor::GPUMonitor(std::uint32_t device_index)
 GPUMonitor::~GPUMonitor() noexcept {
     if (initialized_) {
 #if GPUMONITOR_HAS_NVML
-        if (backend_ == Backend::NVML) {
-            nvmlShutdown();
-        }
+        // Intentionally skip nvmlShutdown() — process-wide singleton keeps it alive.
+        // NVML does not support re-initialization after shutdown.
 #endif
 #if GPUMONITOR_HAS_ROCM_SMI
         if (backend_ == Backend::ROCM_SMI) {
@@ -103,9 +142,8 @@ GPUMonitor& GPUMonitor::operator=(GPUMonitor&& other) noexcept {
     if (this != &other) {
         if (initialized_) {
 #if GPUMONITOR_HAS_NVML
-            if (backend_ == Backend::NVML) {
-                nvmlShutdown();
-            }
+            // Intentionally skip nvmlShutdown() — process-wide singleton keeps it alive.
+            // NVML does not support re-initialization after shutdown.
 #endif
 #if GPUMONITOR_HAS_ROCM_SMI
             if (backend_ == Backend::ROCM_SMI) {
@@ -143,10 +181,9 @@ std::expected<void, GPUErrorInfo> GPUMonitor::initialize() {
     // --- Try NVML first (NVIDIA GPUs) ---
 #if GPUMONITOR_HAS_NVML
     {
-        nvmlReturn_t nr = nvmlInit();
-        if (nr == NVML_SUCCESS) {
+        if (nvml_guard().ensure_init()) {
             unsigned int device_count = 0;
-            nr = nvmlDeviceGetCount(&device_count);
+            nvmlReturn_t nr = nvmlDeviceGetCount(&device_count);
             if (nr == NVML_SUCCESS && device_count > 0 && device_index_ < device_count) {
                 nvmlDevice_t dev = nullptr;
                 nr = nvmlDeviceGetHandleByIndex(device_index_, &dev);
@@ -166,9 +203,9 @@ std::expected<void, GPUErrorInfo> GPUMonitor::initialize() {
                 hq_println(std::format("[GPUMonitor] NVML device count query failed or no devices (status={}, count={})",
                            static_cast<int>(nr), device_count));
             }
-            nvmlShutdown();
+            // Do NOT call nvmlShutdown() — process-wide singleton keeps NVML alive.
         } else {
-            hq_println(std::format("[GPUMonitor] NVML init failed (status={})", static_cast<int>(nr)));
+            hq_println(std::format("[GPUMonitor] NVML init failed (already attempted)"));
         }
     }
 #endif

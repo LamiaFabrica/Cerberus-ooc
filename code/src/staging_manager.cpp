@@ -62,6 +62,8 @@ public:
 EmbeddingStagingManager::Impl::Impl(StagingConfig cfg)
     : cfg_{std::move(cfg)}
 {
+    std::string msg0 = "[DEBUG] Impl ctor entered\n";
+    hq_safe_write(1, msg0.data(), msg0.size());
     std::string msg1 = "[DEBUG] Impl ctor start, buffer_count=" + std::to_string(cfg_.buffer_count) + "\n";
     hq_safe_write(1, msg1.data(), msg1.size());
     buffers_.reserve(cfg_.buffer_count);
