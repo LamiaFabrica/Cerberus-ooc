@@ -4255,8 +4255,10 @@ TEST_F(Round15EvidenceTest, NpuBackend_AllFour_ConceptSatisfied) {
                   "CpuFallbackEncoder must satisfy NpuBackend");
     static_assert(hq::npu::NpuBackend<hq::npu::WindowsNpuBackend>,
                   "WindowsNpuBackend must satisfy NpuBackend");
-    // Runtime proof: remaining three can be default-constructed and queried
-    EXPECT_FALSE(hq::npu::CpuFallbackEncoder{}.name().empty());
+    // Runtime proof: remaining three can be constructed and queried
+    // CpuFallbackEncoder requires Ort::Session* and Ort::MemoryInfo* — pass nullptr for test
+    auto enc = hq::npu::CpuFallbackEncoder(nullptr, nullptr);
+    EXPECT_FALSE(enc.name().empty());
     EXPECT_FALSE(hq::npu::WindowsNpuBackend{}.name().empty());
     std::print("[TEST] PASSED (3 static_asserts + runtime name checks)\n");
 }
@@ -4582,64 +4584,6 @@ TEST_F(Round18EvidenceTest, CpuPostProcessor_PostProcess_DimensionsPreserved) {
 }
 
 // Test 7: CpuPostProcessor post-process reports was_npu_accelerated = false
-TEST_F(Round18EvidenceTest, CpuPostProcessor_PostProcess_NotNpuAccelerated) {
-    std::print("[TEST] CpuPostProcessor_PostProcess_NotNpuAccelerated\n");
-    hq::npu::CpuPostProcessor pp;
-    std::vector<std::uint8_t> pixels(16u, 0u);
-    hq::npu::NpuPostProcessRequest req{
-        .pixels = std::span<const std::uint8_t>{pixels},
-        .width  = 2,
-        .height = 2,
-    };
-    auto result = pp.post_process(req);
-    ASSERT_TRUE(result.has_value());
-    EXPECT_FALSE(result->was_npu_accelerated);
-    std::print("[TEST] PASSED\n");
-}
-
-// Test 4: CpuPostProcessor::can_handle() accepts SafetyFilter task
-TEST_F(Round18EvidenceTest, CpuPostProcessor_CanHandle_SafetyFilter) {
-    std::print("[TEST] CpuPostProcessor_CanHandle_SafetyFilter\n");
-    hq::npu::CpuPostProcessor pp;
-    EXPECT_TRUE(pp.can_handle(hq::npu::NpuTaskType::SafetyFilter));
-    std::print("[TEST] PASSED\n");
-}
-
-// Test 5: CpuPostProcessor::post_process() returns a valid result
-TEST_F(Round18EvidenceTest, CpuPostProcessor_PostProcess_ReturnsResult) {
-    std::print("[TEST] CpuPostProcessor_PostProcess_ReturnsResult\n");
-    hq::npu::CpuPostProcessor pp;
-    std::vector<std::uint8_t> pixels(512u * 512u * 4u, 128u);
-    hq::npu::NpuPostProcessRequest req{
-        .pixels = std::span<const std::uint8_t>{pixels},
-        .width  = 512,
-        .height = 512,
-        .task   = hq::npu::NpuTaskType::PostProcess,
-    };
-    auto result = pp.post_process(req);
-    EXPECT_TRUE(result.has_value());
-    std::print("[TEST] PASSED\n");
-}
-
-// Test 6: post_process() output dimensions match input
-TEST_F(Round18EvidenceTest, CpuPostProcessor_PostProcess_DimensionsPreserved) {
-    std::print("[TEST] CpuPostProcessor_PostProcess_DimensionsPreserved\n");
-    hq::npu::CpuPostProcessor pp;
-    std::vector<std::uint8_t> pixels(64u * 64u * 4u, 255u);
-    hq::npu::NpuPostProcessRequest req{
-        .pixels = std::span<const std::uint8_t>{pixels},
-        .width  = 64,
-        .height = 64,
-    };
-    auto result = pp.post_process(req);
-    ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(result->width,  64u);
-    EXPECT_EQ(result->height, 64u);
-    EXPECT_EQ(result->pixels.size(), pixels.size());
-    std::print("[TEST] PASSED\n");
-}
-
-// Test 7: CPU post-processor reports was_npu_accelerated = false
 TEST_F(Round18EvidenceTest, CpuPostProcessor_PostProcess_NotNpuAccelerated) {
     std::print("[TEST] CpuPostProcessor_PostProcess_NotNpuAccelerated\n");
     hq::npu::CpuPostProcessor pp;
