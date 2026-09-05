@@ -29,6 +29,7 @@ namespace hq::cerberus::native {
 /// Target: achieve >70% peak FP32 on modern CPUs (AVX-512 friendly).
 [[nodiscard]] std::expected<void, std::string> kernel_matmul_blocked(
     const float* A, const float* B, float* C,
-    std::size_t M, std::size_t N, std::size_t K);
+    std::size_t M, std::size_t N, std::size_t K,
+    std::size_t block_size = 32);
 
 } // namespace hq::cerberus::native

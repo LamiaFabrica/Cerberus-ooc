@@ -178,8 +178,11 @@ HIPGraphDenoiser::HIPGraphDenoiser(const GraphConfig& cfg)
     : hip_state_{std::make_unique<HipGraphState>()}
     , cfg_{cfg} {
     available_ = is_available();
-    hq_println(std::format("[HIPGraphDenoiser] created (available={}, capture_enabled={})",
-               available_, cfg_.enable_capture));
+    hq_println(std::string("[HIPGraphDenoiser] created (available=")
+               + (available_ ? "true" : "false")
+               + ", capture_enabled="
+               + (cfg_.enable_capture ? "true" : "false")
+               + ")");
 }
 
 HIPGraphDenoiser::~HIPGraphDenoiser() noexcept {
@@ -212,8 +215,8 @@ bool HIPGraphDenoiser::is_available() const noexcept {
 
 void HIPGraphDenoiser::set_scheduler(DEISScheduler* scheduler) {
     scheduler_ = scheduler;
-    hq_println(std::format("[HIPGraphDenoiser] scheduler attached={}",
-               scheduler_ != nullptr));
+    hq_println(std::string("[HIPGraphDenoiser] scheduler attached=")
+               + (scheduler_ != nullptr ? "true" : "false"));
 }
 
 // ===========================================================================

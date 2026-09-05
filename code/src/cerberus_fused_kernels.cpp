@@ -60,69 +60,60 @@ static void micro_kernel_4x4(
     std::size_t kc, std::size_t mr, std::size_t nr, std::size_t nc) {
     float c_reg[MR * NR] = {};
 
-    std::ranges::for_each(
-        std::views::iota(std::size_t{0}, kc),
-        [&](std::size_t k) {
-            std::ranges::for_each(
-                std::views::cartesian_product(
-                    std::views::iota(std::size_t{0}, mr),
-                    std::views::iota(std::size_t{0}, nr)),
-                [&](auto ij) {
-                    auto [i, j] = ij;
-                    c_reg[i * NR + j] += A_panel[i * kc + k] * B_panel[k * nc + j];
-                });
-        });
+    for (std::size_t k = 0; k < kc; ++k) {
+        for (std::size_t i = 0; i < mr; ++i) {
+            const float a = A_panel[i * kc + k];
+            for (std::size_t j = 0; j < nr; ++j) {
+                c_reg[i * NR + j] += a * B_panel[k * nc + j];
+            }
+        }
+    }
 
-    std::ranges::for_each(
-        std::views::cartesian_product(
-            std::views::iota(std::size_t{0}, mr),
-            std::views::iota(std::size_t{0}, nr)),
-        [&](auto ij) {
-            auto [i, j] = ij;
+    for (std::size_t i = 0; i < mr; ++i) {
+        for (std::size_t j = 0; j < nr; ++j) {
             C_block[i * ldc + j] += c_reg[i * NR + j];
-        });
+        }
+    }
 }
 
 std::expected<void, std::string> kernel_matmul_blocked(
     const float* A, const float* B, float* C,
-    std::size_t M, std::size_t N, std::size_t K) {
+    std::size_t M, std::size_t N, std::size_t K,
+    std::size_t block_size) {
     if (!A || !B || !C)
         return std::unexpected{"null pointer"};
     if (M == 0 || N == 0 || K == 0)
         return std::unexpected{"empty dimension"};
 
+    // Keep block dimensions sensible even if caller passes block_size=0.
+    const std::size_t MC_block = block_size ? block_size : 32;
+    const std::size_t NC_block = block_size ? block_size : 32;
+    const std::size_t KC_block = block_size ? block_size : 32;
+    constexpr std::size_t MR = 4;
+    constexpr std::size_t NR = 4;
+
     // Zero C
     std::memset(C, 0, M * N * sizeof(float));
 
     // Blocked iteration
-    for (std::size_t j = 0; j < N; j += NC) {
-        std::size_t nc = std::min(NC, N - j);
-        for (std::size_t k = 0; k < K; k += KC) {
-            std::size_t kc = std::min(KC, K - k);
-            for (std::size_t i = 0; i < M; i += MC) {
-                std::size_t mc = std::min(MC, M - i);
+    for (std::size_t j = 0; j < N; j += NC_block) {
+        std::size_t nc = std::min(NC_block, N - j);
+        for (std::size_t k = 0; k < K; k += KC_block) {
+            std::size_t kc = std::min(KC_block, K - k);
+            for (std::size_t i = 0; i < M; i += MC_block) {
+                std::size_t mc = std::min(MC_block, M - i);
 
                 // Pack B panel: [kc x nc] row-major
                 std::vector<float> B_panel(kc * nc);
-                std::ranges::for_each(
-                    std::views::cartesian_product(
-                        std::views::iota(std::size_t{0}, kc),
-                        std::views::iota(std::size_t{0}, nc)),
-                    [&](auto idx) {
-                        auto [kk, jj] = idx;
+                for (std::size_t kk = 0; kk < kc; ++kk)
+                    for (std::size_t jj = 0; jj < nc; ++jj)
                         B_panel[kk * nc + jj] = B[(k + kk) * N + (j + jj)];
-                    });
 
                 // Pack A panel: [mc x kc] row-major
                 std::vector<float> A_panel(mc * kc);
-                std::ranges::for_each(
-                    std::views::cartesian_product(
-                        std::views::iota(std::size_t{0}, mc),
-                        std::views::iota(std::size_t{0}, kc)),
-                    [&](auto idx) {
-                        auto [ii, kk] = idx;
+                for (std::size_t ii = 0; ii < mc; ++ii)
+                    for (std::size_t kk = 0; kk < kc; ++kk)
                         A_panel[ii * kc + kk] = A[(i + ii) * K + (k + kk)];
-                    });
 
                 // Micro-kernel loop
                 for (std::size_t ii = 0; ii < mc; ii += MR) {

@@ -37,8 +37,8 @@
 
 #ifdef UM790_HAS_HIP
 #include <hip/hip_runtime_api.h>
-#include <format>
 #endif
+#include <format>
 
 extern "C" std::size_t hq_safe_write(int fd, const char* data, std::size_t len);
 
@@ -295,9 +295,9 @@ cerberus_status_t cerberus_init(void) {
     gs.sessions.reserve(kMaxSessions);
     gs.initialized = true;
 
-    printf("[cerberus] initialized: hailo=%d gpu=%d cpu=1\n",
+    hq_println(std::format("[cerberus] initialized: hailo={} gpu={} cpu=1",
            gs.hailo_available ? 1 : 0,
-           gs.gpu_available ? 1 : 0);
+           gs.gpu_available ? 1 : 0));
 
     return CERBERUS_OK;
 }
@@ -327,7 +327,7 @@ cerberus_status_t cerberus_shutdown(void) {
     gs.hailo_available = false;
     gs.gpu_available = false;
 
-    printf("[cerberus] shutdown complete\n");
+    hq_println("[cerberus] shutdown complete");
     return CERBERUS_OK;
 }
 
@@ -656,7 +656,7 @@ cerberus_status_t cerberus_create_session(
         gs.sessions.push_back(std::move(ss));
         *session = gs.sessions.back().handle;
 
-        printf("[cerberus] session created: handle=%p\n", *session);
+        hq_println(std::format("[cerberus] session created: handle={}", reinterpret_cast<std::uintptr_t>(*session)));
         return CERBERUS_OK;
 
     } catch (const std::exception& e) {
@@ -682,7 +682,7 @@ cerberus_status_t cerberus_destroy_session(cerberus_handle_t session) {
             it->npu_pipeline.reset();
             it->active = false;
             gs.sessions.erase(it);
-            printf("[cerberus] session destroyed: handle=%p\n", session);
+            hq_println(std::format("[cerberus] session destroyed: handle={}", reinterpret_cast<std::uintptr_t>(session)));
             return CERBERUS_OK;
         }
     }
@@ -805,8 +805,7 @@ cerberus_status_t cerberus_alloc_pinned(size_t bytes, void** ptr) {
 #if defined(UM790_HAS_HIP)
     hipError_t err = hipHostMalloc(ptr, bytes, hipHostMallocPortable);
     if (err != hipSuccess) {
-        printf("[cerberus] hipHostMalloc failed (code=%d), falling back to "
-               "aligned_alloc\n", static_cast<int>(err));
+        hq_println(std::format("[cerberus] hipHostMalloc failed (code={}), falling back to aligned_alloc", static_cast<int>(err)));
 #ifdef _WIN32
         *ptr = _aligned_malloc(((bytes + 255) / 256) * 256, 256);
 #else

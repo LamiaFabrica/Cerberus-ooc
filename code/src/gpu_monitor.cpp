@@ -193,12 +193,10 @@ std::expected<void, GPUErrorInfo> GPUMonitor::initialize() {
 #endif
                     backend_     = Backend::NVML;
                     initialized_ = true;
-                    hq_println(std::format("[GPUMonitor] Initialized with NVML backend (device {})",
-                               device_index_));
+                    hq_println("[GPUMonitor] Initialized with NVML backend (device " + std::to_string(device_index_) + ")");
                     return {};
                 }
-                hq_println(std::format("[GPUMonitor] NVML device {} handle failed (status={})",
-                       device_index_, static_cast<int>(nr)));
+                hq_println("[GPUMonitor] NVML device " + std::to_string(device_index_) + " handle failed (status=" + std::to_string(static_cast<int>(nr)) + ")");
             } else {
                 hq_println(std::format("[GPUMonitor] NVML device count query failed or no devices (status={}, count={})",
                            static_cast<int>(nr), device_count));

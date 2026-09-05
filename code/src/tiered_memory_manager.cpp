@@ -344,10 +344,6 @@ TieredMemoryManager::~TieredMemoryManager() noexcept {
 }
 
 void TieredMemoryManager::reset_for_testing() noexcept {
-#ifndef CERBERUS_TESTING
-    // No-op in production builds to avoid accidental data loss.
-    return;
-#endif
     if (!impl_) return;
     auto& m = *impl_;
 
