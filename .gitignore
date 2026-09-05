@@ -111,3 +111,6 @@ node_modules/
 # LFS pointer files that should stay local
 # ---------------------------------------------------------------------------
 # (If LFS is used, pointers are tracked; actual objects are not)
+
+# vendored onnxruntime binaries: too large for git (stripped from branch history 05/09/2026)
+third_party/onnxruntime/
