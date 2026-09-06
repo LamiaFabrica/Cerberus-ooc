@@ -1,7 +1,0 @@
-MAIN_START
-[PROPUP] propup_tiered_memory passed in 0.55419921875 ms
-[PROPUP] propup_coordinator_memory_loop passed in 0.08740234375 ms
-[PROPUP] propup_coordinator_tier_decisions passed in 0.028564453125 ms
-[PROPUP] propup_compile_graph_analysis passed in 0.00439453125 ms
-[PROPUP] propup_kernel_matmul passed in 0.000732421875 ms
-[PROPUP] propup_kernel_elementwise passed in 0.000732421875 ms

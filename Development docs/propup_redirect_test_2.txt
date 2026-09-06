@@ -1,3 +1,0 @@
-The requested API version [21] is not available, only API versions [1, 17] are supported in this build. Current ORT Version is: 1.17.1
-[TieredMemory] Hot=off Warm=on(RAM-fallback) Cool=on Cold=/tmp/cerberus_cold
-[PROPUP] propup_tiered_memory passed in 0.518555 ms

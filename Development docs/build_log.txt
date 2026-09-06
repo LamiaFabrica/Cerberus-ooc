@@ -1,3 +1,0 @@
-[ 92%] Built target um790_pipeline
-[ 96%] Built target cerberus_npu
-[100%] Built target david_propup_engine

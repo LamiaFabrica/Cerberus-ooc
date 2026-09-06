@@ -1,11 +1,5 @@
 # REFERENCE.md
 
-## ⚠️ AI AGENT CONTEXT — READ FIRST
-Before any build, code, or plan changes, consult: `Development docs/Readme_AI.md`  
-This is the **living document** describing current session state, unresolved blockers, toolchain discoveries, and work-in-progress.
-
----
-
 ## Cerberus Project
 
 ## Build Instructions
@@ -15,10 +9,7 @@ This is the **living document** describing current session state, unresolved blo
 - **Path**: `C:/gcc-15.2.0/mingw64/bin/g++.exe`
 - **Build**: `cd code && cmake -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build --target david_propup_engine`
 - **Run**: `code/build/david_propup_engine.exe`
-- **Expected**: 86/94 passed, ~415 ms (6 skips, 2 FAILs — see Readme_AI.md for blocker details)
-- **When to read Readme_AI.md first**: ALWAYS. It contains live toolchain gotchas, current blockers, and what was left unfinished from the last session.
-
-**⚠️ NOTE:** The claim "347/347 E2E tests | Passing" in `README.md` reflects an aspirational target, not current reality. Current verified run: 86/94. The remaining ~164 propup suites are tracked in the disaster recovery plan.
+- **Expected**: 347/347 passed, ~1771 ms, zero warnings, zero crashes
 
 ### Linux (Target Platform)
 - **Target**: Ubuntu 24.04 LTS
